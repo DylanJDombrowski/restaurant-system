@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase, generateOrderNumber } from "@/lib/supabase/client";
+import { supabaseServer } from "@/lib/supabase/server";
 import { InsertOrder, OrderWithItems, ApiResponse } from "@/lib/types";
 
 export async function GET(
@@ -13,7 +13,7 @@ export async function GET(
       ? parseInt(searchParams.get("limit")!)
       : 50;
 
-    let query = supabase
+    let query = supabaseServer
       .from("orders")
       .select(
         `
@@ -39,6 +39,7 @@ export async function GET(
     const { data, error } = await query;
 
     if (error) {
+      console.error("Database error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -56,7 +57,11 @@ export async function POST(
   request: NextRequest
 ): Promise<NextResponse<ApiResponse<OrderWithItems>>> {
   try {
+    console.log("Creating order - request received");
+
     const body = await request.json();
+    console.log("Request body:", body);
+
     const { orderData, orderItems } = body as {
       orderData: Omit<InsertOrder, "order_number">;
       orderItems: Array<{
@@ -68,7 +73,12 @@ export async function POST(
     };
 
     // Generate order number
-    const orderNumber = generateOrderNumber();
+    const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${Math.floor(
+      Math.random() * 100
+    )
+      .toString()
+      .padStart(2, "0")}`;
+    console.log("Generated order number:", orderNumber);
 
     // Calculate totals
     const subtotal = orderItems.reduce(
@@ -80,26 +90,33 @@ export async function POST(
     const deliveryFee = orderData.order_type === "delivery" ? 3.99 : 0;
     const total = subtotal + taxAmount + deliveryFee;
 
+    console.log("Order totals:", { subtotal, taxAmount, deliveryFee, total });
+
     // Create order
-    const { data: order, error: orderError } = await supabase
+    const orderToInsert = {
+      ...orderData,
+      order_number: orderNumber,
+      subtotal,
+      tax_amount: taxAmount,
+      delivery_fee: deliveryFee,
+      total,
+      status: "pending" as const,
+    };
+
+    console.log("Creating order with data:", orderToInsert);
+
+    const { data: order, error: orderError } = await supabaseServer
       .from("orders")
-      .insert([
-        {
-          ...orderData,
-          order_number: orderNumber,
-          subtotal,
-          tax_amount: taxAmount,
-          delivery_fee: deliveryFee,
-          total,
-          status: "pending",
-        },
-      ])
+      .insert([orderToInsert])
       .select()
       .single();
 
     if (orderError) {
+      console.error("Error creating order:", orderError);
       return NextResponse.json({ error: orderError.message }, { status: 500 });
     }
+
+    console.log("Order created successfully:", order);
 
     // Create order items
     const orderItemsData = orderItems.map((item) => ({
@@ -108,21 +125,26 @@ export async function POST(
       quantity: item.quantity,
       unit_price: item.unitPrice,
       total_price: item.unitPrice * item.quantity,
-      special_instructions: item.specialInstructions,
+      special_instructions: item.specialInstructions || null,
     }));
 
-    const { error: itemsError } = await supabase
+    console.log("Creating order items:", orderItemsData);
+
+    const { error: itemsError } = await supabaseServer
       .from("order_items")
       .insert(orderItemsData);
 
     if (itemsError) {
+      console.error("Error creating order items:", itemsError);
       // If order items creation fails, delete the order
-      await supabase.from("orders").delete().eq("id", order.id);
+      await supabaseServer.from("orders").delete().eq("id", order.id);
       return NextResponse.json({ error: itemsError.message }, { status: 500 });
     }
 
+    console.log("Order items created successfully");
+
     // Fetch complete order with items
-    const { data: completeOrder, error: fetchError } = await supabase
+    const { data: completeOrder, error: fetchError } = await supabaseServer
       .from("orders")
       .select(
         `
@@ -137,12 +159,15 @@ export async function POST(
       .single();
 
     if (fetchError) {
+      console.error("Error fetching complete order:", fetchError);
       return NextResponse.json({ error: fetchError.message }, { status: 500 });
     }
 
+    console.log("Complete order fetched:", completeOrder);
+
     return NextResponse.json({ data: completeOrder }, { status: 201 });
   } catch (error) {
-    console.error("Error creating order:", error);
+    console.error("Error in order creation:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
