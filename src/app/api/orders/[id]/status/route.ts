@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { OrderStatus, ApiResponse, Order } from "@/lib/types";
 
+interface RouteParams {
+  params: { id: string };
+}
+
 export async function PATCH(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteParams
 ): Promise<NextResponse<ApiResponse<Order>>> {
   try {
     const { status, notes } = (await request.json()) as {
@@ -16,7 +20,7 @@ export async function PATCH(
     const { data: order, error } = await supabaseServer
       .from("orders")
       .update({ status })
-      .eq("id", context.params.id)
+      .eq("id", params.id)
       .select()
       .single();
 
@@ -27,7 +31,7 @@ export async function PATCH(
     // Log the status change with notes (for future audit trail)
     if (notes) {
       console.log(
-        `Order ${context.params.id} status changed to ${status}. Notes: ${notes}`
+        `Order ${params.id} status changed to ${status}. Notes: ${notes}`
       );
     }
 
