@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase/client";
+import { supabaseServer } from "@/lib/supabase/server";
 import { OrderStatus, ApiResponse, Order } from "@/lib/types";
 
 export async function PATCH(
@@ -7,14 +7,13 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ): Promise<NextResponse<ApiResponse<Order>>> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { status, notes } = (await request.json()) as {
       status: OrderStatus;
       notes?: string;
     };
 
     // Update order status
-    const { data: order, error } = await supabase
+    const { data: order, error } = await supabaseServer
       .from("orders")
       .update({ status })
       .eq("id", params.id)
@@ -23,6 +22,13 @@ export async function PATCH(
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Log the status change with notes (for future audit trail)
+    if (notes) {
+      console.log(
+        `Order ${params.id} status changed to ${status}. Notes: ${notes}`
+      );
     }
 
     return NextResponse.json({ data: order });
