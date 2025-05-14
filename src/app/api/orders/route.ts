@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase, generateOrderNumber } from "@/src/lib/supabase/client";
-import { InsertOrder, OrderWithItems, ApiResponse } from "@/src/lib/types";
+import { supabase, generateOrderNumber } from "@/lib/supabase/client";
+import { InsertOrder, OrderWithItems, ApiResponse } from "@/lib/types";
 
 export async function GET(
   request: NextRequest

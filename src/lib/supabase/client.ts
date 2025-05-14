@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { Database } from "@/src/lib/types/database.types";
+import { Database } from "@/lib/types/database.types";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -24,4 +24,17 @@ export function generateOrderNumber(): string {
     .toString()
     .padStart(2, "0");
   return `ORD-${timestamp}-${random}`;
+}
+
+export async function testConnection() {
+  try {
+    const { error } = await supabase.from("restaurants").select("id").limit(1);
+
+    return { success: !error, error: error?.message };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
 }

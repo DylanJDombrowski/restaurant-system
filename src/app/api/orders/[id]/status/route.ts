@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/src/lib/supabase/client";
-import { OrderStatus, ApiResponse, Order } from "@/src/lib/types";
+import { supabase } from "@/lib/supabase/client";
+import { OrderStatus, ApiResponse, Order } from "@/lib/types";
 
 export async function PATCH(
   request: NextRequest,

@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/src/lib/supabase/client";
-import { MenuItemWithCategory, ApiResponse } from "@/src/lib/types";
+import { supabaseServer } from "@/lib/supabase/server";
 
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse<ApiResponse<MenuItemWithCategory[]>>> {
+export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const restaurantId = searchParams.get("restaurant_id");
     const categoryId = searchParams.get("category_id");
     const availableOnly = searchParams.get("available_only") === "true";
 
-    let query = supabase
+    let query = supabaseServer
       .from("menu_items")
       .select(
         `
@@ -36,6 +33,7 @@ export async function GET(
     const { data, error } = await query;
 
     if (error) {
+      console.error("Menu query error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/src/lib/supabase/client";
-import { MenuCategory, ApiResponse } from "@/src/lib/types";
+import { supabase } from "@/lib/supabase/client";
+import { MenuCategory, ApiResponse } from "@/lib/types";
 
 export async function GET(
   request: NextRequest
