@@ -4,7 +4,7 @@ import { OrderStatus, ApiResponse, Order } from "@/lib/types";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ): Promise<NextResponse<ApiResponse<Order>>> {
   try {
     const { status, notes } = (await request.json()) as {
@@ -16,7 +16,7 @@ export async function PATCH(
     const { data: order, error } = await supabaseServer
       .from("orders")
       .update({ status })
-      .eq("id", params.id)
+      .eq("id", context.params.id)
       .select()
       .single();
 
@@ -27,7 +27,7 @@ export async function PATCH(
     // Log the status change with notes (for future audit trail)
     if (notes) {
       console.log(
-        `Order ${params.id} status changed to ${status}. Notes: ${notes}`
+        `Order ${context.params.id} status changed to ${status}. Notes: ${notes}`
       );
     }
 
