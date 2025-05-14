@@ -1,51 +1,52 @@
-"use client";
-
 import { supabase } from "@/src/lib/supabase/client";
-import { useEffect, useState } from "react";
+import Link from "next/link";
 
-type StateType = {
-  id: number;
-  name: string;
-  created_at: string;
-  // Add other fields as needed based on your "restaurants" table
-};
-
-export default function Home() {
-  const [restaurant, setRestaurant] = useState<StateType | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchRestaurant() {
-      const { data, error } = await supabase
-        .from("restaurants")
-        .select("*")
-        .single();
-
-      if (error) {
-        console.error("Error:", error);
-      } else {
-        setRestaurant(data);
-      }
-      setLoading(false);
-    }
-
-    fetchRestaurant();
-  }, []);
-
-  if (loading) return <div>Loading...</div>;
+export default async function HomePage() {
+  // Fetch restaurant data server-side
+  const { data: restaurant } = await supabase
+    .from("restaurants")
+    .select("*")
+    .single();
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">
-        Welcome to {restaurant?.name || "Your Restaurant"}
-      </h1>
-      <p className="mt-4">Restaurant ID: {restaurant?.id}</p>
-      <p className="text-sm text-gray-600">
-        Created:{" "}
-        {restaurant?.created_at
-          ? new Date(restaurant.created_at).toLocaleDateString()
-          : "N/A"}
-      </p>
+    <div>
+      {/* Hero Section */}
+      <section className="bg-red-50 py-20">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <h1 className="text-5xl font-bold text-gray-900 mb-6">
+            Welcome to {restaurant?.name || "Pizza Mia"}
+          </h1>
+          <p className="text-xl text-gray-600 mb-8">
+            Authentic Italian pizza made with love in New Lenox
+          </p>
+          <Link
+            href="/customer/order"
+            className="bg-red-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-red-700 transition"
+          >
+            Order Now
+          </Link>
+        </div>
+      </section>
+
+      {/* Quick Stats (shows our database connection works) */}
+      <section className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid md:grid-cols-3 gap-8 text-center">
+            <div>
+              <h3 className="text-3xl font-bold text-red-600">15+</h3>
+              <p className="text-gray-600">Years of Service</p>
+            </div>
+            <div>
+              <h3 className="text-3xl font-bold text-red-600">1000+</h3>
+              <p className="text-gray-600">Happy Customers</p>
+            </div>
+            <div>
+              <h3 className="text-3xl font-bold text-red-600">50+</h3>
+              <p className="text-gray-600">Pizza Varieties</p>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
