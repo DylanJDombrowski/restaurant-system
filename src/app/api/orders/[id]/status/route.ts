@@ -2,15 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { OrderStatus, ApiResponse, Order } from "@/lib/types";
 
-interface RouteParams {
-  params: { id: string };
-}
-
 export async function PATCH(
   request: NextRequest,
-  { params }: RouteParams
+  props: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<Order>>> {
   try {
+    const params = await props.params;
     const { status, notes } = (await request.json()) as {
       status: OrderStatus;
       notes?: string;
