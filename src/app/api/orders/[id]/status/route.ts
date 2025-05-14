@@ -7,7 +7,8 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ): Promise<NextResponse<ApiResponse<Order>>> {
   try {
-    const { status } = (await request.json()) as {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status, notes } = (await request.json()) as {
       status: OrderStatus;
       notes?: string;
     };
