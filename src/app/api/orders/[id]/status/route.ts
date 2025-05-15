@@ -4,14 +4,17 @@ import { OrderStatus, ApiResponse, Order } from "@/lib/types";
 
 export async function PATCH(
   request: NextRequest,
-  props: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<Order>>> {
   try {
-    const params = await props.params;
-    const { status, notes } = (await request.json()) as {
+    const params = await context.params;
+    console.log("Updating order status for ID:", params.id);
+
+    const { status } = (await request.json()) as {
       status: OrderStatus;
-      notes?: string;
     };
+
+    console.log("New status:", status);
 
     // Update order status
     const { data: order, error } = await supabaseServer
@@ -22,16 +25,11 @@ export async function PATCH(
       .single();
 
     if (error) {
+      console.error("Database error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Log the status change with notes (for future audit trail)
-    if (notes) {
-      console.log(
-        `Order ${params.id} status changed to ${status}. Notes: ${notes}`
-      );
-    }
-
+    console.log("Order updated successfully:", order);
     return NextResponse.json({ data: order });
   } catch (error) {
     console.error("Error updating order status:", error);
