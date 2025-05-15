@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getCurrentRestaurant } from "@/lib/supabase/client";
 import { MenuItemWithCategory, Restaurant, OrderWithItems } from "@/lib/types";
 
 export default function StaffOrdersPage() {
@@ -14,13 +13,18 @@ export default function StaffOrdersPage() {
     async function loadData() {
       try {
         setError(null);
-        // Get restaurant
-        const restaurantData = await getCurrentRestaurant();
-        setRestaurant(restaurantData);
+
+        // Get restaurant using API route instead of direct Supabase call
+        const restaurantResponse = await fetch("/api/restaurants");
+        if (!restaurantResponse.ok) {
+          throw new Error(`Restaurant API error: ${restaurantResponse.status}`);
+        }
+        const restaurantData = await restaurantResponse.json();
+        setRestaurant(restaurantData.data);
 
         // Get menu items
         const menuResponse = await fetch(
-          `/api/menu?restaurant_id=${restaurantData.id}&available_only=true`
+          `/api/menu?restaurant_id=${restaurantData.data.id}&available_only=true`
         );
         if (!menuResponse.ok) {
           throw new Error(`Menu API error: ${menuResponse.status}`);
@@ -30,7 +34,7 @@ export default function StaffOrdersPage() {
 
         // Get today's orders
         const ordersResponse = await fetch(
-          `/api/orders?restaurant_id=${restaurantData.id}`
+          `/api/orders?restaurant_id=${restaurantData.data.id}`
         );
         if (!ordersResponse.ok) {
           throw new Error(`Orders API error: ${ordersResponse.status}`);
