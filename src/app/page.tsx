@@ -16,9 +16,7 @@ export default async function HomePage() {
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
             Welcome to {restaurant?.name || "Pizza Mia"}
           </h1>
-          <p className="text-xl text-gray-600 mb-8">
-            Authentic Italian pizza made with love in New Lenox
-          </p>
+          <p className="text-xl text-gray-600 mb-8">PIZZA. CHICKEN. CATERING</p>
           <Link
             href="/customer/order"
             className="bg-red-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-red-700 transition"
