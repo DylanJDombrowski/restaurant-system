@@ -8,10 +8,12 @@ export default function StaffOrdersPage() {
   const [menuItems, setMenuItems] = useState<MenuItemWithCategory[]>([]);
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
+        setError(null);
         // Get restaurant
         const restaurantData = await getCurrentRestaurant();
         setRestaurant(restaurantData);
@@ -20,6 +22,9 @@ export default function StaffOrdersPage() {
         const menuResponse = await fetch(
           `/api/menu?restaurant_id=${restaurantData.id}&available_only=true`
         );
+        if (!menuResponse.ok) {
+          throw new Error(`Menu API error: ${menuResponse.status}`);
+        }
         const menuData = await menuResponse.json();
         setMenuItems(menuData.data || []);
 
@@ -27,10 +32,16 @@ export default function StaffOrdersPage() {
         const ordersResponse = await fetch(
           `/api/orders?restaurant_id=${restaurantData.id}`
         );
+        if (!ordersResponse.ok) {
+          throw new Error(`Orders API error: ${ordersResponse.status}`);
+        }
         const ordersData = await ordersResponse.json();
         setOrders(ordersData.data || []);
       } catch (error) {
         console.error("Error loading data:", error);
+        setError(
+          error instanceof Error ? error.message : "Failed to load data"
+        );
       } finally {
         setLoading(false);
       }
@@ -41,47 +52,91 @@ export default function StaffOrdersPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-lg">Loading menu and orders...</div>
+      <div className="flex justify-center items-center h-96">
+        <div className="text-lg font-semibold">Loading restaurant data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16">
+        <div className="text-red-600 text-lg font-semibold mb-4">
+          Error Loading Data
+        </div>
+        <p className="text-gray-600">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Order Management</h1>
-        <p className="text-gray-600">
-          Restaurant: {restaurant?.name} | Today&apos;s Orders: {orders.length}{" "}
-          | Available Items: {menuItems.length}
-        </p>
+        <h1 className="text-4xl font-bold text-gray-900">
+          Staff Order Management
+        </h1>
+        <div className="mt-2 text-lg text-gray-600">
+          <span className="font-semibold">{restaurant?.name}</span> •
+          <span className="ml-2">
+            Today&apos;s Orders:{" "}
+            <span className="font-semibold text-blue-600">{orders.length}</span>
+          </span>{" "}
+          •
+          <span className="ml-2">
+            Available Items:{" "}
+            <span className="font-semibold text-green-600">
+              {menuItems.length}
+            </span>
+          </span>
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-8">
-        {/* Order Creation */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Create New Order</h2>
-          <OrderCreationForm
-            menuItems={menuItems}
-            restaurantId={restaurant?.id || ""}
-            onOrderCreated={() => {
-              // Refresh orders list
-              window.location.reload();
-            }}
-          />
+      <div className="grid lg:grid-cols-3 gap-8">
+        {/* Order Creation - Takes 2 columns */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 border-b pb-3">
+              Create New Order
+            </h2>
+            <OrderCreationForm
+              menuItems={menuItems}
+              restaurantId={restaurant?.id || ""}
+              onOrderCreated={() => {
+                window.location.reload();
+              }}
+            />
+          </div>
         </div>
 
         {/* Recent Orders */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Recent Orders</h2>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {orders.length === 0 ? (
-              <p className="text-gray-500">No orders yet today</p>
-            ) : (
-              orders
-                .slice(0, 10)
-                .map((order) => <OrderCard key={order.id} order={order} />)
-            )}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 border-b pb-3">
+              Recent Orders
+            </h2>
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {orders.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-400 text-lg">
+                    No orders yet today
+                  </div>
+                  <p className="text-gray-500 text-sm mt-2">
+                    Create your first order!
+                  </p>
+                </div>
+              ) : (
+                orders
+                  .slice(0, 10)
+                  .map((order) => <OrderCard key={order.id} order={order} />)
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -89,7 +144,7 @@ export default function StaffOrdersPage() {
   );
 }
 
-// Order Creation Form Component
+// Order Creation Form Component with Better Styling
 function OrderCreationForm({
   menuItems,
   restaurantId,
@@ -105,6 +160,7 @@ function OrderCreationForm({
       quantity: number;
     }>
   >([]);
+
   const [customerInfo, setCustomerInfo] = useState({
     name: "",
     phone: "",
@@ -196,6 +252,8 @@ function OrderCreationForm({
         specialInstructions: null,
       }));
 
+      console.log("Submitting order:", { orderData, orderItems });
+
       // Submit order
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -203,7 +261,12 @@ function OrderCreationForm({
         body: JSON.stringify({ orderData, orderItems }),
       });
 
-      if (!response.ok) throw new Error("Failed to create order");
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        console.error("Order creation failed:", responseData);
+        throw new Error(responseData.error || "Failed to create order");
+      }
 
       // Reset form
       setSelectedItems([]);
@@ -216,98 +279,132 @@ function OrderCreationForm({
       alert("Order created successfully!");
     } catch (error) {
       console.error("Error creating order:", error);
-      alert("Error creating order. Please try again.");
+      alert(
+        `Error creating order: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const totals = calculateTotal();
+  const canSubmit =
+    selectedItems.length > 0 && customerInfo.name && customerInfo.phone;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Customer Information */}
-      <div>
-        <h3 className="font-semibold mb-3">Customer Information</h3>
-        <div className="space-y-3">
-          <input
-            type="text"
-            placeholder="Customer Name *"
-            value={customerInfo.name}
-            onChange={(e) =>
-              setCustomerInfo((prev) => ({ ...prev, name: e.target.value }))
-            }
-            className="w-full border rounded px-3 py-2"
-            required
-          />
-          <input
-            type="tel"
-            placeholder="Phone Number *"
-            value={customerInfo.phone}
-            onChange={(e) =>
-              setCustomerInfo((prev) => ({ ...prev, phone: e.target.value }))
-            }
-            className="w-full border rounded px-3 py-2"
-            required
-          />
-          <input
-            type="email"
-            placeholder="Email (optional)"
-            value={customerInfo.email}
-            onChange={(e) =>
-              setCustomerInfo((prev) => ({ ...prev, email: e.target.value }))
-            }
-            className="w-full border rounded px-3 py-2"
-          />
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Customer Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Customer Name *
+            </label>
+            <input
+              type="text"
+              placeholder="Enter customer name"
+              value={customerInfo.name}
+              onChange={(e) =>
+                setCustomerInfo((prev) => ({ ...prev, name: e.target.value }))
+              }
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Phone Number *
+            </label>
+            <input
+              type="tel"
+              placeholder="(555) 123-4567"
+              value={customerInfo.phone}
+              onChange={(e) =>
+                setCustomerInfo((prev) => ({ ...prev, phone: e.target.value }))
+              }
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email (optional)
+            </label>
+            <input
+              type="email"
+              placeholder="customer@email.com"
+              value={customerInfo.email}
+              onChange={(e) =>
+                setCustomerInfo((prev) => ({ ...prev, email: e.target.value }))
+              }
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
         </div>
       </div>
 
       {/* Order Type */}
-      <div>
-        <h3 className="font-semibold mb-3">Order Type</h3>
-        <div className="flex gap-4">
-          <label className="flex items-center">
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Type</h3>
+        <div className="flex gap-6">
+          <label className="flex items-center text-lg">
             <input
               type="radio"
               value="pickup"
               checked={orderType === "pickup"}
               onChange={(e) => setOrderType(e.target.value as "pickup")}
-              className="mr-2"
+              className="mr-3 w-5 h-5 text-blue-600"
             />
-            Pickup
+            <span className="font-medium">Pickup</span>
           </label>
-          <label className="flex items-center">
+          <label className="flex items-center text-lg">
             <input
               type="radio"
               value="delivery"
               checked={orderType === "delivery"}
               onChange={(e) => setOrderType(e.target.value as "delivery")}
-              className="mr-2"
+              className="mr-3 w-5 h-5 text-blue-600"
             />
-            Delivery (+$3.99)
+            <span className="font-medium">
+              Delivery <span className="text-gray-600">(+$3.99)</span>
+            </span>
           </label>
         </div>
       </div>
 
       {/* Menu Items */}
       <div>
-        <h3 className="font-semibold mb-3">Menu Items</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Available Menu Items
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-80 overflow-y-auto bg-gray-50 p-4 rounded-lg">
           {menuItems.map((item) => (
-            <div key={item.id} className="border rounded p-3">
+            <div
+              key={item.id}
+              className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+            >
               <div className="flex justify-between items-start">
-                <div>
-                  <h4 className="font-medium">{item.name}</h4>
-                  <p className="text-sm text-gray-600">{item.description}</p>
-                  <p className="text-lg font-bold text-green-600">
+                <div className="flex-1">
+                  <h4 className="font-semibold text-gray-900 text-lg">
+                    {item.name}
+                  </h4>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {item.description}
+                  </p>
+                  <p className="text-xl font-bold text-green-600 mt-2">
                     ${item.base_price}
                   </p>
                 </div>
                 <button
                   onClick={() => addItem(item)}
-                  className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                  className="ml-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
                 >
-                  Add
+                  Add to Order
                 </button>
               </div>
             </div>
@@ -317,39 +414,50 @@ function OrderCreationForm({
 
       {/* Selected Items */}
       {selectedItems.length > 0 && (
-        <div>
-          <h3 className="font-semibold mb-3">Selected Items</h3>
-          <div className="space-y-2">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Order Items
+          </h3>
+          <div className="space-y-3">
             {selectedItems.map((item) => (
               <div
                 key={item.menuItem.id}
-                className="flex justify-between items-center bg-gray-50 p-2 rounded"
+                className="flex justify-between items-center bg-white p-3 rounded-lg border"
               >
-                <span>{item.menuItem.name}</span>
-                <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <span className="font-medium text-gray-900">
+                    {item.menuItem.name}
+                  </span>
+                  <div className="text-sm text-gray-600">
+                    ${item.menuItem.base_price} each
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
                   <button
                     onClick={() =>
                       updateQuantity(item.menuItem.id, item.quantity - 1)
                     }
-                    className="bg-gray-200 px-2 py-1 rounded"
+                    className="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded text-lg font-bold"
                   >
                     -
                   </button>
-                  <span>{item.quantity}</span>
+                  <span className="font-semibold text-lg w-8 text-center">
+                    {item.quantity}
+                  </span>
                   <button
                     onClick={() =>
                       updateQuantity(item.menuItem.id, item.quantity + 1)
                     }
-                    className="bg-gray-200 px-2 py-1 rounded"
+                    className="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded text-lg font-bold"
                   >
                     +
                   </button>
-                  <span className="ml-2">
+                  <span className="font-bold text-lg text-green-600 ml-3 w-20 text-right">
                     ${(item.menuItem.base_price * item.quantity).toFixed(2)}
                   </span>
                   <button
                     onClick={() => removeItem(item.menuItem.id)}
-                    className="bg-red-500 text-white px-2 py-1 rounded ml-2"
+                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded ml-3 font-bold"
                   >
                     ×
                   </button>
@@ -360,44 +468,80 @@ function OrderCreationForm({
         </div>
       )}
 
-      {/* Order Total */}
-      {selectedItems.length > 0 && (
-        <div className="border-t pt-4">
-          <div className="space-y-1">
-            <div className="flex justify-between">
-              <span>Subtotal:</span>
-              <span>${totals.subtotal.toFixed(2)}</span>
+      {/* Order Total and Submit */}
+      <div className="bg-gray-100 border border-gray-300 rounded-lg p-6">
+        <div className="space-y-3">
+          <div className="flex justify-between text-lg">
+            <span>Subtotal:</span>
+            <span className="font-semibold">${totals.subtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-lg">
+            <span>Tax (8%):</span>
+            <span className="font-semibold">${totals.tax.toFixed(2)}</span>
+          </div>
+          {orderType === "delivery" && (
+            <div className="flex justify-between text-lg">
+              <span>Delivery Fee:</span>
+              <span className="font-semibold">
+                ${totals.deliveryFee.toFixed(2)}
+              </span>
             </div>
-            <div className="flex justify-between">
-              <span>Tax (8%):</span>
-              <span>${totals.tax.toFixed(2)}</span>
-            </div>
-            {orderType === "delivery" && (
-              <div className="flex justify-between">
-                <span>Delivery Fee:</span>
-                <span>${totals.deliveryFee.toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between font-bold text-lg">
+          )}
+          <div className="border-t border-gray-400 pt-3">
+            <div className="flex justify-between text-xl font-bold">
               <span>Total:</span>
-              <span>${totals.total.toFixed(2)}</span>
+              <span className="text-green-600">${totals.total.toFixed(2)}</span>
             </div>
           </div>
-
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting || selectedItems.length === 0}
-            className="w-full mt-4 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
-          >
-            {isSubmitting ? "Creating Order..." : "Create Order"}
-          </button>
         </div>
-      )}
+
+        <button
+          onClick={handleSubmit}
+          disabled={isSubmitting || !canSubmit}
+          className={`w-full mt-6 py-4 rounded-lg text-lg font-bold transition-colors ${
+            canSubmit && !isSubmitting
+              ? "bg-green-600 hover:bg-green-700 text-white"
+              : "bg-gray-400 text-gray-600 cursor-not-allowed"
+          }`}
+        >
+          {isSubmitting ? (
+            <span className="flex items-center justify-center">
+              <svg
+                className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              Creating Order...
+            </span>
+          ) : canSubmit ? (
+            "Create Order"
+          ) : selectedItems.length === 0 ? (
+            "Add items to create order"
+          ) : (
+            "Fill in customer information"
+          )}
+        </button>
+      </div>
     </div>
   );
 }
 
-// Order Card Component
+// Order Card Component with Better Styling
 function OrderCard({ order }: { order: OrderWithItems }) {
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -422,39 +566,49 @@ function OrderCard({ order }: { order: OrderWithItems }) {
     }
   };
 
+  const statusColors = {
+    pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
+    confirmed: "bg-blue-100 text-blue-800 border-blue-200",
+    preparing: "bg-orange-100 text-orange-800 border-orange-200",
+    ready: "bg-green-100 text-green-800 border-green-200",
+    completed: "bg-gray-100 text-gray-800 border-gray-200",
+    cancelled: "bg-red-100 text-red-800 border-red-200",
+  };
+
   return (
-    <div className="border rounded-lg p-4">
-      <div className="flex justify-between items-start mb-2">
-        <h4 className="font-semibold">Order #{order.order_number}</h4>
+    <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+      <div className="flex justify-between items-start mb-3">
+        <h4 className="font-bold text-lg">#{order.order_number}</h4>
         <span
-          className={`px-2 py-1 rounded text-sm ${
-            order.status === "pending"
-              ? "bg-yellow-100 text-yellow-800"
-              : order.status === "confirmed"
-              ? "bg-blue-100 text-blue-800"
-              : order.status === "preparing"
-              ? "bg-orange-100 text-orange-800"
-              : order.status === "ready"
-              ? "bg-green-100 text-green-800"
-              : "bg-gray-100 text-gray-800"
+          className={`px-3 py-1 rounded-full text-sm font-semibold border ${
+            statusColors[order.status as keyof typeof statusColors]
           }`}
         >
-          {order.status}
+          {order.status.toUpperCase()}
         </span>
       </div>
 
-      <p className="text-sm text-gray-600">
-        {order.customer_name} • {order.customer_phone}
-      </p>
-      <p className="text-sm text-gray-600">
-        {order.order_type} • ${order.total}
-      </p>
+      <div className="space-y-1 text-sm text-gray-600">
+        <p>
+          <span className="font-medium">Customer:</span> {order.customer_name}
+        </p>
+        <p>
+          <span className="font-medium">Phone:</span> {order.customer_phone}
+        </p>
+        <p>
+          <span className="font-medium">Type:</span> {order.order_type}
+        </p>
+        <p>
+          <span className="font-medium">Total:</span>{" "}
+          <span className="text-green-600 font-bold">${order.total}</span>
+        </p>
+      </div>
 
       {order.status === "pending" && (
         <button
           onClick={() => updateOrderStatus("confirmed")}
           disabled={updatingStatus}
-          className="mt-2 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
+          className="mt-3 w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
         >
           {updatingStatus ? "Updating..." : "Confirm Order"}
         </button>
