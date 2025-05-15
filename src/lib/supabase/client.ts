@@ -6,17 +6,6 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey);
 
-// Helper function to get the current restaurant
-export async function getCurrentRestaurant() {
-  const { data, error } = await supabase
-    .from("restaurants")
-    .select("*")
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
 // Helper function to generate order numbers
 export function generateOrderNumber(): string {
   const timestamp = Date.now().toString().slice(-6);
@@ -26,6 +15,7 @@ export function generateOrderNumber(): string {
   return `ORD-${timestamp}-${random}`;
 }
 
+// Keep only the test connection function for debugging
 export async function testConnection() {
   try {
     const { error } = await supabase.from("restaurants").select("id").limit(1);

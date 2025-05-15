@@ -1,27 +1,45 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getCurrentRestaurant } from "@/lib/supabase/client";
 import { OrderWithItems } from "@/lib/types";
 
 export default function KitchenDisplay() {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadOrders() {
       try {
-        const restaurant = await getCurrentRestaurant();
+        setError(null);
 
-        // Fix: Use proper query format for multiple statuses
+        // Get restaurant using API route instead of direct Supabase call
+        const restaurantResponse = await fetch("/api/restaurants");
+        if (!restaurantResponse.ok) {
+          throw new Error(`Restaurant API error: ${restaurantResponse.status}`);
+        }
+        const restaurantData = await restaurantResponse.json();
+        const restaurant = restaurantData.data;
+
+        console.log("Kitchen loading orders for restaurant:", restaurant.id);
+
+        // Get orders with confirmed/preparing status
         const response = await fetch(
           `/api/orders?restaurant_id=${restaurant.id}&statuses=confirmed,preparing`
         );
+
+        if (!response.ok) {
+          throw new Error(`Orders API error: ${response.status}`);
+        }
+
         const data = await response.json();
 
         console.log("Kitchen orders loaded:", data.data);
         setOrders(data.data || []);
       } catch (error) {
         console.error("Error loading orders:", error);
+        setError(
+          error instanceof Error ? error.message : "Failed to load orders"
+        );
       } finally {
         setLoading(false);
       }
@@ -29,7 +47,7 @@ export default function KitchenDisplay() {
 
     loadOrders();
 
-    // Refresh orders every 10 seconds (more frequent for kitchen)
+    // Refresh orders every 10 seconds
     const interval = setInterval(loadOrders, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -55,11 +73,11 @@ export default function KitchenDisplay() {
       console.log("Order marked ready successfully");
     } catch (error) {
       console.error("Error updating order:", error);
-      if (error instanceof Error) {
-        alert(`Error updating order: ${error.message}`);
-      } else {
-        alert("Error updating order: Unknown error");
-      }
+      alert(
+        `Error updating order: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   };
 
@@ -67,6 +85,22 @@ export default function KitchenDisplay() {
     return (
       <div className="flex justify-center items-center h-64 text-white">
         <div className="text-lg">Loading kitchen orders...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16 text-white">
+        <div className="text-6xl mb-4">⚠️</div>
+        <h2 className="text-2xl text-red-400">Error Loading Kitchen Display</h2>
+        <p className="text-gray-400 mt-2">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }
