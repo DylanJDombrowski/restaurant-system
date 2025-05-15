@@ -162,6 +162,7 @@ function OrderCreationForm({
     Array<{
       menuItem: MenuItemWithCategory;
       quantity: number;
+      justAdded?: boolean; // For UI feedback
     }>
   >([]);
 
@@ -172,6 +173,7 @@ function OrderCreationForm({
   });
   const [orderType, setOrderType] = useState<"pickup" | "delivery">("pickup");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
 
   const addItem = (menuItem: MenuItemWithCategory) => {
     setSelectedItems((prev) => {
@@ -179,12 +181,22 @@ function OrderCreationForm({
       if (existing) {
         return prev.map((item) =>
           item.menuItem.id === menuItem.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + 1, justAdded: true }
             : item
         );
       }
-      return [...prev, { menuItem, quantity: 1 }];
+      return [...prev, { menuItem, quantity: 1, justAdded: true }];
     });
+
+    // Show visual feedback
+    setRecentlyAdded(menuItem.id);
+    setTimeout(() => {
+      setRecentlyAdded(null);
+      // Remove the justAdded flag after animation
+      setSelectedItems((prev) =>
+        prev.map((item) => ({ ...item, justAdded: false }))
+      );
+    }, 1000);
   };
 
   const removeItem = (menuItemId: string) => {
@@ -200,7 +212,9 @@ function OrderCreationForm({
     }
     setSelectedItems((prev) =>
       prev.map((item) =>
-        item.menuItem.id === menuItemId ? { ...item, quantity } : item
+        item.menuItem.id === menuItemId
+          ? { ...item, quantity, justAdded: false }
+          : item
       )
     );
   };
@@ -381,7 +395,7 @@ function OrderCreationForm({
         </div>
       </div>
 
-      {/* Menu Items */}
+      {/* Menu Items with Enhanced UI */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
           Available Menu Items
@@ -390,7 +404,11 @@ function OrderCreationForm({
           {menuItems.map((item) => (
             <div
               key={item.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+              className={`bg-white border rounded-lg p-4 transition-all duration-300 ${
+                recentlyAdded === item.id
+                  ? "border-green-500 shadow-lg transform scale-105"
+                  : "border-gray-200 hover:shadow-md"
+              }`}
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1">
@@ -406,9 +424,13 @@ function OrderCreationForm({
                 </div>
                 <button
                   onClick={() => addItem(item)}
-                  className="ml-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                  className={`ml-4 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    recentlyAdded === item.id
+                      ? "bg-green-600 text-white"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
                 >
-                  Add to Order
+                  {recentlyAdded === item.id ? "Added!" : "Add to Order"}
                 </button>
               </div>
             </div>
@@ -416,17 +438,21 @@ function OrderCreationForm({
         </div>
       </div>
 
-      {/* Selected Items */}
+      {/* Selected Items with Animation */}
       {selectedItems.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Order Items
+            Order Items ({selectedItems.length})
           </h3>
           <div className="space-y-3">
             {selectedItems.map((item) => (
               <div
                 key={item.menuItem.id}
-                className="flex justify-between items-center bg-white p-3 rounded-lg border"
+                className={`flex justify-between items-center bg-white p-3 rounded-lg border transition-all duration-300 ${
+                  item.justAdded
+                    ? "border-green-500 bg-green-50"
+                    : "border-gray-200"
+                }`}
               >
                 <div className="flex-1">
                   <span className="font-medium text-gray-900">
@@ -502,9 +528,9 @@ function OrderCreationForm({
         <button
           onClick={handleSubmit}
           disabled={isSubmitting || !canSubmit}
-          className={`w-full mt-6 py-4 rounded-lg text-lg font-bold transition-colors ${
+          className={`w-full mt-6 py-4 rounded-lg text-lg font-bold transition-all duration-200 ${
             canSubmit && !isSubmitting
-              ? "bg-green-600 hover:bg-green-700 text-white"
+              ? "bg-green-600 hover:bg-green-700 text-white transform hover:scale-105"
               : "bg-gray-400 text-gray-600 cursor-not-allowed"
           }`}
         >
