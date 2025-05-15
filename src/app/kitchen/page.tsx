@@ -12,11 +12,13 @@ export default function KitchenDisplay() {
       try {
         const restaurant = await getCurrentRestaurant();
 
-        // Get orders that need kitchen attention
+        // Fix: Use proper query format for multiple statuses
         const response = await fetch(
-          `/api/orders?restaurant_id=${restaurant.id}&status=confirmed&status=preparing`
+          `/api/orders?restaurant_id=${restaurant.id}&statuses=confirmed,preparing`
         );
         const data = await response.json();
+
+        console.log("Kitchen orders loaded:", data.data);
         setOrders(data.data || []);
       } catch (error) {
         console.error("Error loading orders:", error);
@@ -27,25 +29,37 @@ export default function KitchenDisplay() {
 
     loadOrders();
 
-    // Refresh orders every 30 seconds
-    const interval = setInterval(loadOrders, 30000);
+    // Refresh orders every 10 seconds (more frequent for kitchen)
+    const interval = setInterval(loadOrders, 10000);
     return () => clearInterval(interval);
   }, []);
 
   const markOrderReady = async (orderId: string) => {
     try {
+      console.log("Marking order ready:", orderId);
+
       const response = await fetch(`/api/orders/${orderId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "ready" }),
       });
 
-      if (!response.ok) throw new Error("Failed to update order");
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Failed to update order:", errorData);
+        throw new Error(errorData.error || "Failed to update order");
+      }
 
       // Remove order from display
       setOrders((prev) => prev.filter((order) => order.id !== orderId));
+      console.log("Order marked ready successfully");
     } catch (error) {
       console.error("Error updating order:", error);
+      if (error instanceof Error) {
+        alert(`Error updating order: ${error.message}`);
+      } else {
+        alert("Error updating order: Unknown error");
+      }
     }
   };
 
@@ -68,6 +82,12 @@ export default function KitchenDisplay() {
           <span className="bg-blue-600 px-3 py-1 rounded-full">
             {orders.length} Orders
           </span>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded-full text-sm"
+          >
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -76,6 +96,11 @@ export default function KitchenDisplay() {
           <div className="text-6xl mb-4">🍕</div>
           <h2 className="text-2xl text-gray-400">All caught up!</h2>
           <p className="text-gray-500 mt-2">No orders in queue</p>
+          <p className="text-gray-600 mt-4 text-sm">
+            Looking for orders with status:{" "}
+            <span className="font-mono">confirmed</span> or{" "}
+            <span className="font-mono">preparing</span>
+          </p>
         </div>
       ) : (
         <div className="grid lg:grid-cols-3 gap-6">
@@ -111,7 +136,7 @@ function KitchenOrderCard({
         </h3>
         <div className="text-right">
           <span
-            className={`bg-yellow-600 px-2 py-1 rounded text-sm ${
+            className={`px-2 py-1 rounded text-sm ${
               orderAge > 20
                 ? "bg-red-600"
                 : orderAge > 15
@@ -121,7 +146,9 @@ function KitchenOrderCard({
           >
             {orderAge} min ago
           </span>
-          <p className="text-gray-400 text-sm mt-1">{order.order_type}</p>
+          <p className="text-gray-400 text-sm mt-1">
+            {order.order_type} • {order.status.toUpperCase()}
+          </p>
         </div>
       </div>
 
