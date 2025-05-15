@@ -102,6 +102,82 @@ export interface Database {
           updated_at?: string;
         };
       };
+      customer_addresses: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          customer_id: string;
+          customer_phone: string;
+          customer_name: string;
+          customer_email: string | null;
+          address: string;
+          city: string;
+          zip: string;
+          delivery_instructions: string | null;
+          is_default: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          restaurant_id: string;
+          customer_id: string;
+          customer_phone: string;
+          customer_name: string;
+          customer_email?: string | null;
+          address: string;
+          city: string;
+          zip: string;
+          delivery_instructions?: string | null;
+          is_default?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          restaurant_id?: string;
+          customer_id?: string;
+          customer_phone?: string;
+          customer_name?: string;
+          customer_email?: string | null;
+          address?: string;
+          city?: string;
+          zip?: string;
+          delivery_instructions?: string | null;
+          is_default?: boolean;
+          created_at?: string;
+        };
+      };
+      loyalty_transactions: {
+        Row: {
+          id: string;
+          customer_id: string;
+          order_id: string | null;
+          points_earned: number;
+          points_redeemed: number;
+          transaction_type: string;
+          description: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          customer_id: string;
+          order_id?: string | null;
+          points_earned?: number;
+          points_redeemed?: number;
+          transaction_type: string;
+          description?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          customer_id?: string;
+          order_id?: string | null;
+          points_earned?: number;
+          points_redeemed?: number;
+          transaction_type?: string;
+          description?: string | null;
+          created_at?: string;
+        };
+      };
       menu_categories: {
         Row: {
           id: string;

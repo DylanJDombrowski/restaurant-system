@@ -1,6 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
-import { MenuItemWithCategory, Restaurant, OrderWithItems } from "@/lib/types";
+import { useCallback, useEffect, useState } from "react";
+import {
+  MenuItemWithCategory,
+  Restaurant,
+  OrderWithItems,
+  Customer,
+  CustomerAddress,
+} from "@/lib/types";
 
 export default function StaffOrdersPage() {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -14,7 +20,7 @@ export default function StaffOrdersPage() {
       try {
         setError(null);
 
-        // Get restaurant using API route instead of direct Supabase call
+        // Get restaurant using API route
         const restaurantResponse = await fetch("/api/restaurants");
         if (!restaurantResponse.ok) {
           throw new Error(`Restaurant API error: ${restaurantResponse.status}`);
@@ -148,7 +154,7 @@ export default function StaffOrdersPage() {
   );
 }
 
-// Order Creation Form Component with Better Styling
+// Enhanced Order Creation Form with Customer Lookup & Delivery Address
 function OrderCreationForm({
   menuItems,
   restaurantId,
@@ -162,18 +168,109 @@ function OrderCreationForm({
     Array<{
       menuItem: MenuItemWithCategory;
       quantity: number;
-      justAdded?: boolean; // For UI feedback
+      justAdded?: boolean;
     }>
   >([]);
 
+  // Enhanced customer info state
   const [customerInfo, setCustomerInfo] = useState({
     name: "",
     phone: "",
     email: "",
   });
+
+  // Customer lookup state
+  const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [customerAddresses, setCustomerAddresses] = useState<CustomerAddress[]>(
+    []
+  );
+
   const [orderType, setOrderType] = useState<"pickup" | "delivery">("pickup");
+
+  // Delivery address state
+  const [deliveryAddress, setDeliveryAddress] = useState({
+    address: "",
+    city: "",
+    zip: "",
+    instructions: "",
+  });
+
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
+    null
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
+
+  // Customer lookup function - moved outside useEffect
+  const lookupCustomer = useCallback(
+    async (phone: string) => {
+      if (phone.length < 10) {
+        setFoundCustomer(null);
+        setCustomerAddresses([]);
+        return;
+      }
+
+      setLookupLoading(true);
+      try {
+        const response = await fetch(
+          `/api/customers/lookup?phone=${encodeURIComponent(
+            phone
+          )}&restaurant_id=${restaurantId}`
+        );
+        const data = await response.json();
+
+        if (data.data && data.data.customer) {
+          setFoundCustomer(data.data.customer);
+          setCustomerInfo({
+            name: data.data.customer.name || "",
+            phone: data.data.customer.phone,
+            email: data.data.customer.email || "",
+          });
+
+          // Load customer addresses
+          const addressResponse = await fetch(
+            `/api/customers/${data.data.customer.id}/addresses`
+          );
+          const addressData = await addressResponse.json();
+          setCustomerAddresses(addressData.data?.addresses || []);
+        } else {
+          setFoundCustomer(null);
+          setCustomerAddresses([]);
+        }
+      } catch (error) {
+        console.error("Error looking up customer:", error);
+      } finally {
+        setLookupLoading(false);
+      }
+    },
+    [restaurantId]
+  );
+
+  // Handle phone number change with debounced lookup - fixed dependencies
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (customerInfo.phone) {
+        lookupCustomer(customerInfo.phone);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [customerInfo.phone, lookupCustomer]);
+
+  // Handle address selection
+  const handleAddressSelection = (addressId: string) => {
+    const address = customerAddresses.find((addr) => addr.id === addressId);
+    if (address) {
+      setSelectedAddressId(addressId);
+      setDeliveryAddress({
+        address: address.address,
+        city: address.city,
+        zip: address.zip,
+        instructions: address.delivery_instructions || "",
+      });
+    }
+  };
 
   const addItem = (menuItem: MenuItemWithCategory) => {
     setSelectedItems((prev) => {
@@ -188,11 +285,9 @@ function OrderCreationForm({
       return [...prev, { menuItem, quantity: 1, justAdded: true }];
     });
 
-    // Show visual feedback
     setRecentlyAdded(menuItem.id);
     setTimeout(() => {
       setRecentlyAdded(null);
-      // Remove the justAdded flag after animation
       setSelectedItems((prev) =>
         prev.map((item) => ({ ...item, justAdded: false }))
       );
@@ -235,6 +330,7 @@ function OrderCreationForm({
   };
 
   const handleSubmit = async () => {
+    // Validation
     if (
       selectedItems.length === 0 ||
       !customerInfo.name ||
@@ -244,11 +340,21 @@ function OrderCreationForm({
       return;
     }
 
+    if (
+      orderType === "delivery" &&
+      (!deliveryAddress.address ||
+        !deliveryAddress.city ||
+        !deliveryAddress.zip)
+    ) {
+      alert("Please fill in the delivery address");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { subtotal, tax, deliveryFee, total } = calculateTotal();
 
-      // Prepare order data
+      // Prepare order data with delivery address
       const orderData = {
         restaurant_id: restaurantId,
         customer_name: customerInfo.name,
@@ -260,6 +366,13 @@ function OrderCreationForm({
         delivery_fee: deliveryFee,
         total,
         status: "pending" as const,
+        // Add delivery address fields
+        ...(orderType === "delivery" && {
+          customer_address: deliveryAddress.address,
+          customer_city: deliveryAddress.city,
+          customer_zip: deliveryAddress.zip,
+          delivery_instructions: deliveryAddress.instructions || null,
+        }),
       };
 
       // Prepare order items
@@ -290,10 +403,12 @@ function OrderCreationForm({
       setSelectedItems([]);
       setCustomerInfo({ name: "", phone: "", email: "" });
       setOrderType("pickup");
+      setDeliveryAddress({ address: "", city: "", zip: "", instructions: "" });
+      setFoundCustomer(null);
+      setCustomerAddresses([]);
+      setSelectedAddressId(null);
 
-      // Notify parent
       onOrderCreated();
-
       alert("Order created successfully!");
     } catch (error) {
       console.error("Error creating order:", error);
@@ -309,16 +424,51 @@ function OrderCreationForm({
 
   const totals = calculateTotal();
   const canSubmit =
-    selectedItems.length > 0 && customerInfo.name && customerInfo.phone;
+    selectedItems.length > 0 &&
+    customerInfo.name &&
+    customerInfo.phone &&
+    (orderType === "pickup" ||
+      (deliveryAddress.address && deliveryAddress.city && deliveryAddress.zip));
 
   return (
     <div className="space-y-8">
-      {/* Customer Information */}
+      {/* Customer Information with Lookup */}
       <div className="bg-gray-50 p-4 rounded-lg">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
           Customer Information
+          {foundCustomer && (
+            <span className="ml-2 text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
+              ✓ Found: {foundCustomer.total_orders} orders •{" "}
+              {foundCustomer.loyalty_points} points
+            </span>
+          )}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Phone Number *
+            </label>
+            <div className="relative">
+              <input
+                type="tel"
+                placeholder="(555) 123-4567"
+                value={customerInfo.phone}
+                onChange={(e) =>
+                  setCustomerInfo((prev) => ({
+                    ...prev,
+                    phone: e.target.value,
+                  }))
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+              {lookupLoading && (
+                <div className="absolute right-3 top-2">
+                  <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                </div>
+              )}
+            </div>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Customer Name *
@@ -329,21 +479,6 @@ function OrderCreationForm({
               value={customerInfo.name}
               onChange={(e) =>
                 setCustomerInfo((prev) => ({ ...prev, name: e.target.value }))
-              }
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number *
-            </label>
-            <input
-              type="tel"
-              placeholder="(555) 123-4567"
-              value={customerInfo.phone}
-              onChange={(e) =>
-                setCustomerInfo((prev) => ({ ...prev, phone: e.target.value }))
               }
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               required
@@ -364,6 +499,23 @@ function OrderCreationForm({
             />
           </div>
         </div>
+
+        {/* Customer History & Quick Actions */}
+        {foundCustomer && (
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <div className="flex justify-between items-center">
+              <div className="text-sm text-blue-900">
+                <span className="font-medium">Loyalty:</span>{" "}
+                {foundCustomer.loyalty_points} points •
+                <span className="font-medium ml-2">Total Spent:</span> $
+                {foundCustomer.total_spent}
+              </div>
+              <button className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">
+                View Order History
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Order Type */}
@@ -395,7 +547,151 @@ function OrderCreationForm({
         </div>
       </div>
 
-      {/* Menu Items with Enhanced UI */}
+      {/* Delivery Address Section */}
+      {orderType === "delivery" && (
+        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Delivery Address
+          </h3>
+
+          {/* Saved Addresses for existing customers */}
+          {customerAddresses.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Saved Addresses
+              </label>
+              <div className="space-y-2">
+                {customerAddresses.map((address) => (
+                  <label
+                    key={address.id}
+                    className="flex items-start space-x-2"
+                  >
+                    <input
+                      type="radio"
+                      name="savedAddress"
+                      value={address.id}
+                      checked={selectedAddressId === address.id}
+                      onChange={() => handleAddressSelection(address.id)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">
+                        {address.address}
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        {address.city}, {address.zip}
+                        {address.delivery_instructions && (
+                          <span className="ml-2 text-blue-600">
+                            • {address.delivery_instructions}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-3 pt-3 border-t border-yellow-300">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="savedAddress"
+                    value="new"
+                    checked={selectedAddressId === null}
+                    onChange={() => {
+                      setSelectedAddressId(null);
+                      setDeliveryAddress({
+                        address: "",
+                        city: "",
+                        zip: "",
+                        instructions: "",
+                      });
+                    }}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium">Enter new address</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Address Input Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Street Address *
+              </label>
+              <input
+                type="text"
+                placeholder="123 Main Street"
+                value={deliveryAddress.address}
+                onChange={(e) =>
+                  setDeliveryAddress((prev) => ({
+                    ...prev,
+                    address: e.target.value,
+                  }))
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                City *
+              </label>
+              <input
+                type="text"
+                placeholder="New Lenox"
+                value={deliveryAddress.city}
+                onChange={(e) =>
+                  setDeliveryAddress((prev) => ({
+                    ...prev,
+                    city: e.target.value,
+                  }))
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                ZIP Code *
+              </label>
+              <input
+                type="text"
+                placeholder="60451"
+                value={deliveryAddress.zip}
+                onChange={(e) =>
+                  setDeliveryAddress((prev) => ({
+                    ...prev,
+                    zip: e.target.value,
+                  }))
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Delivery Instructions (optional)
+              </label>
+              <textarea
+                placeholder="Apartment #, gate code, special instructions..."
+                value={deliveryAddress.instructions}
+                onChange={(e) =>
+                  setDeliveryAddress((prev) => ({
+                    ...prev,
+                    instructions: e.target.value,
+                  }))
+                }
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Menu Items */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
           Available Menu Items
@@ -438,7 +734,7 @@ function OrderCreationForm({
         </div>
       </div>
 
-      {/* Selected Items with Animation */}
+      {/* Selected Items */}
       {selectedItems.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -562,8 +858,10 @@ function OrderCreationForm({
             "Create Order"
           ) : selectedItems.length === 0 ? (
             "Add items to create order"
-          ) : (
+          ) : !customerInfo.name || !customerInfo.phone ? (
             "Fill in customer information"
+          ) : (
+            "Complete delivery address"
           )}
         </button>
       </div>
@@ -571,7 +869,7 @@ function OrderCreationForm({
   );
 }
 
-// Order Card Component with Better Styling
+// Order Card Component (unchanged)
 function OrderCard({ order }: { order: OrderWithItems }) {
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -586,7 +884,6 @@ function OrderCard({ order }: { order: OrderWithItems }) {
 
       if (!response.ok) throw new Error("Failed to update status");
 
-      // Reload page to show updated status
       window.location.reload();
     } catch (error) {
       console.error("Error updating order status:", error);
@@ -628,6 +925,12 @@ function OrderCard({ order }: { order: OrderWithItems }) {
         <p>
           <span className="font-medium">Type:</span> {order.order_type}
         </p>
+        {order.order_type === "delivery" && order.customer_address && (
+          <p>
+            <span className="font-medium">Address:</span>{" "}
+            {order.customer_address}, {order.customer_city} {order.customer_zip}
+          </p>
+        )}
         <p>
           <span className="font-medium">Total:</span>{" "}
           <span className="text-green-600 font-bold">${order.total}</span>
