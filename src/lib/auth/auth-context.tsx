@@ -1,5 +1,5 @@
 // src/lib/auth/auth-context.tsx
-"use client";
+"use client"; // Essential directive for client-side authentication
 import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
@@ -127,16 +127,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setError(null);
 
-      // Fetch staff record for this user
-      // Note: We're assuming the staff.id matches the Supabase user.id
+      // First, fetch the staff record
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
-        .select(
-          `
-          *,
-          restaurants:restaurant_id (*)
-        `
-        )
+        .select("*")
         .eq("id", userId)
         .eq("is_active", true)
         .single();
@@ -153,11 +147,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw staffError;
       }
 
+      // Now fetch the restaurant data
+      const { data: restaurantData, error: restaurantError } = await supabase
+        .from("restaurants")
+        .select("*")
+        .eq("id", staffData.restaurant_id)
+        .single();
+
+      if (restaurantError) {
+        console.error("Error loading restaurant data:", restaurantError);
+        throw new Error("Failed to load restaurant information");
+      }
+
       // Set staff and restaurant data
       setStaff(staffData);
-      setRestaurant(staffData.restaurants as Restaurant);
+      setRestaurant(restaurantData);
 
       console.log("Staff data loaded:", staffData.name, staffData.role);
+      console.log("Restaurant data loaded:", restaurantData.name);
     } catch (error) {
       console.error("Failed to load staff data:", error);
       setError(
