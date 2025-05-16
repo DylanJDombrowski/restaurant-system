@@ -1,10 +1,17 @@
+// src/app/admin/layout.tsx - Protected Admin Layout
 import Link from "next/link";
+import { ProtectedRoute, useAuth } from "@/lib/auth/auth-context";
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+/**
+ * Protected Admin Layout Content
+ *
+ * This layout is specifically for admin-only features. Notice how
+ * it's structurally similar to the staff layout but with different
+ * navigation options and styling to distinguish the admin area.
+ */
+function AdminLayoutContent({ children }: { children: React.ReactNode }) {
+  const { staff, restaurant, signOut } = useAuth();
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Admin Sidebar */}
@@ -12,7 +19,15 @@ export default function AdminLayout({
         <aside className="w-64 bg-white shadow-md min-h-screen">
           <div className="p-6">
             <h2 className="text-xl font-bold text-gray-800">Admin Panel</h2>
+            <div className="mt-2 text-sm text-gray-600">
+              <div>{restaurant?.name}</div>
+              <div className="font-medium">{staff?.name}</div>
+              <div className="text-xs text-blue-600">
+                {staff?.role.toUpperCase()}
+              </div>
+            </div>
           </div>
+
           <nav className="mt-6">
             <Link
               href="/admin"
@@ -21,10 +36,10 @@ export default function AdminLayout({
               Dashboard
             </Link>
             <Link
-              href="/admin/restaurants"
+              href="/admin/staff"
               className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
             >
-              Restaurants
+              Staff Management
             </Link>
             <Link
               href="/admin/analytics"
@@ -32,6 +47,21 @@ export default function AdminLayout({
             >
               Analytics
             </Link>
+
+            <div className="mt-8 border-t pt-4">
+              <Link
+                href="/staff"
+                className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+              >
+                ← Back to Staff Dashboard
+              </Link>
+              <button
+                onClick={signOut}
+                className="block w-full text-left px-6 py-3 text-red-600 hover:bg-red-50"
+              >
+                Sign Out
+              </button>
+            </div>
           </nav>
         </aside>
 
@@ -39,5 +69,24 @@ export default function AdminLayout({
         <main className="flex-1 p-8">{children}</main>
       </div>
     </div>
+  );
+}
+
+/**
+ * Admin Layout with Protection
+ *
+ * This layout requires 'admin' role specifically. Notice how we use
+ * ProtectedRoute with requireRole="admin" to enforce admin-only access.
+ * This means managers and regular staff will see an access denied message.
+ */
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <ProtectedRoute requireRole="admin">
+      <AdminLayoutContent>{children}</AdminLayoutContent>
+    </ProtectedRoute>
   );
 }

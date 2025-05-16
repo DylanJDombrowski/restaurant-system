@@ -26,6 +26,7 @@ export type InsertCustomerAddress =
   Database["public"]["Tables"]["customer_addresses"]["Insert"];
 export type InsertMenuItem =
   Database["public"]["Tables"]["menu_items"]["Insert"];
+export type InsertStaff = Database["public"]["Tables"]["staff"]["Insert"];
 
 // Update types
 export type UpdateOrder = Database["public"]["Tables"]["orders"]["Update"];
@@ -33,6 +34,7 @@ export type UpdateMenuItem =
   Database["public"]["Tables"]["menu_items"]["Update"];
 export type UpdateCustomer =
   Database["public"]["Tables"]["customers"]["Update"];
+export type UpdateStaff = Database["public"]["Tables"]["staff"]["Update"];
 
 // Enums
 export type OrderStatus = Database["public"]["Enums"]["order_status"];
@@ -102,4 +104,12 @@ export interface CustomerWithActivity extends Customer {
   recent_orders?: Order[];
   favorite_items?: MenuItem[];
   addresses?: CustomerAddress[];
+}
+
+export interface CreateStaffFormData {
+  name: string;
+  email: string;
+  role: "staff" | "manager" | "admin";
+  password: string;
+  restaurant_id: string;
 }
