@@ -1,5 +1,5 @@
-// src/app/admin/staff/page.tsx - Staff Management Interface
 "use client";
+
 import { useCallback, useEffect, useState } from "react";
 import { Staff, Restaurant } from "@/lib/types";
 import { useAuth } from "@/lib/auth/auth-context";

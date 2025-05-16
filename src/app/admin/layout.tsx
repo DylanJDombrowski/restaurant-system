@@ -1,4 +1,5 @@
-// src/app/admin/layout.tsx - Protected Admin Layout
+"use client";
+
 import Link from "next/link";
 import { ProtectedRoute, useAuth } from "@/lib/auth/auth-context";
 
