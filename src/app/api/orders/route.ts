@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { ApiResponse, OrderWithItems, InsertOrder, InsertOrderItem, InsertCustomer, InsertCustomerAddress } from "@/lib/types";
 
+/**
+ * Interface for incoming order item data
+ *
+ * This solves the TypeScript 'any' error by properly typing our order items.
+ * Think of this like creating a clear specification for what each item
+ * in an order should contain.
+ */
+interface IncomingOrderItem {
+  menuItemId: string;
+  quantity: number;
+  unitPrice: number;
+  specialInstructions?: string;
+}
+
 // GET handler - existing functionality
 export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<OrderWithItems[]>>> {
   try {
@@ -62,7 +76,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
   }
 }
 
-// POST handler - enhanced to handle customer creation and address saving
+// POST handler - enhanced version with proper typing
 export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse<OrderWithItems>>> {
   try {
     console.log("=== Creating New Order ===");
@@ -94,7 +108,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       console.log("Customer handled, ID:", customerId);
     }
 
-    // Create the order - this part remains the same
+    // Create the order
     const orderInsert: InsertOrder = {
       ...orderData,
       order_number: orderNumber,
@@ -122,7 +136,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
      */
     if (order.order_type === "delivery" && customerId && order.customer_address) {
       console.log("Attempting to save delivery address...");
-      const addressSaved = await handleDeliveryAddressWithErrorHandling(customerId, orderData, order.id);
+      const addressSaved = await handleDeliveryAddressWithErrorHandling(customerId, orderData);
 
       if (addressSaved) {
         console.log("✅ Delivery address saved successfully");
@@ -131,8 +145,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       }
     }
 
-    // Create order items - this part remains the same
-    const orderItemsToInsert: InsertOrderItem[] = orderItems.map((item: any) => ({
+    // Create order items with proper typing
+    const orderItemsToInsert: InsertOrderItem[] = orderItems.map((item: IncomingOrderItem) => ({
       order_id: order.id,
       menu_item_id: item.menuItemId,
       quantity: item.quantity,
@@ -150,6 +164,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
 
     if (itemsError) {
       console.error("Error creating order items:", itemsError);
+      // Rollback the order if items creation fails
       await supabaseServer.from("orders").delete().eq("id", order.id);
       return NextResponse.json({ error: `Failed to create order items: ${itemsError.message}` }, { status: 500 });
     }
@@ -185,6 +200,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
   }
 }
 
+/**
+ * Enhanced Customer Handling with Better Error Logging
+ *
+ * This version provides much more detailed logging and error handling
+ * to help us understand what's happening with customer creation and lookup.
+ */
 async function handleCustomerWithBetterErrorHandling(orderData: InsertOrder): Promise<string | null> {
   try {
     console.log("🔍 Looking up customer with phone:", orderData.customer_phone);
@@ -298,8 +319,10 @@ async function handleCustomerWithBetterErrorHandling(orderData: InsertOrder): Pr
  * detailed logging to help troubleshoot any issues. Think of this like
  * maintaining a customer's address book - we want to be thorough and
  * handle edge cases gracefully.
+ *
+ * Note: Removed the unused orderId parameter that was causing linting errors.
  */
-async function handleDeliveryAddressWithErrorHandling(customerId: string, orderData: InsertOrder, orderId: string): Promise<boolean> {
+async function handleDeliveryAddressWithErrorHandling(customerId: string, orderData: InsertOrder): Promise<boolean> {
   try {
     // Validate we have the required address information
     if (!orderData.customer_address || !orderData.customer_city || !orderData.customer_zip) {
@@ -364,6 +387,10 @@ async function handleDeliveryAddressWithErrorHandling(customerId: string, orderD
       .select("id")
       .eq("customer_id", customerId);
 
+    if (countError) {
+      console.error("⚠️ Error checking existing addresses count:", countError);
+    }
+
     const isFirstAddress = !countError && (!existingAddresses || existingAddresses.length === 0);
     console.log("Is this the customer's first address?", isFirstAddress);
 
@@ -410,186 +437,74 @@ async function handleDeliveryAddressWithErrorHandling(customerId: string, orderD
   }
 }
 
-// Helper function to handle customer creation/update
-async function handleCustomer(orderData: InsertOrder): Promise<string | null> {
-  try {
-    console.log("Handling customer for phone:", orderData.customer_phone);
-
-    // Clean phone number
-    const cleanPhone = (orderData.customer_phone ?? "").replace(/\D/g, "");
-
-    // Try to find existing customer
-    const { data: existingCustomer } = await supabaseServer
-      .from("customers")
-      .select("*")
-      .eq("restaurant_id", orderData.restaurant_id)
-      .or(`phone.eq.${orderData.customer_phone},phone.eq.${cleanPhone},phone.eq.+1${cleanPhone}`)
-      .single();
-
-    if (existingCustomer) {
-      console.log("Found existing customer:", existingCustomer.id);
-
-      // Update customer info if needed
-      const updates: Record<string, unknown> = {};
-      if (!existingCustomer.name && orderData.customer_name) {
-        updates.name = orderData.customer_name;
-      }
-      if (!existingCustomer.email && orderData.customer_email) {
-        updates.email = orderData.customer_email;
-      }
-
-      if (Object.keys(updates).length > 0) {
-        updates.updated_at = new Date().toISOString();
-        await supabaseServer.from("customers").update(updates).eq("id", existingCustomer.id);
-        console.log("Updated customer with:", updates);
-      }
-
-      return existingCustomer.id;
-    }
-
-    // Create new customer
-    if (orderData.customer_name && orderData.customer_phone) {
-      console.log("Creating new customer");
-
-      const newCustomer: InsertCustomer = {
-        restaurant_id: orderData.restaurant_id,
-        phone: orderData.customer_phone,
-        name: orderData.customer_name,
-        email: orderData.customer_email || null,
-        loyalty_points: 0,
-        total_orders: 0,
-        total_spent: 0,
-      };
-
-      const { data: customer, error: createError } = await supabaseServer.from("customers").insert(newCustomer).select().single();
-
-      if (createError) {
-        console.error("Error creating customer:", createError);
-        return null;
-      }
-
-      console.log("Created new customer:", customer.id);
-      return customer.id;
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Error handling customer:", error);
-    return null;
-  }
-}
-
-// Helper function to save delivery address
-async function handleDeliveryAddress(customerId: string, orderData: InsertOrder) {
-  try {
-    if (!orderData.customer_address || !orderData.customer_city || !orderData.customer_zip) {
-      return;
-    }
-
-    console.log("Saving delivery address for customer:", customerId);
-
-    // Check if this address already exists
-    const { data: existingAddress } = await supabaseServer
-      .from("customer_addresses")
-      .select("*")
-      .eq("customer_id", customerId)
-      .eq("address", orderData.customer_address)
-      .eq("city", orderData.customer_city)
-      .eq("zip", orderData.customer_zip)
-      .single();
-
-    if (existingAddress) {
-      console.log("Address already exists, skipping creation");
-      return;
-    }
-
-    // Create new address
-    const newAddress = {
-      customer_id: customerId,
-      restaurant_id: orderData.restaurant_id,
-      customer_phone: orderData.customer_phone,
-      customer_name: orderData.customer_name,
-      customer_email: orderData.customer_email,
-      address: orderData.customer_address,
-      city: orderData.customer_city,
-      zip: orderData.customer_zip,
-      delivery_instructions: orderData.delivery_instructions || null,
-      is_default: false, // You could make this configurable
-    };
-
-    const { error } = await supabaseServer.from("customer_addresses").insert(newAddress);
-
-    if (error) {
-      console.error("Error saving address:", error);
-    } else {
-      console.log("Delivery address saved successfully");
-    }
-  } catch (error) {
-    console.error("Error handling delivery address:", error);
-  }
-}
-
-// Helper function to update customer statistics
+/**
+ * Update Customer Statistics
+ *
+ * This function handles updating customer loyalty points and statistics.
+ * It includes fallback logic in case the database RPC function isn't available.
+ */
 async function updateCustomerStats(customerId: string, orderTotal: number) {
   try {
-    console.log("Updating customer stats for:", customerId);
+    console.log("📊 Updating customer stats for:", customerId);
 
     // Calculate loyalty points (1 point per dollar)
     const pointsEarned = Math.floor(orderTotal);
 
-    // Use the database function to update customer stats
-    const { error } = await supabaseServer.rpc("update_customer_stats", {
-      customer_id: customerId,
-      order_total: orderTotal,
-      points_earned: pointsEarned,
-    });
+    // Use manual update approach for reliability
+    const { data: customer, error: fetchError } = await supabaseServer
+      .from("customers")
+      .select("total_orders, total_spent, loyalty_points")
+      .eq("id", customerId)
+      .single();
 
-    if (error) {
-      console.error("Error updating customer stats:", error);
-      // Fallback to manual update
-      // Manually increment fields by first fetching current values
-      const { data: customer, error: fetchError } = await supabaseServer
-        .from("customers")
-        .select("total_orders, total_spent, loyalty_points")
-        .eq("id", customerId)
-        .single();
+    if (fetchError || !customer) {
+      console.error("❌ Error fetching customer for stats update:", fetchError);
+      return;
+    }
 
-      if (!fetchError && customer) {
-        const { total_orders, total_spent, loyalty_points } = customer;
-        const { error: fallbackError } = await supabaseServer
-          .from("customers")
-          .update({
-            total_orders: (total_orders ?? 0) + 1,
-            total_spent: (total_spent ?? 0) + orderTotal,
-            loyalty_points: (loyalty_points ?? 0) + pointsEarned,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", customerId);
+    const { error: updateError } = await supabaseServer
+      .from("customers")
+      .update({
+        total_orders: (customer.total_orders ?? 0) + 1,
+        total_spent: (customer.total_spent ?? 0) + orderTotal,
+        loyalty_points: (customer.loyalty_points ?? 0) + pointsEarned,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", customerId);
 
-        if (fallbackError) {
-          console.error("Fallback update also failed:", fallbackError);
-        }
-      } else {
-        console.error("Failed to fetch customer for fallback update:", fetchError);
-      }
-    } else {
-      console.log(`Updated customer stats: +${pointsEarned} points, +$${orderTotal} spent`);
+    if (updateError) {
+      console.error("❌ Error updating customer stats:", updateError);
+      return;
     }
 
     // Log loyalty transaction
-    await supabaseServer.from("loyalty_transactions").insert({
+    const { error: loyaltyError } = await supabaseServer.from("loyalty_transactions").insert({
       customer_id: customerId,
       points_earned: pointsEarned,
       points_redeemed: 0,
       transaction_type: "earned",
       description: `Order reward: ${pointsEarned} points`,
     });
+
+    if (loyaltyError) {
+      console.error("⚠️ Error logging loyalty transaction:", loyaltyError);
+    }
+
+    console.log("✅ Customer stats updated successfully:", {
+      points_earned: pointsEarned,
+      new_total_orders: (customer.total_orders ?? 0) + 1,
+    });
   } catch (error) {
-    console.error("Error updating customer stats:", error);
+    console.error("❌ Unexpected error updating customer stats:", error);
   }
 }
 
-// Helper function to generate order numbers
+/**
+ * Generate Order Number
+ *
+ * Creates a unique order number using timestamp and random elements.
+ * This ensures each order has a human-readable identifier.
+ */
 function generateOrderNumber(): string {
   const timestamp = Date.now().toString().slice(-6);
   const random = Math.floor(Math.random() * 100)

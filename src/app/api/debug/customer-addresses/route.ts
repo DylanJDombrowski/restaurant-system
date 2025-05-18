@@ -2,6 +2,56 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 
 /**
+ * Response interface for the debug endpoint
+ *
+ * This interface ensures our response has a consistent structure
+ * and helps TypeScript understand what data we're returning.
+ */
+interface DebugResponse {
+  search_criteria: {
+    original_phone: string;
+    clean_phone: string;
+    restaurant_id: string;
+  };
+  summary: {
+    customers_found: number;
+    total_addresses: number;
+    total_delivery_orders: number;
+    potential_issues: string[];
+  };
+  customers: Array<{
+    customer: {
+      id: string;
+      name: string | null;
+      phone: string;
+      email: string | null;
+      total_orders: number;
+      loyalty_points: number;
+      created_at: string;
+      updated_at: string;
+    };
+    addresses: Array<{
+      id: string;
+      address: string;
+      city: string;
+      zip: string;
+      delivery_instructions: string | null;
+      is_default: boolean;
+      created_at: string;
+    }>;
+    delivery_orders: Array<{
+      id: string;
+      order_number: string;
+      order_type: string;
+      customer_address: string | null;
+      customer_city: string | null;
+      customer_zip: string | null;
+      created_at: string;
+    }>;
+  }>;
+}
+
+/**
  * Debug API for Customer Address Issues
  *
  * This endpoint helps diagnose issues with customer address saving
@@ -9,7 +59,7 @@ import { supabaseServer } from "@/lib/supabase/server";
  * exactly what's in your customer database and helps identify
  * where the address saving process might be failing.
  */
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest): Promise<NextResponse<DebugResponse | { error: string }>> {
   try {
     const { searchParams } = new URL(request.url);
     const phone = searchParams.get("phone");
@@ -38,13 +88,14 @@ export async function GET(request: NextRequest) {
 
     console.log(`📊 Found ${customers?.length || 0} customer records`);
 
-    // For each customer, get their addresses
+    // For each customer, get their addresses and delivery orders
     const customerData = [];
 
     for (const customer of customers || []) {
+      // Fetch addresses for this customer
       const { data: addresses, error: addressError } = await supabaseServer
         .from("customer_addresses")
-        .select("*")
+        .select("id, address, city, zip, delivery_instructions, is_default, created_at")
         .eq("customer_id", customer.id)
         .order("created_at", { ascending: false });
 
@@ -52,7 +103,7 @@ export async function GET(request: NextRequest) {
         console.error("❌ Error fetching addresses for customer:", customer.id, addressError);
       }
 
-      // Get orders for this customer to see delivery history
+      // Get delivery orders for this customer to see delivery history
       const { data: orders, error: orderError } = await supabaseServer
         .from("orders")
         .select("id, order_number, order_type, customer_address, customer_city, customer_zip, created_at")
@@ -81,11 +132,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Summary statistics
+    // Calculate summary statistics
     const totalAddresses = customerData.reduce((sum, c) => sum + c.addresses.length, 0);
     const totalDeliveryOrders = customerData.reduce((sum, c) => sum + c.delivery_orders.length, 0);
 
-    const response = {
+    const response: DebugResponse = {
       search_criteria: {
         original_phone: phone,
         clean_phone: cleanPhone,
@@ -95,12 +146,12 @@ export async function GET(request: NextRequest) {
         customers_found: customers?.length || 0,
         total_addresses: totalAddresses,
         total_delivery_orders: totalDeliveryOrders,
-        potential_issues: [] as string[],
+        potential_issues: [],
       },
       customers: customerData,
     };
 
-    // Identify potential issues
+    // Identify potential issues and add them to the response
     if (totalDeliveryOrders > 0 && totalAddresses === 0) {
       response.summary.potential_issues.push("Customer has delivery orders but no saved addresses - address saving may be failing");
     }
@@ -109,6 +160,7 @@ export async function GET(request: NextRequest) {
       response.summary.potential_issues.push("Multiple customer records found for same phone - may indicate duplicate customer creation");
     }
 
+    // Check each customer for specific issues
     customerData.forEach((customerInfo, index) => {
       if (customerInfo.delivery_orders.length > 0 && customerInfo.addresses.length === 0) {
         response.summary.potential_issues.push(
@@ -119,9 +171,10 @@ export async function GET(request: NextRequest) {
       }
 
       // Check for mismatched address data in orders vs saved addresses
-      const orderAddresses = customerInfo.delivery_orders.map(
-        (order) => `${order.customer_address}, ${order.customer_city} ${order.customer_zip}`
-      );
+      const orderAddresses = customerInfo.delivery_orders
+        .filter((order) => order.customer_address && order.customer_city && order.customer_zip)
+        .map((order) => `${order.customer_address}, ${order.customer_city} ${order.customer_zip}`);
+
       const savedAddresses = customerInfo.addresses.map((addr) => `${addr.address}, ${addr.city} ${addr.zip}`);
 
       const uniqueOrderAddresses = [...new Set(orderAddresses)];
@@ -138,10 +191,24 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("❌ Unexpected error in debug endpoint:", error);
     return NextResponse.json(
-      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
+}
+
+/**
+ * Interface for the POST request body
+ *
+ * This ensures we have proper typing for the manual address saving requests.
+ */
+interface ManualAddressSaveRequest {
+  customerId?: string;
+  orderId?: string;
+  forceUpdate?: boolean;
 }
 
 /**
@@ -152,7 +219,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { customerId, orderId, forceUpdate } = await request.json();
+    const body = (await request.json()) as ManualAddressSaveRequest;
+    const { customerId, orderId, forceUpdate } = body;
 
     if (!customerId && !orderId) {
       return NextResponse.json({ error: "Either customerId or orderId must be provided" }, { status: 400 });
@@ -198,6 +266,7 @@ export async function POST(request: NextRequest) {
 
     for (const order of orders) {
       try {
+        // Validate that we have complete address information
         if (!order.customer_address || !order.customer_city || !order.customer_zip) {
           results.push({
             order_id: order.id,
@@ -207,7 +276,7 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Check if address already exists
+        // Check if address already exists (unless we're forcing an update)
         const { data: existingAddress } = await supabaseServer
           .from("customer_addresses")
           .select("id")
@@ -226,12 +295,12 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Create new address
+        // Create new address record
         const newAddress = {
           customer_id: order.customer_id,
           restaurant_id: order.restaurant_id,
-          customer_phone: order.customer_phone!,
-          customer_name: order.customer_name!,
+          customer_phone: order.customer_phone || "",
+          customer_name: order.customer_name || "",
           customer_email: order.customer_email,
           address: order.customer_address,
           city: order.customer_city,
