@@ -20,8 +20,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const staffRef = useRef<Staff | null>(null);
-const restaurantRef = useRef<Restaurant | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Core state
@@ -35,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Refs for state management
   const loadingStaffData = useRef(false);
   const currentUserId = useRef<string | null>(null);
+  const staffRef = useRef<Staff | null>(null);
+  const restaurantRef = useRef<Restaurant | null>(null);
 
   /**
    * Load Staff Data via API Route
