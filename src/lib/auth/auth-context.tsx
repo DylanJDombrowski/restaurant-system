@@ -195,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  });
+  }, []);
 
   /**
    * Auth State Change Listener
