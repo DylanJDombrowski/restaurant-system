@@ -384,15 +384,18 @@ function OrderCreationForm({
   // Effect to auto-suggest delivery for customers with addresses - fixed dependencies
   useEffect(() => {
     if (foundCustomer && customerAddresses.length > 0) {
-      // Auto-suggest delivery for customers with saved addresses
       const defaultAddress =
         customerAddresses.find((addr) => addr.is_default) ||
         customerAddresses[0];
 
-      if (defaultAddress && orderType === "pickup") {
-        // Smart suggestion: if customer has addresses, suggest delivery
-        setOrderType("delivery");
+      if (defaultAddress) {
+        // Always populate the address fields when a customer is found
         handleAddressSelection(defaultAddress.id);
+
+        // Only auto-switch to delivery if currently in pickup mode
+        if (orderType === "pickup") {
+          setOrderType("delivery");
+        }
       }
     }
   }, [foundCustomer, customerAddresses, orderType, handleAddressSelection]);
