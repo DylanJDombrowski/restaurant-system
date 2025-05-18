@@ -154,6 +154,8 @@ export default function StaffOrdersPage() {
   );
 }
 
+// Utility function for distance calculation - this can stay at the top level
+// because it's not a React hook
 const calculateDistance = (
   lat1: number,
   lon1: number,
@@ -172,19 +174,6 @@ const calculateDistance = (
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
-
-// Add these state variables for address validation
-const [addressValidation, setAddressValidation] = useState<{
-  isValidating: boolean;
-  distance: number | null;
-  isInDeliveryArea: boolean;
-  overrideDelivery: boolean;
-}>({
-  isValidating: false,
-  distance: null,
-  isInDeliveryArea: true,
-  overrideDelivery: false,
-});
 
 // Enhanced Order Creation Form with Customer Lookup & Delivery Address
 function OrderCreationForm({
@@ -234,6 +223,23 @@ function OrderCreationForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
 
+  // Address validation state - now properly inside the component
+  const [addressValidation, setAddressValidation] = useState<{
+    isValidating: boolean;
+    distance: number | null;
+    isInDeliveryArea: boolean;
+    overrideDelivery: boolean;
+  }>({
+    isValidating: false,
+    distance: null,
+    isInDeliveryArea: true,
+    overrideDelivery: false,
+  });
+
+  // Restaurant coordinates (you'll want to get these from your restaurant data)
+  const RESTAURANT_COORDS = { lat: 41.5067, lng: -87.9673 }; // New Lenox, IL approximation
+  const STANDARD_DELIVERY_RADIUS = 8; // miles
+
   // Customer lookup function - moved outside useEffect
   const lookupCustomer = useCallback(
     async (phone: string) => {
@@ -279,6 +285,68 @@ function OrderCreationForm({
     [restaurantId]
   );
 
+  // Address validation function - wrapped in useCallback to fix dependency warning
+  const validateDeliveryAddress = useCallback(
+    async (address: string, city: string, zip: string) => {
+      if (!address || !city || !zip) return;
+
+      setAddressValidation((prev) => ({ ...prev, isValidating: true }));
+
+      try {
+        // Simple geocoding using a free service (you might want to use Google Maps API later)
+        const fullAddress = `${address}, ${city}, ${zip}`;
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            fullAddress
+          )}`
+        );
+        const data = await response.json();
+
+        if (data && data[0]) {
+          const distance = calculateDistance(
+            RESTAURANT_COORDS.lat,
+            RESTAURANT_COORDS.lng,
+            parseFloat(data[0].lat),
+            parseFloat(data[0].lon)
+          );
+
+          setAddressValidation({
+            isValidating: false,
+            distance: Math.round(distance * 10) / 10,
+            isInDeliveryArea: distance <= STANDARD_DELIVERY_RADIUS,
+            overrideDelivery: false,
+          });
+        }
+      } catch (error) {
+        console.error("Error validating address:", error);
+        setAddressValidation((prev) => ({
+          ...prev,
+          isValidating: false,
+          distance: null,
+          isInDeliveryArea: true, // Default to allowing if validation fails
+        }));
+      }
+    },
+    [RESTAURANT_COORDS.lat, RESTAURANT_COORDS.lng, STANDARD_DELIVERY_RADIUS]
+  );
+
+  // Handle address selection - wrapped in useCallback to fix dependency warning
+  const handleAddressSelection = useCallback(
+    (addressId: string) => {
+      const address = customerAddresses.find((addr) => addr.id === addressId);
+      if (address) {
+        setSelectedAddressId(addressId);
+        setDeliveryAddress({
+          address: address.address,
+          city: address.city,
+          zip: address.zip,
+          instructions: address.delivery_instructions || "",
+        });
+      }
+    },
+    [customerAddresses]
+  );
+
   // Handle phone number change with debounced lookup - fixed dependencies
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -290,57 +358,7 @@ function OrderCreationForm({
     return () => clearTimeout(timeoutId);
   }, [customerInfo.phone, lookupCustomer]);
 
-  // Restaurant coordinates (you'll want to get these from your restaurant data)
-  const RESTAURANT_COORDS = { lat: 41.5067, lng: -87.9673 }; // New Lenox, IL approximation
-  const STANDARD_DELIVERY_RADIUS = 8; // miles
-
-  // Address validation function
-  const validateDeliveryAddress = async (
-    address: string,
-    city: string,
-    zip: string
-  ) => {
-    if (!address || !city || !zip) return;
-
-    setAddressValidation((prev) => ({ ...prev, isValidating: true }));
-
-    try {
-      // Simple geocoding using a free service (you might want to use Google Maps API later)
-      const fullAddress = `${address}, ${city}, ${zip}`;
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          fullAddress
-        )}`
-      );
-      const data = await response.json();
-
-      if (data && data[0]) {
-        const distance = calculateDistance(
-          RESTAURANT_COORDS.lat,
-          RESTAURANT_COORDS.lng,
-          parseFloat(data[0].lat),
-          parseFloat(data[0].lon)
-        );
-
-        setAddressValidation({
-          isValidating: false,
-          distance: Math.round(distance * 10) / 10,
-          isInDeliveryArea: distance <= STANDARD_DELIVERY_RADIUS,
-          overrideDelivery: false,
-        });
-      }
-    } catch (error) {
-      console.error("Error validating address:", error);
-      setAddressValidation((prev) => ({
-        ...prev,
-        isValidating: false,
-        distance: null,
-        isInDeliveryArea: true, // Default to allowing if validation fails
-      }));
-    }
-  };
-
-  // Add this effect to trigger validation when address changes
+  // Effect to trigger validation when address changes - fixed dependencies
   useEffect(() => {
     if (
       deliveryAddress.address &&
@@ -356,22 +374,14 @@ function OrderCreationForm({
       }, 1000);
       return () => clearTimeout(timeoutId);
     }
-  }, [deliveryAddress.address, deliveryAddress.city, deliveryAddress.zip]);
+  }, [
+    deliveryAddress.address,
+    deliveryAddress.city,
+    deliveryAddress.zip,
+    validateDeliveryAddress,
+  ]);
 
-  // Handle address selection
-  const handleAddressSelection = (addressId: string) => {
-    const address = customerAddresses.find((addr) => addr.id === addressId);
-    if (address) {
-      setSelectedAddressId(addressId);
-      setDeliveryAddress({
-        address: address.address,
-        city: address.city,
-        zip: address.zip,
-        instructions: address.delivery_instructions || "",
-      });
-    }
-  };
-
+  // Effect to auto-suggest delivery for customers with addresses - fixed dependencies
   useEffect(() => {
     if (foundCustomer && customerAddresses.length > 0) {
       // Auto-suggest delivery for customers with saved addresses
@@ -385,7 +395,7 @@ function OrderCreationForm({
         handleAddressSelection(defaultAddress.id);
       }
     }
-  }, [foundCustomer, customerAddresses, orderType]);
+  }, [foundCustomer, customerAddresses, orderType, handleAddressSelection]);
 
   const addItem = (menuItem: MenuItemWithCategory) => {
     setSelectedItems((prev) => {
@@ -522,6 +532,13 @@ function OrderCreationForm({
       setFoundCustomer(null);
       setCustomerAddresses([]);
       setSelectedAddressId(null);
+      // Reset address validation state
+      setAddressValidation({
+        isValidating: false,
+        distance: null,
+        isInDeliveryArea: true,
+        overrideDelivery: false,
+      });
 
       onOrderCreated();
       alert("Order created successfully!");
@@ -551,6 +568,9 @@ function OrderCreationForm({
 
   return (
     <div className="space-y-8">
+      {/* Rest of your JSX stays exactly the same */}
+      {/* I'm keeping the rest of your render logic unchanged since it was working correctly */}
+
       {/* Customer Information with Lookup */}
       <div className="bg-gray-50 p-4 rounded-lg">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -807,6 +827,8 @@ function OrderCreationForm({
               />
             </div>
           </div>
+
+          {/* Address Validation Display */}
           {orderType === "delivery" && addressValidation.distance !== null && (
             <div
               className={`mt-4 p-3 rounded-lg border ${
