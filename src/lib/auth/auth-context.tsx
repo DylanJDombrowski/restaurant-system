@@ -1,4 +1,3 @@
-// src/lib/auth/auth-context.tsx - Type-Safe Enhanced Version
 "use client";
 import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
@@ -17,39 +16,10 @@ interface AuthContextType {
   isStaff: boolean;
   isManager: boolean;
   isAdmin: boolean;
-  // Add a retry function for stuck states
   retryAuthentication: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-/**
- * Enhanced Promise with Timeout Utility
- *
- * This utility allows us to add timeout functionality to any promise
- * while maintaining proper TypeScript types. It's like putting a
- * kitchen timer on your database queries - if they take too long,
- * we abort and try again.
- */
-function withTimeout<T>(
-  promise: Promise<T> | PromiseLike<T>,
-  timeoutMs: number,
-  timeoutMessage = "Operation timed out"
-): Promise<T> {
-  let timeoutHandle: NodeJS.Timeout;
-
-  const timeoutPromise = new Promise<T>((_, reject) => {
-    timeoutHandle = setTimeout(() => {
-      reject(new Error(timeoutMessage));
-    }, timeoutMs);
-  });
-
-  const wrappedPromise = Promise.resolve(promise).finally(() =>
-    clearTimeout(timeoutHandle)
-  );
-
-  return Promise.race([wrappedPromise, timeoutPromise]);
-}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Core state
@@ -60,29 +30,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Enhanced refs for better state management
+  // Refs for state management
   const loadingStaffData = useRef(false);
   const currentUserId = useRef<string | null>(null);
-  const maxRetries = useRef(0);
 
   /**
-   * Enhanced Staff Data Loading with Timeout and Retry Logic
+   * Load Staff Data via API Route
    *
-   * This function now includes timeout handling to prevent hanging,
-   * retry logic for temporary failures, and better error states.
-   *
-   * Think of this as the hiring process for your restaurant - we need
-   * to verify the person's identity (auth user) and get their job
-   * details (staff record) and workplace info (restaurant data).
+   * This new approach uses our API route to fetch staff data, which bypasses
+   * RLS issues and provides more reliable performance. Think of it like using
+   * the employee entrance instead of the customer entrance - it's a direct
+   * path to the data without security checkpoints that might slow things down.
    */
-  const loadStaffData = async (userId: string, retryCount = 0) => {
-    // Prevent multiple concurrent attempts
+  const loadStaffData = async (session: Session, retryCount = 0) => {
+    // Prevent concurrent loading attempts
     if (loadingStaffData.current) {
       console.log("Staff data already loading, skipping...");
       return;
     }
 
     // Prevent reloading the same user's data unless it's a retry
+    const userId = session.user.id;
     if (currentUserId.current === userId && retryCount === 0) {
       console.log("Staff data already loaded for this user, skipping...");
       return;
@@ -92,105 +60,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     currentUserId.current = userId;
 
     try {
-      console.log(
-        `Loading staff data for user: ${userId} (attempt ${retryCount + 1})`
-      );
+      console.log(`Loading staff data via API (attempt ${retryCount + 1})`);
       setError(null);
 
-      /**
-       * Step 1: Load Staff Record with Timeout Protection
-       *
-       * We wrap the Supabase query in our timeout utility. This preserves
-       * the response type while adding timeout functionality. It's like
-       * setting a timer when you're looking up an employee's file.
-       */
-      const staffData = await withTimeout(
-        supabase
-          .from("staff")
-          .select("*")
-          .eq("id", userId)
-          .eq("is_active", true)
-          .single()
-          .then(({ data, error }) => {
-            if (error) throw error;
-            return data;
-          }),
-        10000, // 10 second timeout
-        "Staff data query timed out"
-      );
+      // Use the API route with the access token
+      const response = await fetch("/api/auth/staff", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
-      console.log("Staff record loaded:", staffData);
+      if (!response.ok) {
+        const errorData = await response.json();
 
-      /**
-       * Step 2: Load Restaurant Data with Timeout Protection
-       *
-       * Once we have the staff record, we need their restaurant details.
-       * This is like getting the restaurant's operations manual after
-       * we've confirmed the employee works there.
-       */
-      const restaurantData = await withTimeout(
-        supabase
-          .from("restaurants")
-          .select("*")
-          .eq("id", staffData.restaurant_id)
-          .single()
-          .then(({ data, error }) => {
-            if (error) throw error;
-            return data;
-          }),
-        5000, // 5 second timeout for restaurant data
-        "Restaurant data query timed out"
-      );
+        if (response.status === 401) {
+          throw new Error("Authentication failed - please sign in again");
+        } else if (response.status === 404) {
+          throw new Error("No staff record found for this account");
+        } else {
+          throw new Error(errorData.error || `API request failed with status ${response.status}`);
+        }
+      }
 
-      console.log("Restaurant data loaded:", restaurantData);
+      const result = await response.json();
 
-      // Update state atomically to prevent intermediate renders
+      if (!result.data) {
+        throw new Error("Invalid response from API");
+      }
+
+      const { staff: staffData, restaurant: restaurantData } = result.data;
+
+      // Update state atomically
       setStaff(staffData);
       setRestaurant(restaurantData);
       setError(null);
-      maxRetries.current = 0; // Reset retry counter on success
 
-      console.log(
-        "Authentication completed successfully:",
-        staffData.name,
-        staffData.role
-      );
+      console.log("Staff data loaded successfully via API:", staffData.name, staffData.role);
+      console.log("Restaurant data loaded:", restaurantData.name);
     } catch (error) {
       console.error("Failed to load staff data:", error);
 
-      // Increment retry counter
-      maxRetries.current = Math.max(maxRetries.current, retryCount + 1);
-
-      /**
-       * Enhanced Error Handling with Smart Retry Logic
-       *
-       * Different errors require different responses:
-       * - Timeout errors: Retry automatically (network might be slow)
-       * - Permission errors: Don't retry (user doesn't have access)
-       * - Not found errors: Don't retry (user not in system)
-       */
+      // Handle different types of errors
       if (error instanceof Error) {
-        if (error.message.includes("timeout") && retryCount < 3) {
-          console.log(`Retrying staff data load (attempt ${retryCount + 1})`);
-          // Wait progressively longer between retries (1s, 2s, 3s)
-          await new Promise((resolve) =>
-            setTimeout(resolve, (retryCount + 1) * 1000)
-          );
-          return loadStaffData(userId, retryCount + 1);
+        if (error.message.includes("Failed to fetch") && retryCount < 2) {
+          // Network error - retry with delay
+          console.log(`Retrying API call (attempt ${retryCount + 1})`);
+          await new Promise((resolve) => setTimeout(resolve, (retryCount + 1) * 1000));
+          return loadStaffData(session, retryCount + 1);
         }
 
-        // For non-timeout errors or max retries reached
-        if (error.message.includes("No rows returned")) {
-          setError("Access denied. No staff record found for this account.");
-        } else if (error.message.includes("timeout")) {
-          setError(
-            "Connection timeout. Please check your internet connection and try again."
-          );
-        } else {
-          setError(error.message);
-        }
+        setError(error.message);
       } else {
-        setError("An unexpected error occurred during authentication.");
+        setError("An unexpected error occurred during authentication");
       }
 
       // Clear user data on error
@@ -199,8 +122,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRestaurant(null);
       currentUserId.current = null;
 
-      // Only sign out for non-timeout errors to allow manual retry
-      if (!(error instanceof Error && error.message.includes("timeout"))) {
+      // Sign out for auth errors
+      if (error instanceof Error && error.message.includes("Authentication failed")) {
         await supabase.auth.signOut();
       }
     } finally {
@@ -210,10 +133,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /**
-   * Initialize Authentication with Better Error Handling
+   * Initialize Authentication
    *
-   * This enhanced initialization provides better feedback when
-   * authentication fails and includes recovery mechanisms.
+   * Gets the initial session and loads staff data if user is signed in.
+   * This now uses a simpler approach since we're not doing database queries directly.
    */
   useEffect(() => {
     let mounted = true;
@@ -223,39 +146,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Initializing authentication...");
         setLoading(true);
 
-        // Get initial session with timeout protection
-        const sessionResult = await withTimeout(
-          supabase.auth.getSession(),
-          8000,
-          "Session initialization timed out"
-        );
+        // Get initial session
+        const {
+          data: { session: initialSession },
+          error,
+        } = await supabase.auth.getSession();
 
-        if (sessionResult.error) {
-          console.error("Error getting initial session:", sessionResult.error);
-          setError(sessionResult.error.message);
+        if (error) {
+          console.error("Error getting initial session:", error);
+          setError(error.message);
           setLoading(false);
           return;
         }
 
         if (!mounted) return;
 
-        const session = sessionResult.data.session;
-        setSession(session);
-        setUser(session?.user ?? null);
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
 
-        if (session?.user) {
-          await loadStaffData(session.user.id);
+        // Load staff data if user exists
+        if (initialSession?.user) {
+          await loadStaffData(initialSession);
         } else {
           setLoading(false);
         }
       } catch (error) {
         console.error("Error initializing auth:", error);
         if (mounted) {
-          setError(
-            error instanceof Error
-              ? error.message
-              : "Failed to initialize authentication"
-          );
+          setError(error instanceof Error ? error.message : "Failed to initialize authentication");
           setLoading(false);
         }
       }
@@ -269,10 +187,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
-   * Enhanced Auth State Listener
+   * Auth State Change Listener
    *
-   * This listener now includes better state management and
-   * prevents conflicts with the initialization process.
+   * Handles sign in, sign out, and token refresh events.
    */
   useEffect(() => {
     console.log("Setting up auth state listener...");
@@ -282,9 +199,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event);
 
-      // Ignore token refresh events if we're already loading
-      if (event === "TOKEN_REFRESHED" && loadingStaffData.current) {
-        console.log("Ignoring token refresh during staff data loading");
+      // Don't process events if we're still loading
+      if (loadingStaffData.current) {
+        console.log("Still loading staff data, skipping auth change...");
         return;
       }
 
@@ -292,6 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
 
       if (event === "SIGNED_OUT" || !session?.user) {
+        // Clear all user data
         setUser(null);
         setStaff(null);
         setRestaurant(null);
@@ -299,13 +217,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         console.log("User signed out - cleared auth state");
       } else if (event === "SIGNED_IN" && session?.user) {
+        // User signed in - load their staff data
         setUser(session.user);
-        await loadStaffData(session.user.id);
+        await loadStaffData(session);
       } else if (event === "TOKEN_REFRESHED" && session?.user) {
+        // Token refreshed - update user but only reload staff data if needed
         setUser(session.user);
-        // Don't reload staff data on token refresh unless there's an error
         if (!staff || !restaurant) {
-          await loadStaffData(session.user.id);
+          await loadStaffData(session);
         }
       }
     });
@@ -314,14 +233,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Cleaning up auth listener...");
       subscription.unsubscribe();
     };
-  }, [staff, restaurant]); // Include staff and restaurant in dependencies
+  }, [staff, restaurant]);
 
   /**
    * Manual Retry Function
    *
-   * Sometimes network issues or temporary database problems can leave
-   * users in a stuck state. This function gives them a way to manually
-   * retry the authentication process without refreshing the page.
+   * Allows users to retry authentication if they get stuck.
    */
   const retryAuthentication = () => {
     console.log("Manually retrying authentication...");
@@ -329,12 +246,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     if (session?.user) {
-      // Reset the current user ID to force a reload
+      // Reset state and retry
       currentUserId.current = null;
       loadingStaffData.current = false;
-      loadStaffData(session.user.id);
+      loadStaffData(session);
     } else {
-      // Refresh the entire session
+      // No session - refresh page
       window.location.reload();
     }
   };
@@ -411,10 +328,7 @@ export const useAuth = () => {
 };
 
 /**
- * Enhanced Protected Route with Retry Capability
- *
- * Now includes a retry button when authentication gets stuck
- * and better error messaging for different failure scenarios.
+ * Protected Route Component - Unchanged
  */
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -422,44 +336,29 @@ interface ProtectedRouteProps {
   fallback?: React.ReactNode;
 }
 
-export function ProtectedRoute({
-  children,
-  requireRole,
-  fallback,
-}: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requireRole, fallback }: ProtectedRouteProps) {
   const { user, staff, loading, error, retryAuthentication } = useAuth();
 
-  // Enhanced loading state with retry option
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center h-screen">
         <div className="text-lg mb-4">Checking authentication...</div>
-        <div className="text-sm text-gray-600 mb-4">
-          This usually takes just a moment
-        </div>
-        {/* Show retry button after some time */}
+        <div className="text-sm text-gray-600 mb-4">This usually takes just a moment</div>
         <RetryButton onRetry={retryAuthentication} />
       </div>
     );
   }
 
-  // Enhanced error state with specific messaging
   if (error) {
     return (
       <div className="flex flex-col justify-center items-center h-screen">
         <div className="text-center max-w-md">
           <div className="text-red-600 text-lg mb-2">Authentication Error</div>
           <div className="text-gray-600 mb-4">{error}</div>
-          <button
-            onClick={retryAuthentication}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2"
-          >
+          <button onClick={retryAuthentication} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2">
             Try Again
           </button>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
-          >
+          <button onClick={() => window.location.reload()} className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
             Refresh Page
           </button>
         </div>
@@ -467,28 +366,21 @@ export function ProtectedRoute({
     );
   }
 
-  // Check authentication
   if (!user || !staff) {
     return fallback || <LoginForm />;
   }
 
-  // Check role-based access
   if (requireRole) {
     const roleHierarchy = { staff: 1, manager: 2, admin: 3 };
-    const userLevel =
-      roleHierarchy[staff.role as keyof typeof roleHierarchy] || 0;
+    const userLevel = roleHierarchy[staff.role as keyof typeof roleHierarchy] || 0;
     const requiredLevel = roleHierarchy[requireRole];
 
     if (userLevel < requiredLevel) {
       return (
         <div className="text-center py-16">
           <div className="text-red-600 text-lg mb-2">Access Denied</div>
-          <p className="text-gray-600">
-            You need {requireRole} or higher privileges to access this area.
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Current role: {staff.role}
-          </p>
+          <p className="text-gray-600">You need {requireRole} or higher privileges to access this area.</p>
+          <p className="text-sm text-gray-500 mt-2">Current role: {staff.role}</p>
         </div>
       );
     }
@@ -499,9 +391,6 @@ export function ProtectedRoute({
 
 /**
  * Retry Button Component
- *
- * Shows a retry button after a delay to help users who get stuck
- * in the loading state.
  */
 function RetryButton({ onRetry }: { onRetry: () => void }) {
   const [showRetry, setShowRetry] = useState(false);
@@ -509,7 +398,7 @@ function RetryButton({ onRetry }: { onRetry: () => void }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowRetry(true);
-    }, 5000); // Show retry button after 5 seconds
+    }, 5000);
 
     return () => clearTimeout(timer);
   }, []);
@@ -518,20 +407,17 @@ function RetryButton({ onRetry }: { onRetry: () => void }) {
 
   return (
     <div className="text-center">
-      <div className="text-sm text-gray-500 mb-2">
-        Taking longer than expected?
-      </div>
-      <button
-        onClick={onRetry}
-        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-      >
+      <div className="text-sm text-gray-500 mb-2">Taking longer than expected?</div>
+      <button onClick={onRetry} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">
         Retry Authentication
       </button>
     </div>
   );
 }
 
-// LoginForm component remains unchanged from your original
+/**
+ * Login Form Component - Unchanged
+ */
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -548,10 +434,9 @@ function LoginForm() {
     try {
       await signIn(email, password);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Login failed";
+      const errorMessage = error instanceof Error ? error.message : "Login failed";
       setLoginError(errorMessage);
-      setPassword(""); // Clear password on error
+      setPassword("");
     } finally {
       setIsSubmitting(false);
     }
@@ -561,12 +446,8 @@ function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-gray-900">
-            🍕 Pizza Mia Staff Login
-          </h2>
-          <p className="mt-2 text-gray-600">
-            Sign in to access the staff dashboard
-          </p>
+          <h2 className="text-3xl font-extrabold text-gray-900">🍕 Pizza Mia Staff Login</h2>
+          <p className="mt-2 text-gray-600">Sign in to access the staff dashboard</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -583,10 +464,7 @@ function LoginForm() {
           )}
 
           <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
               Email Address
             </label>
             <input
@@ -603,10 +481,7 @@ function LoginForm() {
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
               Password
             </label>
             <input
@@ -628,20 +503,8 @@ function LoginForm() {
           >
             {isSubmitting ? (
               <span className="flex items-center">
-                <svg
-                  className="animate-spin -ml-1 mr-3 h-5 w-5"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path
                     className="opacity-75"
                     fill="currentColor"
