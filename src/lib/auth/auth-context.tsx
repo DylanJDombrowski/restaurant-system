@@ -184,7 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [loadStaffData]);
+  });
 
   /**
    * Auth State Change Listener
@@ -233,7 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Cleaning up auth listener...");
       subscription.unsubscribe();
     };
-  }, [loadStaffData, staff, restaurant]);
+  }, [staff, restaurant]);
 
   /**
    * Manual Retry Function
