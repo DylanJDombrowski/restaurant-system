@@ -1,40 +1,55 @@
-// src/lib/auth/auth-context.tsx
+// src/lib/auth/auth-context.tsx - Type-Safe Enhanced Version
 "use client";
 import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import { Staff, Restaurant } from "@/lib/types";
 
-/**
- * Authentication Context - Infinite Loop Prevention Version
- *
- * This version includes several safeguards to prevent infinite loops:
- * 1. Loading flags to prevent duplicate API calls
- * 2. Ref tracking to avoid unnecessary effect triggers
- * 3. Proper cleanup and error boundaries
- */
 interface AuthContextType {
-  // Core authentication state
   user: User | null;
   staff: Staff | null;
   restaurant: Restaurant | null;
   session: Session | null;
-
-  // Loading and error states
   loading: boolean;
   error: string | null;
-
-  // Authentication actions
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-
-  // Role checking helpers
   isStaff: boolean;
   isManager: boolean;
   isAdmin: boolean;
+  // Add a retry function for stuck states
+  retryAuthentication: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+/**
+ * Enhanced Promise with Timeout Utility
+ *
+ * This utility allows us to add timeout functionality to any promise
+ * while maintaining proper TypeScript types. It's like putting a
+ * kitchen timer on your database queries - if they take too long,
+ * we abort and try again.
+ */
+function withTimeout<T>(
+  promise: Promise<T> | PromiseLike<T>,
+  timeoutMs: number,
+  timeoutMessage = "Operation timed out"
+): Promise<T> {
+  let timeoutHandle: NodeJS.Timeout;
+
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+  });
+
+  const wrappedPromise = Promise.resolve(promise).finally(() =>
+    clearTimeout(timeoutHandle)
+  );
+
+  return Promise.race([wrappedPromise, timeoutPromise]);
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Core state
@@ -45,27 +60,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Refs to prevent infinite loops
+  // Enhanced refs for better state management
   const loadingStaffData = useRef(false);
   const currentUserId = useRef<string | null>(null);
+  const maxRetries = useRef(0);
 
   /**
-   * Load Staff Data with Loop Prevention
+   * Enhanced Staff Data Loading with Timeout and Retry Logic
    *
-   * This function includes several safeguards:
-   * - Loading flag to prevent concurrent calls
-   * - User ID check to avoid reloading same data
-   * - Proper error handling and cleanup
+   * This function now includes timeout handling to prevent hanging,
+   * retry logic for temporary failures, and better error states.
+   *
+   * Think of this as the hiring process for your restaurant - we need
+   * to verify the person's identity (auth user) and get their job
+   * details (staff record) and workplace info (restaurant data).
    */
-  const loadStaffData = async (userId: string) => {
-    // Prevent concurrent loading attempts
+  const loadStaffData = async (userId: string, retryCount = 0) => {
+    // Prevent multiple concurrent attempts
     if (loadingStaffData.current) {
       console.log("Staff data already loading, skipping...");
       return;
     }
 
-    // Prevent reloading the same user's data
-    if (currentUserId.current === userId) {
+    // Prevent reloading the same user's data unless it's a retry
+    if (currentUserId.current === userId && retryCount === 0) {
       console.log("Staff data already loaded for this user, skipping...");
       return;
     }
@@ -74,63 +92,117 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     currentUserId.current = userId;
 
     try {
-      console.log("Loading staff data for user:", userId);
+      console.log(
+        `Loading staff data for user: ${userId} (attempt ${retryCount + 1})`
+      );
       setError(null);
 
-      // First, fetch the staff record
-      const { data: staffData, error: staffError } = await supabase
-        .from("staff")
-        .select("*")
-        .eq("id", userId)
-        .eq("is_active", true)
-        .single();
+      /**
+       * Step 1: Load Staff Record with Timeout Protection
+       *
+       * We wrap the Supabase query in our timeout utility. This preserves
+       * the response type while adding timeout functionality. It's like
+       * setting a timer when you're looking up an employee's file.
+       */
+      const staffData = await withTimeout(
+        supabase
+          .from("staff")
+          .select("*")
+          .eq("id", userId)
+          .eq("is_active", true)
+          .single()
+          .then(({ data, error }) => {
+            if (error) throw error;
+            return data;
+          }),
+        10000, // 10 second timeout
+        "Staff data query timed out"
+      );
 
-      if (staffError) {
-        console.error("Error loading staff data:", staffError);
+      console.log("Staff record loaded:", staffData);
 
-        if (staffError.code === "PGRST116") {
-          throw new Error("Access denied. No staff record found.");
-        }
+      /**
+       * Step 2: Load Restaurant Data with Timeout Protection
+       *
+       * Once we have the staff record, we need their restaurant details.
+       * This is like getting the restaurant's operations manual after
+       * we've confirmed the employee works there.
+       */
+      const restaurantData = await withTimeout(
+        supabase
+          .from("restaurants")
+          .select("*")
+          .eq("id", staffData.restaurant_id)
+          .single()
+          .then(({ data, error }) => {
+            if (error) throw error;
+            return data;
+          }),
+        5000, // 5 second timeout for restaurant data
+        "Restaurant data query timed out"
+      );
 
-        throw staffError;
-      }
+      console.log("Restaurant data loaded:", restaurantData);
 
-      // Then fetch the restaurant data
-      const { data: restaurantData, error: restaurantError } = await supabase
-        .from("restaurants")
-        .select("*")
-        .eq("id", staffData.restaurant_id)
-        .single();
-
-      if (restaurantError) {
-        console.error("Error loading restaurant data:", restaurantError);
-        throw new Error("Failed to load restaurant information");
-      }
-
-      // Update state in a single batch to prevent multiple re-renders
+      // Update state atomically to prevent intermediate renders
       setStaff(staffData);
       setRestaurant(restaurantData);
+      setError(null);
+      maxRetries.current = 0; // Reset retry counter on success
 
       console.log(
-        "Staff data loaded successfully:",
+        "Authentication completed successfully:",
         staffData.name,
         staffData.role
       );
-      console.log("Restaurant data loaded:", restaurantData.name);
     } catch (error) {
       console.error("Failed to load staff data:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to load staff data"
-      );
 
-      // Clear user data and sign out on error
+      // Increment retry counter
+      maxRetries.current = Math.max(maxRetries.current, retryCount + 1);
+
+      /**
+       * Enhanced Error Handling with Smart Retry Logic
+       *
+       * Different errors require different responses:
+       * - Timeout errors: Retry automatically (network might be slow)
+       * - Permission errors: Don't retry (user doesn't have access)
+       * - Not found errors: Don't retry (user not in system)
+       */
+      if (error instanceof Error) {
+        if (error.message.includes("timeout") && retryCount < 3) {
+          console.log(`Retrying staff data load (attempt ${retryCount + 1})`);
+          // Wait progressively longer between retries (1s, 2s, 3s)
+          await new Promise((resolve) =>
+            setTimeout(resolve, (retryCount + 1) * 1000)
+          );
+          return loadStaffData(userId, retryCount + 1);
+        }
+
+        // For non-timeout errors or max retries reached
+        if (error.message.includes("No rows returned")) {
+          setError("Access denied. No staff record found for this account.");
+        } else if (error.message.includes("timeout")) {
+          setError(
+            "Connection timeout. Please check your internet connection and try again."
+          );
+        } else {
+          setError(error.message);
+        }
+      } else {
+        setError("An unexpected error occurred during authentication.");
+      }
+
+      // Clear user data on error
       setUser(null);
       setStaff(null);
       setRestaurant(null);
       currentUserId.current = null;
 
-      // Sign out to prevent stuck states
-      await supabase.auth.signOut();
+      // Only sign out for non-timeout errors to allow manual retry
+      if (!(error instanceof Error && error.message.includes("timeout"))) {
+        await supabase.auth.signOut();
+      }
     } finally {
       loadingStaffData.current = false;
       setLoading(false);
@@ -138,9 +210,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /**
-   * Initialize Authentication
+   * Initialize Authentication with Better Error Handling
    *
-   * This effect runs only once when the component mounts
+   * This enhanced initialization provides better feedback when
+   * authentication fails and includes recovery mechanisms.
    */
   useEffect(() => {
     let mounted = true;
@@ -148,28 +221,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initializeAuth = async () => {
       try {
         console.log("Initializing authentication...");
+        setLoading(true);
 
-        // Get initial session
-        const {
-          data: { session: initialSession },
-          error,
-        } = await supabase.auth.getSession();
+        // Get initial session with timeout protection
+        const sessionResult = await withTimeout(
+          supabase.auth.getSession(),
+          8000,
+          "Session initialization timed out"
+        );
 
-        if (error) {
-          console.error("Error getting initial session:", error);
-          setError(error.message);
+        if (sessionResult.error) {
+          console.error("Error getting initial session:", sessionResult.error);
+          setError(sessionResult.error.message);
           setLoading(false);
           return;
         }
 
-        if (!mounted) return; // Component unmounted, don't update state
+        if (!mounted) return;
 
-        setSession(initialSession);
-        setUser(initialSession?.user ?? null);
+        const session = sessionResult.data.session;
+        setSession(session);
+        setUser(session?.user ?? null);
 
-        // Load staff data if user exists
-        if (initialSession?.user) {
-          await loadStaffData(initialSession.user.id);
+        if (session?.user) {
+          await loadStaffData(session.user.id);
         } else {
           setLoading(false);
         }
@@ -177,7 +252,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Error initializing auth:", error);
         if (mounted) {
           setError(
-            error instanceof Error ? error.message : "Failed to initialize auth"
+            error instanceof Error
+              ? error.message
+              : "Failed to initialize authentication"
           );
           setLoading(false);
         }
@@ -189,12 +266,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, []); // Empty dependency array - only run once
+  }, []);
 
   /**
-   * Auth State Change Listener
+   * Enhanced Auth State Listener
    *
-   * Set up after initial load to handle sign in/out events
+   * This listener now includes better state management and
+   * prevents conflicts with the initialization process.
    */
   useEffect(() => {
     console.log("Setting up auth state listener...");
@@ -204,9 +282,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event);
 
-      // Prevent processing the same event multiple times
-      if (loadingStaffData.current) {
-        console.log("Still loading staff data, skipping auth change...");
+      // Ignore token refresh events if we're already loading
+      if (event === "TOKEN_REFRESHED" && loadingStaffData.current) {
+        console.log("Ignoring token refresh during staff data loading");
         return;
       }
 
@@ -214,19 +292,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
 
       if (event === "SIGNED_OUT" || !session?.user) {
-        // Clear all user data
         setUser(null);
         setStaff(null);
         setRestaurant(null);
         currentUserId.current = null;
         setLoading(false);
+        console.log("User signed out - cleared auth state");
       } else if (event === "SIGNED_IN" && session?.user) {
-        // User signed in - load their staff data
         setUser(session.user);
         await loadStaffData(session.user.id);
       } else if (event === "TOKEN_REFRESHED" && session?.user) {
-        // Token refreshed - update user but don't reload staff data
         setUser(session.user);
+        // Don't reload staff data on token refresh unless there's an error
+        if (!staff || !restaurant) {
+          await loadStaffData(session.user.id);
+        }
       }
     });
 
@@ -234,7 +314,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Cleaning up auth listener...");
       subscription.unsubscribe();
     };
-  }, []); // Empty dependency array - listener should be set up once
+  }, [staff, restaurant]); // Include staff and restaurant in dependencies
+
+  /**
+   * Manual Retry Function
+   *
+   * Sometimes network issues or temporary database problems can leave
+   * users in a stuck state. This function gives them a way to manually
+   * retry the authentication process without refreshing the page.
+   */
+  const retryAuthentication = () => {
+    console.log("Manually retrying authentication...");
+    setLoading(true);
+    setError(null);
+
+    if (session?.user) {
+      // Reset the current user ID to force a reload
+      currentUserId.current = null;
+      loadingStaffData.current = false;
+      loadStaffData(session.user.id);
+    } else {
+      // Refresh the entire session
+      window.location.reload();
+    }
+  };
 
   const signIn = async (email: string, password: string) => {
     setError(null);
@@ -247,8 +350,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) throw error;
-
-      // Note: loadStaffData will be called by the auth state change listener
     } catch (error) {
       setError(error instanceof Error ? error.message : "Sign in failed");
       setLoading(false);
@@ -260,7 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
-      // Clear refs before signing out
+      // Clear refs and state before signing out
       loadingStaffData.current = false;
       currentUserId.current = null;
 
@@ -293,6 +394,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isStaff,
         isManager,
         isAdmin,
+        retryAuthentication,
       }}
     >
       {children}
@@ -309,7 +411,10 @@ export const useAuth = () => {
 };
 
 /**
- * Protected Route Component
+ * Enhanced Protected Route with Retry Capability
+ *
+ * Now includes a retry button when authentication gets stuck
+ * and better error messaging for different failure scenarios.
  */
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -322,30 +427,47 @@ export function ProtectedRoute({
   requireRole,
   fallback,
 }: ProtectedRouteProps) {
-  const { user, staff, loading, error } = useAuth();
+  const { user, staff, loading, error, retryAuthentication } = useAuth();
 
-  // Show loading state
+  // Enhanced loading state with retry option
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="text-lg">Checking authentication...</div>
+      <div className="flex flex-col justify-center items-center h-screen">
+        <div className="text-lg mb-4">Checking authentication...</div>
+        <div className="text-sm text-gray-600 mb-4">
+          This usually takes just a moment
+        </div>
+        {/* Show retry button after some time */}
+        <RetryButton onRetry={retryAuthentication} />
       </div>
     );
   }
 
-  // Show error state
+  // Enhanced error state with specific messaging
   if (error) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="text-center">
+      <div className="flex flex-col justify-center items-center h-screen">
+        <div className="text-center max-w-md">
           <div className="text-red-600 text-lg mb-2">Authentication Error</div>
-          <div className="text-gray-600">{error}</div>
+          <div className="text-gray-600 mb-4">{error}</div>
+          <button
+            onClick={retryAuthentication}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2"
+          >
+            Try Again
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+          >
+            Refresh Page
+          </button>
         </div>
       </div>
     );
   }
 
-  // If not authenticated, show login
+  // Check authentication
   if (!user || !staff) {
     return fallback || <LoginForm />;
   }
@@ -376,8 +498,40 @@ export function ProtectedRoute({
 }
 
 /**
- * Login Form Component
+ * Retry Button Component
+ *
+ * Shows a retry button after a delay to help users who get stuck
+ * in the loading state.
  */
+function RetryButton({ onRetry }: { onRetry: () => void }) {
+  const [showRetry, setShowRetry] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowRetry(true);
+    }, 5000); // Show retry button after 5 seconds
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!showRetry) return null;
+
+  return (
+    <div className="text-center">
+      <div className="text-sm text-gray-500 mb-2">
+        Taking longer than expected?
+      </div>
+      <button
+        onClick={onRetry}
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+      >
+        Retry Authentication
+      </button>
+    </div>
+  );
+}
+
+// LoginForm component remains unchanged from your original
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
