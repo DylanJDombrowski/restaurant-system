@@ -154,6 +154,38 @@ export default function StaffOrdersPage() {
   );
 }
 
+const calculateDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number => {
+  const R = 3959; // Earth's radius in miles
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+// Add these state variables for address validation
+const [addressValidation, setAddressValidation] = useState<{
+  isValidating: boolean;
+  distance: number | null;
+  isInDeliveryArea: boolean;
+  overrideDelivery: boolean;
+}>({
+  isValidating: false,
+  distance: null,
+  isInDeliveryArea: true,
+  overrideDelivery: false,
+});
+
 // Enhanced Order Creation Form with Customer Lookup & Delivery Address
 function OrderCreationForm({
   menuItems,
@@ -258,6 +290,74 @@ function OrderCreationForm({
     return () => clearTimeout(timeoutId);
   }, [customerInfo.phone, lookupCustomer]);
 
+  // Restaurant coordinates (you'll want to get these from your restaurant data)
+  const RESTAURANT_COORDS = { lat: 41.5067, lng: -87.9673 }; // New Lenox, IL approximation
+  const STANDARD_DELIVERY_RADIUS = 8; // miles
+
+  // Address validation function
+  const validateDeliveryAddress = async (
+    address: string,
+    city: string,
+    zip: string
+  ) => {
+    if (!address || !city || !zip) return;
+
+    setAddressValidation((prev) => ({ ...prev, isValidating: true }));
+
+    try {
+      // Simple geocoding using a free service (you might want to use Google Maps API later)
+      const fullAddress = `${address}, ${city}, ${zip}`;
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          fullAddress
+        )}`
+      );
+      const data = await response.json();
+
+      if (data && data[0]) {
+        const distance = calculateDistance(
+          RESTAURANT_COORDS.lat,
+          RESTAURANT_COORDS.lng,
+          parseFloat(data[0].lat),
+          parseFloat(data[0].lon)
+        );
+
+        setAddressValidation({
+          isValidating: false,
+          distance: Math.round(distance * 10) / 10,
+          isInDeliveryArea: distance <= STANDARD_DELIVERY_RADIUS,
+          overrideDelivery: false,
+        });
+      }
+    } catch (error) {
+      console.error("Error validating address:", error);
+      setAddressValidation((prev) => ({
+        ...prev,
+        isValidating: false,
+        distance: null,
+        isInDeliveryArea: true, // Default to allowing if validation fails
+      }));
+    }
+  };
+
+  // Add this effect to trigger validation when address changes
+  useEffect(() => {
+    if (
+      deliveryAddress.address &&
+      deliveryAddress.city &&
+      deliveryAddress.zip
+    ) {
+      const timeoutId = setTimeout(() => {
+        validateDeliveryAddress(
+          deliveryAddress.address,
+          deliveryAddress.city,
+          deliveryAddress.zip
+        );
+      }, 1000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [deliveryAddress.address, deliveryAddress.city, deliveryAddress.zip]);
+
   // Handle address selection
   const handleAddressSelection = (addressId: string) => {
     const address = customerAddresses.find((addr) => addr.id === addressId);
@@ -271,6 +371,21 @@ function OrderCreationForm({
       });
     }
   };
+
+  useEffect(() => {
+    if (foundCustomer && customerAddresses.length > 0) {
+      // Auto-suggest delivery for customers with saved addresses
+      const defaultAddress =
+        customerAddresses.find((addr) => addr.is_default) ||
+        customerAddresses[0];
+
+      if (defaultAddress && orderType === "pickup") {
+        // Smart suggestion: if customer has addresses, suggest delivery
+        setOrderType("delivery");
+        handleAddressSelection(defaultAddress.id);
+      }
+    }
+  }, [foundCustomer, customerAddresses, orderType]);
 
   const addItem = (menuItem: MenuItemWithCategory) => {
     setSelectedItems((prev) => {
@@ -428,7 +543,11 @@ function OrderCreationForm({
     customerInfo.name &&
     customerInfo.phone &&
     (orderType === "pickup" ||
-      (deliveryAddress.address && deliveryAddress.city && deliveryAddress.zip));
+      (deliveryAddress.address &&
+        deliveryAddress.city &&
+        deliveryAddress.zip &&
+        (addressValidation.isInDeliveryArea ||
+          addressValidation.overrideDelivery)));
 
   return (
     <div className="space-y-8">
@@ -688,6 +807,58 @@ function OrderCreationForm({
               />
             </div>
           </div>
+          {orderType === "delivery" && addressValidation.distance !== null && (
+            <div
+              className={`mt-4 p-3 rounded-lg border ${
+                addressValidation.isInDeliveryArea ||
+                addressValidation.overrideDelivery
+                  ? "bg-green-50 border-green-200"
+                  : "bg-yellow-50 border-yellow-300"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span
+                    className={`w-3 h-3 rounded-full ${
+                      addressValidation.isInDeliveryArea ||
+                      addressValidation.overrideDelivery
+                        ? "bg-green-500"
+                        : "bg-yellow-500"
+                    }`}
+                  ></span>
+                  <span className="text-sm font-medium">
+                    Distance: {addressValidation.distance} miles from restaurant
+                  </span>
+                </div>
+
+                {!addressValidation.isInDeliveryArea && (
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={addressValidation.overrideDelivery}
+                      onChange={(e) =>
+                        setAddressValidation((prev) => ({
+                          ...prev,
+                          overrideDelivery: e.target.checked,
+                        }))
+                      }
+                      className="rounded"
+                    />
+                    <span className="text-sm">Override delivery limit</span>
+                  </label>
+                )}
+              </div>
+
+              {!addressValidation.isInDeliveryArea &&
+                !addressValidation.overrideDelivery && (
+                  <p className="text-sm text-yellow-800 mt-2">
+                    ⚠️ This address is outside our standard delivery area (8
+                    miles). Check with customer about additional delivery fees
+                    or pickup option.
+                  </p>
+                )}
+            </div>
+          )}
         </div>
       )}
 
