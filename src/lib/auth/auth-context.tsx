@@ -20,6 +20,8 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const staffRef = useRef<Staff | null>(null);
+const restaurantRef = useRef<Restaurant | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Core state
@@ -132,6 +134,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Update the refs whenever staff or restaurant change
+  useEffect(() => {
+    staffRef.current = staff;
+  }, [staff]);
+
+  useEffect(() => {
+    restaurantRef.current = restaurant;
+  }, [restaurant]);
+
   /**
    * Initialize Authentication
    *
@@ -223,7 +234,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (event === "TOKEN_REFRESHED" && session?.user) {
         // Token refreshed - update user but only reload staff data if needed
         setUser(session.user);
-        if (!staff || !restaurant) {
+
+        // Check current state directly instead of relying on stale closure values
+        const currentStaff = staffRef.current;
+        const currentRestaurant = restaurantRef.current;
+
+        if (!currentStaff || !currentRestaurant) {
           await loadStaffData(session);
         }
       }
@@ -233,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Cleaning up auth listener...");
       subscription.unsubscribe();
     };
-  }, [staff, restaurant]);
+  }, []);
 
   /**
    * Manual Retry Function
