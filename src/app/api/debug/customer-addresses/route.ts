@@ -175,7 +175,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<DebugRespo
         .filter((order) => order.customer_address && order.customer_city && order.customer_zip)
         .map((order) => `${order.customer_address}, ${order.customer_city} ${order.customer_zip}`);
 
-      const savedAddresses = customerInfo.addresses.map((addr) => `${addr.address}, ${addr.city} ${addr.zip}`);
+      //   const savedAddresses = customerInfo.addresses.map((addr) => `${addr.address}, ${addr.city} ${addr.zip}`);
 
       const uniqueOrderAddresses = [...new Set(orderAddresses)];
       if (uniqueOrderAddresses.length > customerInfo.addresses.length) {
