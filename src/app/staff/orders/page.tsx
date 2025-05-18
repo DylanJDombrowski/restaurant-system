@@ -135,16 +135,16 @@ export default function StaffOrdersPage() {
 
 // Utility function for distance calculation - this can stay at the top level
 // because it's not a React hook
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 3959; // Earth's radius in miles
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
+// const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+//   const R = 3959; // Earth's radius in miles
+//   const dLat = ((lat2 - lat1) * Math.PI) / 180;
+//   const dLon = ((lon2 - lon1) * Math.PI) / 180;
+//   const a =
+//     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+//     Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// };
 
 // Enhanced Order Creation Form with Customer Lookup & Delivery Address
 function OrderCreationForm({
@@ -456,7 +456,7 @@ function OrderCreationForm({
               </p>
             )}
             {customerLookupStatus === "not-found" && customerInfo.phone.length >= 10 && (
-              <p className="text-sm text-gray-500 mt-1">New customer - we'll create their account</p>
+              <p className="text-sm text-gray-500 mt-1">New customer - we&apos;ll create their account</p>
             )}
           </div>
 
