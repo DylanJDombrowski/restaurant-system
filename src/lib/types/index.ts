@@ -1,147 +1,299 @@
-import { Database } from "./database.types";
+// src/lib/types/index.ts - Clean, Working Type System
+// Starting simple and building up gradually
 
-export type { Database } from "./database.types";
+/**
+ * ===================================================================
+ * CORE ENUMS AND CONSTANTS
+ * ===================================================================
+ * These define the fixed values our system recognizes
+ */
 
-// Re-export table types for easier imports
-export type Restaurant = Database["public"]["Tables"]["restaurants"]["Row"];
-export type Staff = Database["public"]["Tables"]["staff"]["Row"];
-export type Customer = Database["public"]["Tables"]["customers"]["Row"];
-export type CustomerAddress =
-  Database["public"]["Tables"]["customer_addresses"]["Row"];
-export type LoyaltyTransaction =
-  Database["public"]["Tables"]["loyalty_transactions"]["Row"];
-export type Order = Database["public"]["Tables"]["orders"]["Row"];
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready"
+  | "completed"
+  | "cancelled";
 
-// Updated Menu System Types
-export type MenuCategory =
-  Database["public"]["Tables"]["menu_categories"]["Row"];
-export type MenuItem = Database["public"]["Tables"]["menu_items"]["Row"];
-export type MenuItemVariant =
-  Database["public"]["Tables"]["menu_item_variants"]["Row"];
-export type Topping = Database["public"]["Tables"]["toppings"]["Row"];
-export type MenuItemVariantToppingPrice =
-  Database["public"]["Tables"]["menu_item_variant_topping_prices"]["Row"];
-export type Modifier = Database["public"]["Tables"]["modifiers"]["Row"];
-export type MenuItemModifier =
-  Database["public"]["Tables"]["menu_item_modifiers"]["Row"];
+export type StaffRole = "staff" | "manager" | "admin";
+export type OrderType = "pickup" | "delivery";
 
-export type OrderItem = Database["public"]["Tables"]["order_items"]["Row"];
+/**
+ * ===================================================================
+ * BASIC DATABASE INTERFACES
+ * ===================================================================
+ * These match your current database structure exactly
+ */
 
-// Insert types for forms
-export type InsertOrder = Database["public"]["Tables"]["orders"]["Insert"];
-export type InsertOrderItem =
-  Database["public"]["Tables"]["order_items"]["Insert"];
-export type InsertCustomer =
-  Database["public"]["Tables"]["customers"]["Insert"];
-export type InsertCustomerAddress =
-  Database["public"]["Tables"]["customer_addresses"]["Insert"];
-export type InsertMenuItem =
-  Database["public"]["Tables"]["menu_items"]["Insert"];
-export type InsertMenuItemVariant =
-  Database["public"]["Tables"]["menu_item_variants"]["Insert"];
-export type InsertTopping = Database["public"]["Tables"]["toppings"]["Insert"];
-export type InsertMenuItemVariantToppingPrice =
-  Database["public"]["Tables"]["menu_item_variant_topping_prices"]["Insert"];
-export type InsertModifier =
-  Database["public"]["Tables"]["modifiers"]["Insert"];
-export type InsertStaff = Database["public"]["Tables"]["staff"]["Insert"];
+export interface Restaurant {
+  id: string;
+  name: string;
+  slug: string;
+  config: Record<string, unknown>; // More specific than 'any'
+  created_at: string;
+  updated_at: string;
+}
 
-// Update types
-export type UpdateOrder = Database["public"]["Tables"]["orders"]["Update"];
-export type UpdateMenuItem =
-  Database["public"]["Tables"]["menu_items"]["Update"];
-export type UpdateMenuItemVariant =
-  Database["public"]["Tables"]["menu_item_variants"]["Update"];
-export type UpdateCustomer =
-  Database["public"]["Tables"]["customers"]["Update"];
-export type UpdateStaff = Database["public"]["Tables"]["staff"]["Update"];
+export interface Staff {
+  id: string;
+  restaurant_id: string;
+  email: string;
+  name: string;
+  role: StaffRole;
+  is_active: boolean;
+  created_at: string;
+}
 
-// Enums
-export type OrderStatus = Database["public"]["Enums"]["order_status"];
-// export type StaffRole = Database["public"]["Enums"]["staff_role_enum"];
-// export type OrderType = Database["public"]["Enums"]["order_type_enum"];
+export interface MenuCategory {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  description?: string;
+  sort_order: number;
+  is_active: boolean;
+}
 
-// Custom business types / Hydrated types for frontend use
+/**
+ * Base MenuItem interface - this reflects your actual database structure
+ * Including the enhanced fields you've added during migration
+ */
+export interface MenuItem {
+  id: string;
+  restaurant_id: string;
+  category_id?: string;
+  name: string;
+  description?: string;
+  base_price: number;
+  prep_time_minutes: number;
+  is_available: boolean;
+  // Enhanced fields for the new menu system
+  item_type: string; // 'pizza', 'appetizer', etc.
+  allows_custom_toppings: boolean; // Whether this item can be customized
+  default_toppings_json?: unknown; // JSON field for default toppings
+  image_url?: string; // Product image
+  created_at: string;
+  updated_at: string;
+}
 
-export type ConfiguredTopping = Topping & { price: number; quantity?: number }; // Price here is specific to the item variant
-export type ConfiguredModifier = Modifier & { quantity?: number };
+/**
+ * Menu Item Variants - for sizes, crusts, portions
+ * This allows different sizes of the same item with different prices
+ */
+export interface MenuItemVariant {
+  id: string;
+  menu_item_id: string;
+  name: string; // "Small 10\"", "Medium 12\"", etc.
+  price: number; // Price for this specific variant
+  serves?: string; // "Serves 1-2", etc.
+  crust_type?: string; // For pizzas - "thin", "thick", etc.
+  sort_order: number;
+  is_available: boolean;
+}
 
-// Represents an item being configured in the UI or an item in the cart
-export type CartItem = {
-  id: string; // Could be a unique ID generated for the cart item, or combo of item+variant+config
-  baseMenuItem: MenuItem;
-  selectedVariant: MenuItemVariant | null; // Null if item has no variants (e.g. a drink)
-  selectedToppings: ConfiguredTopping[];
-  selectedModifiers: ConfiguredModifier[];
+/**
+ * Toppings - ingredients that can be added to customizable items
+ */
+export interface Topping {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  category: string; // "meats", "vegetables", "cheese", etc.
+  is_premium: boolean; // Whether this topping costs extra
+  is_available: boolean;
+}
+
+/**
+ * Modifiers - additional modifications like "Well Done", "Cut in Squares"
+ */
+export interface Modifier {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  price_adjustment: number; // How much this modifier adds/subtracts
+  is_available: boolean;
+}
+
+/**
+ * Customer management
+ */
+export interface Customer {
+  id: string;
+  restaurant_id: string;
+  phone: string;
+  email?: string;
+  name?: string;
+  loyalty_points: number;
+  total_orders: number;
+  total_spent: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerAddress {
+  id: string;
+  restaurant_id: string;
+  customer_id: string;
+  customer_phone: string;
+  customer_name: string;
+  customer_email?: string;
+  address: string;
+  city: string;
+  zip: string;
+  delivery_instructions?: string;
+  is_default: boolean;
+  created_at: string;
+}
+
+/**
+ * Order management
+ */
+export interface Order {
+  id: string;
+  restaurant_id: string;
+  customer_id?: string;
+  order_number: string;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  order_type?: OrderType;
+  status: OrderStatus;
+
+  // Delivery fields
+  customer_address?: string;
+  customer_city?: string;
+  customer_zip?: string;
+  delivery_instructions?: string;
+
+  // Pricing
+  subtotal: number;
+  tax_amount: number;
+  tip_amount: number;
+  delivery_fee: number;
+  total: number;
+
+  // Additional details
+  special_instructions?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Order Items - individual items within an order
+ * This now supports both simple items and complex customizable items
+ */
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  menu_item_id: string;
+  menu_item_variant_id?: string; // Links to specific size/variant
   quantity: number;
-  itemLevelSpecialInstructions: string | null;
-  calculatedPrice: number; // Price for one unit of this configured item
-};
+  unit_price: number;
+  total_price: number;
 
-// This replaces the old OrderItem that only had menu_item_id
-export type OrderItemWithDetails = OrderItem & {
-  menu_item: MenuItem; // Base menu item
-  menu_item_variant?: MenuItemVariant; // Specific variant like size/crust
-  // selected_toppings_json and selected_modifiers_json are already on OrderItem
-  // You'd parse them on the frontend if needed for display
-};
+  // JSON fields for storing customizations
+  selected_toppings_json?: unknown; // Store topping selections
+  selected_modifiers_json?: unknown; // Store modifier selections
 
-export type OrderWithItems = Order & {
-  order_items: OrderItemWithDetails[]; // Use the more detailed OrderItemWithDetails
-  customer?: Customer;
-};
+  special_instructions?: string;
+  created_at: string;
+}
 
-// Enhanced MenuItem for display, including its variants and category
-export type MenuItemWithRelations = MenuItem & {
-  category?: MenuCategory;
-  variants: MenuItemVariant[]; // All available variants for this item
-  // Toppings and modifiers would likely be fetched separately based on context
-  // or linked through variants for pricing.
-};
+/**
+ * ===================================================================
+ * ENHANCED TYPES FOR FRONTEND USE
+ * ===================================================================
+ * These add relationships and computed properties for better UI display
+ */
 
-export type CustomerWithStats = Customer & {
-  order_count?: number;
-  last_order_date?: string;
-  addresses?: CustomerAddress[];
-};
-
-export type CustomerAddressWithDetails = CustomerAddress & {
-  customer?: Customer;
-};
-
+/**
+ * MenuItem with its category information
+ * Used throughout the staff interface for simple displays
+ */
 export type MenuItemWithCategory = MenuItem & {
   category?: MenuCategory;
 };
 
-// Form data types
-export interface CreateOrderFormData {
-  customerName: string;
-  customerPhone: string;
-  customerEmail?: string;
-  orderType: "pickup" | "delivery";
-  customerAddress?: string;
-  customerCity?: string;
-  customerZip?: string;
-  deliveryInstructions?: string;
-  specialInstructions?: string; // Order-level special instructions
-  // items will now be an array of CartItem or similar structure
-  items: CartItem[];
-}
+/**
+ * MenuItem with all its variants
+ * Used in the customer interface where size/variant selection is important
+ */
+export type MenuItemWithVariants = MenuItem & {
+  category?: MenuCategory;
+  variants: MenuItemVariant[];
+};
 
-// Customer lookup response
-export interface CustomerLookupResponse {
-  customer: Customer | null;
+/**
+ * Order item with full menu information
+ * Used for displaying orders with complete item details
+ */
+export type OrderItemWithDetails = OrderItem & {
+  menu_item?: MenuItem;
+  menu_item_variant?: MenuItemVariant;
+};
+
+/**
+ * Complete order with all related information
+ * This is the main type used throughout the application for order display
+ */
+export type OrderWithItems = Order & {
+  order_items?: OrderItemWithDetails[];
+  customer?: Customer;
+};
+
+/**
+ * Customer with additional statistics
+ * Used for customer lookup and loyalty displays
+ */
+export type CustomerWithStats = Customer & {
   addresses?: CustomerAddress[];
-}
+};
 
-// API Response types
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface ApiResponse<T = any> {
+/**
+ * ===================================================================
+ * INSERT TYPES FOR FORMS
+ * ===================================================================
+ * These represent the data needed when creating new records
+ */
+
+export type InsertOrder = Omit<Order, "id" | "created_at" | "updated_at">;
+export type InsertOrderItem = Omit<OrderItem, "id" | "created_at">;
+export type InsertCustomer = Omit<Customer, "id" | "created_at" | "updated_at">;
+export type InsertCustomerAddress = Omit<CustomerAddress, "id" | "created_at">;
+export type InsertStaff = Omit<Staff, "id" | "created_at">;
+export type InsertMenuItem = Omit<MenuItem, "id" | "created_at" | "updated_at">;
+export type InsertMenuItemVariant = Omit<MenuItemVariant, "id">;
+export type InsertTopping = Omit<Topping, "id">;
+export type InsertModifier = Omit<Modifier, "id">;
+
+/**
+ * ===================================================================
+ * API AND FORM INTERFACES
+ * ===================================================================
+ * These define the structure of data flowing between frontend and backend
+ */
+
+/**
+ * Standard API response wrapper
+ * All API endpoints return data in this format for consistency
+ */
+export interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
   message?: string;
 }
 
+/**
+ * Customer lookup response from the search API
+ */
+export interface CustomerLookupResponse {
+  customer: Customer | null;
+  addresses?: CustomerAddress[];
+}
+
+/**
+ * Order summary for price calculations
+ */
 export interface OrderSummary {
   subtotal: number;
   tax: number;
@@ -150,22 +302,44 @@ export interface OrderSummary {
   total: number;
 }
 
-// Enhanced customer with recent activity
-export interface CustomerWithActivity extends Customer {
-  recent_orders?: Order[];
-  favorite_items?: MenuItem[]; // This would require more complex logic to determine
-  addresses?: CustomerAddress[];
-}
-
+/**
+ * Form data for creating new staff members
+ */
 export interface CreateStaffFormData {
   name: string;
   email: string;
-  role: "staff" | "manager" | "admin";
+  role: StaffRole;
   password: string;
   restaurant_id: string;
 }
 
-// Type for fetching menu data for the UI
-export type FullMenuCategory = MenuCategory & {
-  menu_items: MenuItemWithRelations[];
-};
+/**
+ * ===================================================================
+ * UTILITY FUNCTIONS
+ * ===================================================================
+ * Helper functions for working with the types
+ */
+
+/**
+ * Type guard to check if an item allows customization
+ */
+export function isCustomizableItem(item: MenuItem): boolean {
+  return item.allows_custom_toppings === true;
+}
+
+/**
+ * Type guard to check if an item is a pizza
+ */
+export function isPizzaItem(item: MenuItem): boolean {
+  return item.item_type === "pizza";
+}
+
+/**
+ * ===================================================================
+ * CONSTANTS
+ * ===================================================================
+ */
+
+export const DEFAULT_PREP_TIME = 25; // minutes
+export const DEFAULT_TAX_RATE = 0.08; // 8%
+export const DEFAULT_DELIVERY_FEE = 3.99;

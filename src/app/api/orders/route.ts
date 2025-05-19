@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { ApiResponse, OrderWithItems, InsertOrder, InsertOrderItem, InsertCustomer, InsertCustomerAddress } from "@/lib/types";
+import {
+  ApiResponse,
+  OrderWithItems,
+  InsertOrder,
+  InsertCustomer,
+  InsertCustomerAddress,
+} from "@/lib/types";
 
 /**
  * Interface for incoming order item data
@@ -9,15 +15,29 @@ import { ApiResponse, OrderWithItems, InsertOrder, InsertOrderItem, InsertCustom
  * Think of this like creating a clear specification for what each item
  * in an order should contain.
  */
-interface IncomingOrderItem {
+
+interface EnhancedOrderItem {
   menuItemId: string;
+  variantId?: string; // For sized items like pizzas
   quantity: number;
   unitPrice: number;
+  selectedToppings?: Array<{
+    id: string;
+    name: string;
+    price: number;
+  }>;
+  selectedModifiers?: Array<{
+    id: string;
+    name: string;
+    price: number;
+  }>;
   specialInstructions?: string;
 }
 
 // GET handler - existing functionality
-export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<OrderWithItems[]>>> {
+export async function GET(
+  request: NextRequest
+): Promise<NextResponse<ApiResponse<OrderWithItems[]>>> {
   try {
     const { searchParams } = new URL(request.url);
     const restaurantId = searchParams.get("restaurant_id");
@@ -25,7 +45,10 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
     const limit = searchParams.get("limit");
 
     if (!restaurantId) {
-      return NextResponse.json({ error: "restaurant_id is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "restaurant_id is required" },
+        { status: 400 }
+      );
     }
 
     console.log("Fetching orders for restaurant:", restaurantId);
@@ -72,129 +95,118 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
     return NextResponse.json({ data: orders || [] });
   } catch (error) {
     console.error("Error fetching orders:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
 // POST handler - enhanced version with proper typing
-export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse<OrderWithItems>>> {
+export async function POST(request: NextRequest) {
   try {
-    console.log("=== Creating New Order ===");
-
     const body = await request.json();
-    console.log("Request body:", body);
-
     const { orderData, orderItems } = body;
 
-    if (!orderData || !orderItems) {
-      return NextResponse.json({ error: "Missing orderData or orderItems" }, { status: 400 });
+    // Validate that we have the required data
+    if (!orderData || !orderItems || !Array.isArray(orderItems)) {
+      return NextResponse.json(
+        { error: "Missing orderData or orderItems" },
+        { status: 400 }
+      );
     }
 
-    // Generate order number
+    // Generate order number (keeping your existing logic)
     const orderNumber = generateOrderNumber();
-    console.log("Generated order number:", orderNumber);
 
-    /**
-     * Step 1: Enhanced Customer Handling
-     *
-     * This improved version ensures we always create or find a customer
-     * before processing the order. Think of this like checking someone in
-     * at the front desk before seating them - we want their record ready
-     * before we start taking their order details.
-     */
+    // Handle customer creation/lookup (keeping your existing logic)
     let customerId = null;
     if (orderData.customer_phone) {
       customerId = await handleCustomerWithBetterErrorHandling(orderData);
-      console.log("Customer handled, ID:", customerId);
     }
 
-    // Create the order
-    const orderInsert: InsertOrder = {
+    // Create the order record (keeping your existing logic)
+    const orderInsert = {
       ...orderData,
       order_number: orderNumber,
       customer_id: customerId,
     };
 
-    console.log("Inserting order:", orderInsert);
-
-    const { data: order, error: orderError } = await supabaseServer.from("orders").insert(orderInsert).select().single();
+    const { data: order, error: orderError } = await supabaseServer
+      .from("orders")
+      .insert(orderInsert)
+      .select()
+      .single();
 
     if (orderError) {
       console.error("Error creating order:", orderError);
-      return NextResponse.json({ error: `Failed to create order: ${orderError.message}` }, { status: 500 });
+      return NextResponse.json({ error: orderError.message }, { status: 500 });
     }
 
-    console.log("Order created successfully:", order);
-
-    /**
-     * Step 2: Enhanced Address Saving
-     *
-     * This is where the magic happens. We save the delivery address
-     * with comprehensive error handling and validation. Think of this
-     * like updating a customer's address book - we want to make sure
-     * we capture this information properly for future orders.
-     */
-    if (order.order_type === "delivery" && customerId && order.customer_address) {
-      console.log("Attempting to save delivery address...");
-      const addressSaved = await handleDeliveryAddressWithErrorHandling(customerId, orderData);
-
-      if (addressSaved) {
-        console.log("✅ Delivery address saved successfully");
-      } else {
-        console.log("⚠️ Delivery address could not be saved (order still successful)");
-      }
+    // Handle delivery address saving (keeping your existing logic)
+    if (
+      order.order_type === "delivery" &&
+      customerId &&
+      order.customer_address
+    ) {
+      await handleDeliveryAddressWithErrorHandling(customerId, orderData);
     }
 
-    // Create order items with proper typing
-    const orderItemsToInsert: InsertOrderItem[] = orderItems.map((item: IncomingOrderItem) => ({
-      order_id: order.id,
-      menu_item_id: item.menuItemId,
-      quantity: item.quantity,
-      unit_price: item.unitPrice,
-      total_price: item.unitPrice * item.quantity,
-      special_instructions: item.specialInstructions || null,
-    }));
+    // Create order items with enhanced configuration support
+    const enhancedOrderItems = await Promise.all(
+      orderItems.map(async (item: EnhancedOrderItem) => {
+        const orderItemData = {
+          order_id: order.id,
+          menu_item_id: item.menuItemId,
+          menu_item_variant_id: item.variantId || null,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          total_price: item.unitPrice * item.quantity,
+          selected_toppings_json: item.selectedToppings || [],
+          selected_modifiers_json: item.selectedModifiers || [],
+          special_instructions: item.specialInstructions || null,
+        };
 
-    console.log("Inserting order items:", orderItemsToInsert);
+        return orderItemData;
+      })
+    );
 
-    const { data: createdOrderItems, error: itemsError } = await supabaseServer.from("order_items").insert(orderItemsToInsert).select(`
+    const { data: createdOrderItems, error: itemsError } = await supabaseServer
+      .from("order_items")
+      .insert(enhancedOrderItems).select(`
         *,
-        menu_items(id, name, description, base_price)
+        menu_items(id, name, description),
+        menu_item_variants(id, name, size_code)
       `);
 
     if (itemsError) {
       console.error("Error creating order items:", itemsError);
       // Rollback the order if items creation fails
       await supabaseServer.from("orders").delete().eq("id", order.id);
-      return NextResponse.json({ error: `Failed to create order items: ${itemsError.message}` }, { status: 500 });
+      return NextResponse.json({ error: itemsError.message }, { status: 500 });
     }
 
-    console.log("Order items created:", createdOrderItems);
-
-    // Update customer stats if customer exists
+    // Update customer statistics (keeping your existing logic)
     if (customerId) {
       await updateCustomerStats(customerId, order.total);
     }
 
-    // Return complete order with items
+    // Return the complete order with enhanced items
     const completeOrder = {
       ...order,
       order_items: createdOrderItems,
     };
 
-    console.log("✅ Order creation completed successfully");
+    console.log("✅ Enhanced order created successfully");
 
     return NextResponse.json({
       data: completeOrder,
       message: "Order created successfully",
     });
   } catch (error) {
-    console.error("❌ Unexpected error creating order:", error);
+    console.error("Error creating enhanced order:", error);
     return NextResponse.json(
-      {
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -206,7 +218,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
  * This version provides much more detailed logging and error handling
  * to help us understand what's happening with customer creation and lookup.
  */
-async function handleCustomerWithBetterErrorHandling(orderData: InsertOrder): Promise<string | null> {
+async function handleCustomerWithBetterErrorHandling(
+  orderData: InsertOrder
+): Promise<string | null> {
   try {
     console.log("🔍 Looking up customer with phone:", orderData.customer_phone);
 
@@ -219,7 +233,9 @@ async function handleCustomerWithBetterErrorHandling(orderData: InsertOrder): Pr
       .from("customers")
       .select("*")
       .eq("restaurant_id", orderData.restaurant_id)
-      .or(`phone.eq.${orderData.customer_phone},phone.eq.${cleanPhone},phone.eq.+1${cleanPhone}`)
+      .or(
+        `phone.eq.${orderData.customer_phone},phone.eq.${cleanPhone},phone.eq.+1${cleanPhone}`
+      )
       .maybeSingle(); // Use maybeSingle instead of single to avoid errors when no customer found
 
     if (lookupError) {
@@ -283,7 +299,11 @@ async function handleCustomerWithBetterErrorHandling(orderData: InsertOrder): Pr
 
       console.log("New customer data:", newCustomer);
 
-      const { data: customer, error: createError } = await supabaseServer.from("customers").insert(newCustomer).select().single();
+      const { data: customer, error: createError } = await supabaseServer
+        .from("customers")
+        .insert(newCustomer)
+        .select()
+        .single();
 
       if (createError) {
         console.error("❌ Error creating customer:", createError);
@@ -322,10 +342,17 @@ async function handleCustomerWithBetterErrorHandling(orderData: InsertOrder): Pr
  *
  * Note: Removed the unused orderId parameter that was causing linting errors.
  */
-async function handleDeliveryAddressWithErrorHandling(customerId: string, orderData: InsertOrder): Promise<boolean> {
+async function handleDeliveryAddressWithErrorHandling(
+  customerId: string,
+  orderData: InsertOrder
+): Promise<boolean> {
   try {
     // Validate we have the required address information
-    if (!orderData.customer_address || !orderData.customer_city || !orderData.customer_zip) {
+    if (
+      !orderData.customer_address ||
+      !orderData.customer_city ||
+      !orderData.customer_zip
+    ) {
       console.log("⚠️ Incomplete address information, skipping address save:", {
         address: !!orderData.customer_address,
         city: !!orderData.customer_city,
@@ -361,7 +388,11 @@ async function handleDeliveryAddressWithErrorHandling(customerId: string, orderD
       console.log("✅ Address already exists for customer, skipping creation");
 
       // Update the instructions if they're different or were empty
-      if (orderData.delivery_instructions && orderData.delivery_instructions !== existingAddress.delivery_instructions) {
+      if (
+        orderData.delivery_instructions &&
+        orderData.delivery_instructions !==
+          existingAddress.delivery_instructions
+      ) {
         console.log("📝 Updating delivery instructions for existing address");
 
         const { error: updateError } = await supabaseServer
@@ -391,7 +422,8 @@ async function handleDeliveryAddressWithErrorHandling(customerId: string, orderD
       console.error("⚠️ Error checking existing addresses count:", countError);
     }
 
-    const isFirstAddress = !countError && (!existingAddresses || existingAddresses.length === 0);
+    const isFirstAddress =
+      !countError && (!existingAddresses || existingAddresses.length === 0);
     console.log("Is this the customer's first address?", isFirstAddress);
 
     // Create new address record
@@ -410,7 +442,11 @@ async function handleDeliveryAddressWithErrorHandling(customerId: string, orderD
 
     console.log("Creating new address:", newAddress);
 
-    const { data: savedAddress, error: saveError } = await supabaseServer.from("customer_addresses").insert(newAddress).select().single();
+    const { data: savedAddress, error: saveError } = await supabaseServer
+      .from("customer_addresses")
+      .insert(newAddress)
+      .select()
+      .single();
 
     if (saveError) {
       console.error("❌ Error saving new address:", saveError);
@@ -478,13 +514,15 @@ async function updateCustomerStats(customerId: string, orderTotal: number) {
     }
 
     // Log loyalty transaction
-    const { error: loyaltyError } = await supabaseServer.from("loyalty_transactions").insert({
-      customer_id: customerId,
-      points_earned: pointsEarned,
-      points_redeemed: 0,
-      transaction_type: "earned",
-      description: `Order reward: ${pointsEarned} points`,
-    });
+    const { error: loyaltyError } = await supabaseServer
+      .from("loyalty_transactions")
+      .insert({
+        customer_id: customerId,
+        points_earned: pointsEarned,
+        points_redeemed: 0,
+        transaction_type: "earned",
+        description: `Order reward: ${pointsEarned} points`,
+      });
 
     if (loyaltyError) {
       console.error("⚠️ Error logging loyalty transaction:", loyaltyError);
