@@ -103,6 +103,41 @@ export interface Topping {
   is_available: boolean;
 }
 
+// Define the topping amount type once and use it everywhere
+export type ToppingAmount = "none" | "light" | "normal" | "extra";
+
+// Define the configured topping interface consistently
+export interface ConfiguredTopping {
+  id: string;
+  name: string;
+  amount: ToppingAmount;
+  price: number;
+  isDefault: boolean;
+}
+
+// Define the configured modifier interface
+export interface ConfiguredModifier {
+  id: string;
+  name: string;
+  priceAdjustment: number;
+}
+
+// Define the cart item interface that all components will use
+export interface ConfiguredCartItem {
+  id: string;
+  menuItemId: string;
+  menuItemName: string;
+  variantId?: string;
+  variantName?: string;
+  quantity: number;
+  basePrice: number;
+  selectedToppings?: ConfiguredTopping[];
+  selectedModifiers?: ConfiguredModifier[];
+  specialInstructions?: string;
+  totalPrice: number;
+  displayName: string;
+}
+
 /**
  * Modifiers - additional modifications like "Well Done", "Cut in Squares"
  */

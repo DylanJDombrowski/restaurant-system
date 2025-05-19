@@ -1,12 +1,38 @@
+// src/app/staff/orders/page-enhanced.tsx
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import {
-  MenuItemWithCategory,
+  MenuItemWithVariants,
   Restaurant,
   OrderWithItems,
   Customer,
   CustomerAddress,
+  Topping,
+  Modifier,
 } from "@/lib/types";
+import EnhancedMenuItemSelector from "@/components/features/orders/EnhancedMenuItemSelector";
+import type { ConfiguredCartItem } from "@/components/features/orders/EnhancedMenuItemSelector";
+import EnhancedCartSystem, {
+  useCartStatistics,
+} from "@/components/features/orders/EnhancedCartSystem";
+
+/**
+ * Enhanced Staff Orders Page
+ *
+ * This page represents the evolution of your order management system. It integrates
+ * all the sophisticated customization capabilities we've built while maintaining
+ * the efficiency your staff needs during busy service periods.
+ *
+ * Key improvements from the original:
+ * 1. Supports complex menu items with variants (sizes, crusts)
+ * 2. Handles sophisticated topping and modifier systems
+ * 3. Implements your custom pricing logic (no credits for removed toppings)
+ * 4. Provides progressive disclosure (simple items stay simple)
+ * 5. Real-time price calculation throughout the process
+ *
+ * Think of this as transforming from a basic calculator to a sophisticated
+ * order management system that understands the nuances of your business.
+ */
 
 // First, let's create better form styling constants
 const inputStyles = `
@@ -20,193 +46,23 @@ const labelStyles = `
   block text-sm font-medium text-gray-900 mb-1
 `;
 
-export default function StaffOrdersPage() {
+export default function EnhancedStaffOrdersPage() {
+  // Core data states
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
-  const [menuItems, setMenuItems] = useState<MenuItemWithCategory[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItemWithVariants[]>([]);
+  const [toppings, setToppings] = useState<Topping[]>([]);
+  const [modifiers, setModifiers] = useState<Modifier[]>([]);
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
+
+  // Cart state - this is the heart of our enhanced system
+  const [cartItems, setCartItems] = useState<ConfiguredCartItem[]>([]);
+
+  // UI states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRecentOrdersVisible, setIsRecentOrdersVisible] = useState(false);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setError(null);
-
-        const restaurantResponse = await fetch("/api/restaurants");
-        if (!restaurantResponse.ok) {
-          throw new Error(`Restaurant API error: ${restaurantResponse.status}`);
-        }
-        const restaurantData = await restaurantResponse.json();
-        setRestaurant(restaurantData.data);
-
-        const menuResponse = await fetch(
-          `/api/menu?restaurant_id=${restaurantData.data.id}&available_only=true`
-        );
-        if (!menuResponse.ok) {
-          throw new Error(`Menu API error: ${menuResponse.status}`);
-        }
-        const menuData = await menuResponse.json();
-        setMenuItems(menuData.data || []);
-
-        const ordersResponse = await fetch(
-          `/api/orders?restaurant_id=${restaurantData.data.id}`
-        );
-        if (!ordersResponse.ok) {
-          throw new Error(`Orders API error: ${ordersResponse.status}`);
-        }
-        const ordersData = await ordersResponse.json();
-        setOrders(ordersData.data || []);
-      } catch (error) {
-        console.error("Error loading data:", error);
-        setError(
-          error instanceof Error ? error.message : "Failed to load data"
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadData();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-96">
-        <div className="text-lg font-semibold text-gray-900">
-          Loading restaurant data...
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-16">
-        <div className="text-red-600 text-lg font-semibold mb-4">
-          Error Loading Data
-        </div>
-        <p className="text-gray-900">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-          Staff Order Management
-        </h1>
-        <div className="mt-2 text-base md:text-lg text-gray-800">
-          <span className="font-semibold">{restaurant?.name}</span> •
-          <span className="ml-2">
-            Today&apos;s Orders:{" "}
-            <span className="font-semibold text-blue-600">{orders.length}</span>
-          </span>{" "}
-          •
-          <span className="ml-2">
-            Available Items:{" "}
-            <span className="font-semibold text-green-600">
-              {menuItems.length}
-            </span>
-          </span>
-        </div>
-      </div>
-
-      {/* Main content area */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        {/* Order Creation Form - Dynamically adjust column span */}
-        <div
-          className={isRecentOrdersVisible ? "lg:col-span-2" : "lg:col-span-3"}
-        >
-          <OrderCreationForm
-            menuItems={menuItems}
-            restaurantId={restaurant?.id || ""}
-            onOrderCreated={() => {
-              window.location.reload();
-            }}
-          />
-        </div>
-
-        {/* Recent Orders - Conditionally render the entire column */}
-        {isRecentOrdersVisible && (
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex justify-between items-center mb-6 border-b pb-3">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Recent Orders
-                </h2>
-                {/* Button to toggle visibility is now better placed, perhaps in a page header or a dedicated toggle bar if needed */}
-              </div>
-              <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-                {orders.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="text-gray-500 text-lg">
-                      No orders yet today
-                    </div>
-                    <p className="text-gray-700 text-sm mt-2">
-                      Create your first order!
-                    </p>
-                  </div>
-                ) : (
-                  orders
-                    .slice(0, 10)
-                    .map((order) => <OrderCard key={order.id} order={order} />)
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-      {/* Button to toggle recent orders visibility could be placed outside the grid, e.g., in page header or a floating button */}
-      <div className="mt-4 text-right">
-        <button
-          onClick={() => setIsRecentOrdersVisible(!isRecentOrdersVisible)}
-          className="bg-slate-200 text-slate-700 hover:bg-slate-300 px-4 py-2 rounded-md text-sm font-medium"
-        >
-          {isRecentOrdersVisible ? "Hide Recent Orders" : "Show Recent Orders"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// Utility function for distance calculation - this can stay at the top level
-// because it's not a React hook
-// const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-//   const R = 3959; // Earth's radius in miles
-//   const dLat = ((lat2 - lat1) * Math.PI) / 180;
-//   const dLon = ((lon2 - lon1) * Math.PI) / 180;
-//   const a =
-//     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-//     Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-//   return R * c;
-// };
-
-// Enhanced Order Creation Form with Customer Lookup & Delivery Address
-function OrderCreationForm({
-  menuItems,
-  restaurantId,
-  onOrderCreated,
-}: {
-  menuItems: MenuItemWithCategory[];
-  restaurantId: string;
-  onOrderCreated: () => void;
-}) {
-  const [selectedItems, setSelectedItems] = useState<
-    Array<{
-      menuItem: MenuItemWithCategory;
-      quantity: number;
-      justAdded?: boolean;
-    }>
-  >([]);
+  // Customer management states (keeping your existing logic)
   const [customerInfo, setCustomerInfo] = useState({
     name: "",
     phone: "",
@@ -220,6 +76,8 @@ function OrderCreationForm({
   const [customerLookupStatus, setCustomerLookupStatus] = useState<
     "idle" | "searching" | "found" | "not-found"
   >("idle");
+
+  // Order type and delivery states
   const [orderType, setOrderType] = useState<"pickup" | "delivery">("pickup");
   const [orderTypeAutoSuggested, setOrderTypeAutoSuggested] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState({
@@ -232,10 +90,83 @@ function OrderCreationForm({
     null
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
-  const [isCustomerInfoExpanded, setIsCustomerInfoExpanded] = useState(true); // Start with customer info expanded
+
+  // Customer info management
+  const [isCustomerInfoExpanded, setIsCustomerInfoExpanded] = useState(true);
   const [customerInfoConfirmed, setCustomerInfoConfirmed] = useState(false);
 
+  // Calculate cart statistics using our enhanced hook
+  const cartStats = useCartStatistics(cartItems);
+  const orderSummary = {
+    subtotal: cartStats.subtotal,
+    tax: cartStats.tax,
+    deliveryFee: orderType === "delivery" ? 3.99 : 0,
+    total:
+      cartStats.subtotal +
+      cartStats.tax +
+      (orderType === "delivery" ? 3.99 : 0),
+  };
+
+  /**
+   * Data Loading Phase
+   *
+   * This loads all the data needed for the enhanced ordering system.
+   * Notice how we're now loading the full menu with variants, toppings, and modifiers.
+   */
+  useEffect(() => {
+    async function loadEnhancedData() {
+      try {
+        setError(null);
+
+        // Load restaurant information
+        const restaurantResponse = await fetch("/api/restaurants");
+        if (!restaurantResponse.ok) {
+          throw new Error(`Restaurant API error: ${restaurantResponse.status}`);
+        }
+        const restaurantData = await restaurantResponse.json();
+        setRestaurant(restaurantData.data);
+
+        // Load complete menu with variants and customization options
+        const menuResponse = await fetch(
+          `/api/menu/full?restaurant_id=${restaurantData.data.id}`
+        );
+        if (!menuResponse.ok) {
+          throw new Error(`Menu API error: ${menuResponse.status}`);
+        }
+        const menuData = await menuResponse.json();
+
+        // Extract data from the enhanced menu response
+        setMenuItems(menuData.data.menu_items || []);
+        setToppings(menuData.data.toppings || []);
+        setModifiers(menuData.data.modifiers || []);
+
+        // Load recent orders for reference
+        const ordersResponse = await fetch(
+          `/api/orders?restaurant_id=${restaurantData.data.id}&limit=20`
+        );
+        if (!ordersResponse.ok) {
+          throw new Error(`Orders API error: ${ordersResponse.status}`);
+        }
+        const ordersData = await ordersResponse.json();
+        setOrders(ordersData.data || []);
+      } catch (error) {
+        console.error("Error loading enhanced data:", error);
+        setError(
+          error instanceof Error ? error.message : "Failed to load data"
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadEnhancedData();
+  }, []);
+
+  /**
+   * Customer Lookup Logic
+   *
+   * Keeping your existing customer lookup functionality since it works well.
+   */
   const lookupCustomer = useCallback(
     async (phone: string) => {
       if (phone.length < 10) {
@@ -251,7 +182,7 @@ function OrderCreationForm({
         const response = await fetch(
           `/api/customers/lookup?phone=${encodeURIComponent(
             phone
-          )}&restaurant_id=${restaurantId}`
+          )}&restaurant_id=${restaurant!.id}`
         );
         const data = await response.json();
         if (data.data && data.data.customer) {
@@ -289,7 +220,7 @@ function OrderCreationForm({
         setLookupLoading(false);
       }
     },
-    [restaurantId, orderType, orderTypeAutoSuggested]
+    [restaurant, orderType, orderTypeAutoSuggested]
   );
 
   const handleAddressSelection = useCallback(
@@ -310,6 +241,7 @@ function OrderCreationForm({
 
   const handleOrderTypeChange = (newType: "pickup" | "delivery") => {
     setOrderType(newType);
+    // Update cart delivery fee
     if (
       newType === "delivery" &&
       customerAddresses.length > 0 &&
@@ -327,85 +259,77 @@ function OrderCreationForm({
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (customerInfo.phone) {
+      if (customerInfo.phone && restaurant) {
         lookupCustomer(customerInfo.phone);
       }
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [customerInfo.phone, lookupCustomer]);
+  }, [customerInfo.phone, lookupCustomer, restaurant]);
 
   const handleConfirmCustomer = () => {
     if (customerInfo.name && customerInfo.phone) {
       setCustomerInfoConfirmed(true);
-      setIsCustomerInfoExpanded(false); // Collapse after confirmation
+      setIsCustomerInfoExpanded(false);
     } else {
       alert("Please enter customer name and phone number.");
     }
   };
 
-  // const handleEditCustomer = () => {
-  //   setCustomerInfoConfirmed(false);
-  //   setIsCustomerInfoExpanded(true);
-  // };
-
-  const addItem = (menuItem: MenuItemWithCategory) => {
-    setSelectedItems((prev) => {
-      const existing = prev.find((item) => item.menuItem.id === menuItem.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.menuItem.id === menuItem.id
-            ? { ...item, quantity: item.quantity + 1, justAdded: true }
-            : item
-        );
-      }
-      return [...prev, { menuItem, quantity: 1, justAdded: true }];
-    });
-    setRecentlyAdded(menuItem.id);
-    setTimeout(() => {
-      setRecentlyAdded(null);
-      setSelectedItems((prev) =>
-        prev.map((item) => ({ ...item, justAdded: false }))
+  /**
+   * Enhanced Cart Management
+   *
+   * These functions handle the sophisticated cart operations for configured items.
+   */
+  const handleAddToCart = (configuredItem: ConfiguredCartItem) => {
+    setCartItems((prev) => {
+      // Check if the exact same configuration already exists
+      const existingIndex = prev.findIndex(
+        (item) =>
+          item.menuItemId === configuredItem.menuItemId &&
+          item.variantId === configuredItem.variantId &&
+          JSON.stringify(item.selectedToppings) ===
+            JSON.stringify(configuredItem.selectedToppings) &&
+          JSON.stringify(item.selectedModifiers) ===
+            JSON.stringify(configuredItem.selectedModifiers) &&
+          item.specialInstructions === configuredItem.specialInstructions
       );
-    }, 1000);
+
+      if (existingIndex >= 0) {
+        // Same configuration exists, just increase quantity
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          quantity: updated[existingIndex].quantity + 1,
+        };
+        return updated;
+      } else {
+        // New configuration, add as new item
+        return [...prev, configuredItem];
+      }
+    });
   };
 
-  const removeItem = (menuItemId: string) => {
-    setSelectedItems((prev) =>
-      prev.filter((item) => item.menuItem.id !== menuItemId)
+  const handleUpdateCartItem = (
+    itemId: string,
+    updates: Partial<ConfiguredCartItem>
+  ) => {
+    setCartItems((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, ...updates } : item))
     );
   };
 
-  const updateQuantity = (menuItemId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeItem(menuItemId);
-      return;
-    }
-    setSelectedItems((prev) =>
-      prev.map((item) =>
-        item.menuItem.id === menuItemId
-          ? { ...item, quantity, justAdded: false }
-          : item
-      )
-    );
+  const handleRemoveCartItem = (itemId: string) => {
+    setCartItems((prev) => prev.filter((item) => item.id !== itemId));
   };
 
-  const calculateTotal = () => {
-    const subtotal = selectedItems.reduce(
-      (sum, item) => sum + item.menuItem.base_price * item.quantity,
-      0
-    );
-    const tax = subtotal * 0.08; // Assuming 8% tax
-    const deliveryFee = orderType === "delivery" ? 3.99 : 0;
-    return { subtotal, tax, deliveryFee, total: subtotal + tax + deliveryFee };
-  };
-
-  const handleSubmit = async () => {
-    if (
-      selectedItems.length === 0 ||
-      !customerInfo.name ||
-      !customerInfo.phone
-    ) {
-      alert("Please add items and fill in customer information."); // Keep this for user feedback
+  /**
+   * Order Submission
+   *
+   * This transforms our configured cart items into the format your backend expects.
+   */
+  const handleSubmitOrder = async () => {
+    if (cartItems.length === 0 || !customerInfo.name || !customerInfo.phone) {
+      alert("Please add items and fill in customer information.");
       return;
     }
     if (
@@ -414,24 +338,24 @@ function OrderCreationForm({
         !deliveryAddress.city ||
         !deliveryAddress.zip)
     ) {
-      alert("Please fill in the delivery address."); // Keep this
+      alert("Please fill in the delivery address.");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const { subtotal, tax, deliveryFee, total } = calculateTotal();
+      // Prepare order data
       const orderData = {
-        restaurant_id: restaurantId,
+        restaurant_id: restaurant!.id,
         customer_name: customerInfo.name,
         customer_phone: customerInfo.phone,
         customer_email: customerInfo.email || null,
         order_type: orderType,
-        subtotal,
-        tax_amount: tax,
-        delivery_fee: deliveryFee,
-        total,
-        status: "pending" as const, // Ensure status is of type OrderStatus
+        subtotal: orderSummary.subtotal,
+        tax_amount: orderSummary.tax,
+        delivery_fee: orderSummary.deliveryFee,
+        total: orderSummary.total,
+        status: "pending" as const,
         ...(orderType === "delivery" && {
           customer_address: deliveryAddress.address,
           customer_city: deliveryAddress.city,
@@ -439,11 +363,16 @@ function OrderCreationForm({
           delivery_instructions: deliveryAddress.instructions || null,
         }),
       };
-      const orderItemsData = selectedItems.map((item) => ({
-        menuItemId: item.menuItem.id,
+
+      // Transform cart items to API format
+      const orderItemsData = cartItems.map((item) => ({
+        menuItemId: item.menuItemId,
+        variantId: item.variantId,
         quantity: item.quantity,
-        unitPrice: item.menuItem.base_price,
-        specialInstructions: null, // Add if you have special instructions per item
+        unitPrice: item.totalPrice,
+        selectedToppings: item.selectedToppings,
+        selectedModifiers: item.selectedModifiers,
+        specialInstructions: item.specialInstructions,
       }));
 
       const response = await fetch("/api/orders", {
@@ -457,7 +386,8 @@ function OrderCreationForm({
         throw new Error(responseData.error || "Failed to create order");
       }
 
-      setSelectedItems([]);
+      // Reset form state
+      setCartItems([]);
       setCustomerInfo({ name: "", phone: "", email: "" });
       setOrderType("pickup");
       setDeliveryAddress({ address: "", city: "", zip: "", instructions: "" });
@@ -466,253 +396,469 @@ function OrderCreationForm({
       setSelectedAddressId(null);
       setCustomerLookupStatus("idle");
       setOrderTypeAutoSuggested(false);
-      onOrderCreated();
-      // Removed alert("Order created successfully!");
+      setCustomerInfoConfirmed(false);
+      setIsCustomerInfoExpanded(true);
+
+      // Refresh orders list
+      window.location.reload();
     } catch (error) {
       console.error("Error creating order:", error);
       alert(
         `Error creating order: ${
           error instanceof Error ? error.message : "Unknown error"
         }`
-      ); // Keep error alert
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const totals = calculateTotal();
-  const canSubmit =
-    selectedItems.length > 0 &&
-    customerInfo.name &&
-    customerInfo.phone &&
-    (orderType === "pickup" ||
-      (deliveryAddress.address && deliveryAddress.city && deliveryAddress.zip));
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <div className="text-lg font-semibold text-gray-900">
+          Loading enhanced ordering system...
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="text-center py-16">
+        <div className="text-red-600 text-lg font-semibold mb-4">
+          Error Loading Enhanced System
+        </div>
+        <p className="text-gray-900">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-4 md:p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6 border-b pb-3">
-        Create New Order
-      </h2>
-      {/* Use a single top-level grid for the form's internal layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Column 1: Customer, Order Type, Delivery Address */}
-        {/* This column will now house the collapsible customer section and other details */}
-        <div
-          className={`lg:col-span-4 space-y-6 ${
-            !isCustomerInfoExpanded && customerInfoConfirmed ? "lg:h-auto" : ""
-          }`}
-        >
-          {/* Customer Information Section - Collapsible */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <div
-              className="flex justify-between items-center cursor-pointer"
-              onClick={() =>
-                customerInfoConfirmed
-                  ? setIsCustomerInfoExpanded(!isCustomerInfoExpanded)
-                  : setIsCustomerInfoExpanded(true)
-              }
-            >
-              <h3 className="text-lg font-semibold text-gray-900">
-                {customerInfoConfirmed && !isCustomerInfoExpanded
-                  ? `Customer: ${customerInfo.name}`
-                  : "Customer Information"}
-              </h3>
-              {customerInfoConfirmed ? (
-                isCustomerInfoExpanded ? (
-                  <span className="text-blue-600 text-sm">▲ Collapse</span>
-                ) : (
-                  <span className="text-blue-600 text-sm">
-                    ▼ Expand to Edit
-                  </span>
-                )
-              ) : (
-                <span className="text-gray-500 text-sm">
-                  {isCustomerInfoExpanded ? "▲" : "▼"}
-                </span>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      {/* Page Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+          Enhanced Order Management
+        </h1>
+        <div className="mt-2 text-base md:text-lg text-gray-800">
+          <span className="font-semibold">{restaurant?.name}</span> •
+          <span className="ml-2">
+            Cart:{" "}
+            <span className="font-semibold text-blue-600">
+              {cartStats.totalItems} items
+            </span>
+          </span>{" "}
+          •
+          <span className="ml-2">
+            Menu:{" "}
+            <span className="font-semibold text-green-600">
+              {menuItems.length} items
+            </span>
+          </span>
+        </div>
+      </div>
+
+      {/* Main Interface */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+        {/* Customer Information Panel */}
+        <div className="lg:col-span-3">
+          <CustomerInformationPanel
+            customerInfo={customerInfo}
+            setCustomerInfo={setCustomerInfo}
+            foundCustomer={foundCustomer}
+            lookupLoading={lookupLoading}
+            customerLookupStatus={customerLookupStatus}
+            customerAddresses={customerAddresses}
+            orderType={orderType}
+            handleOrderTypeChange={handleOrderTypeChange}
+            orderTypeAutoSuggested={orderTypeAutoSuggested}
+            deliveryAddress={deliveryAddress}
+            setDeliveryAddress={setDeliveryAddress}
+            selectedAddressId={selectedAddressId}
+            handleAddressSelection={handleAddressSelection}
+            isCustomerInfoExpanded={isCustomerInfoExpanded}
+            setIsCustomerInfoExpanded={setIsCustomerInfoExpanded}
+            customerInfoConfirmed={customerInfoConfirmed}
+            handleConfirmCustomer={handleConfirmCustomer}
+          />
+        </div>
+
+        {/* Menu Items Selector - Only visible when customer is confirmed */}
+        {customerInfoConfirmed && (
+          <div className="lg:col-span-2">
+            <EnhancedMenuItemSelector
+              menuItems={menuItems}
+              toppings={toppings}
+              modifiers={modifiers}
+              onAddToCart={handleAddToCart}
+            />
+          </div>
+        )}
+
+        {/* Enhanced Cart System - Only visible when customer is confirmed */}
+        {customerInfoConfirmed && (
+          <div className="lg:col-span-1">
+            <div className="space-y-6">
+              <EnhancedCartSystem
+                items={cartItems}
+                onUpdateItem={handleUpdateCartItem}
+                onRemoveItem={handleRemoveCartItem}
+                restaurantId={restaurant?.id || ""}
+                orderSummary={orderSummary}
+              />
+
+              {/* Submit Order Button */}
+              {cartItems.length > 0 && (
+                <button
+                  onClick={handleSubmitOrder}
+                  disabled={isSubmitting}
+                  className={`w-full py-4 rounded-lg text-lg font-bold transition-all ${
+                    !isSubmitting
+                      ? "bg-green-600 hover:bg-green-700 text-white transform hover:scale-105"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  {isSubmitting
+                    ? "Creating Order..."
+                    : `Submit Order - $${orderSummary.total.toFixed(2)}`}
+                </button>
               )}
             </div>
+          </div>
+        )}
 
-            {isCustomerInfoExpanded && (
-              <div className="mt-4 space-y-4">
-                <div>
-                  <label className={labelStyles}>Phone Number *</label>
-                  <div className="relative">
-                    <input
-                      type="tel"
-                      placeholder="(555) 123-4567"
-                      value={customerInfo.phone}
-                      onChange={(e) =>
-                        setCustomerInfo((prev) => ({
-                          ...prev,
-                          phone: e.target.value,
-                        }))
-                      }
-                      className={inputStyles}
-                      required
-                      disabled={customerInfoConfirmed}
-                    />
-                    {lookupLoading && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                      </div>
-                    )}
-                  </div>
-                  {customerLookupStatus === "searching" && (
-                    <p className="text-sm text-blue-600 mt-1">Searching...</p>
-                  )}
-                  {customerLookupStatus === "found" && foundCustomer && (
-                    <p className="text-sm text-green-600 mt-1">
-                      ✓ Customer: {foundCustomer.name} (
-                      {foundCustomer.total_orders} orders)
-                    </p>
-                  )}
-                  {customerLookupStatus === "not-found" &&
-                    customerInfo.phone.length >= 10 && (
-                      <p className="text-sm text-gray-700 mt-1">
-                        New customer.
-                      </p>
-                    )}
-                </div>
-                <div>
-                  <label className={labelStyles}>Customer Name *</label>
+        {/* Placeholder when customer not confirmed */}
+        {!customerInfoConfirmed && (
+          <div className="lg:col-span-3 flex flex-col items-center justify-center text-center p-12 bg-gray-100 rounded-lg">
+            <div className="text-6xl mb-6">👤</div>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+              Customer Information Required
+            </h2>
+            <p className="text-gray-600 text-lg">
+              Please confirm customer details to access the enhanced ordering
+              system
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Recent Orders Toggle */}
+      <div className="mt-8 text-right">
+        <button
+          onClick={() => setIsRecentOrdersVisible(!isRecentOrdersVisible)}
+          className="bg-slate-200 text-slate-700 hover:bg-slate-300 px-4 py-2 rounded-md text-sm font-medium"
+        >
+          {isRecentOrdersVisible ? "Hide Recent Orders" : "Show Recent Orders"}
+        </button>
+      </div>
+
+      {/* Recent Orders Panel */}
+      {isRecentOrdersVisible && (
+        <div className="mt-6 bg-white rounded-lg shadow-lg">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Recent Orders
+            </h2>
+          </div>
+          <div className="p-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {orders.slice(0, 12).map((order) => (
+                <SimpleOrderCard key={order.id} order={order} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Customer Information Panel Component
+ *
+ * This component encapsulates all the customer management logic in a clean,
+ * collapsible panel. It maintains the same functionality as your original
+ * system while fitting into the new architecture.
+ */
+interface CustomerInformationPanelProps {
+  customerInfo: { name: string; phone: string; email: string };
+  setCustomerInfo: React.Dispatch<
+    React.SetStateAction<{ name: string; phone: string; email: string }>
+  >;
+  foundCustomer: Customer | null;
+  lookupLoading: boolean;
+  customerLookupStatus: "idle" | "searching" | "found" | "not-found";
+  customerAddresses: CustomerAddress[];
+  orderType: "pickup" | "delivery";
+  handleOrderTypeChange: (type: "pickup" | "delivery") => void;
+  orderTypeAutoSuggested: boolean;
+  deliveryAddress: {
+    address: string;
+    city: string;
+    zip: string;
+    instructions: string;
+  };
+  setDeliveryAddress: React.Dispatch<
+    React.SetStateAction<{
+      address: string;
+      city: string;
+      zip: string;
+      instructions: string;
+    }>
+  >;
+  selectedAddressId: string | null;
+  handleAddressSelection: (addressId: string) => void;
+  isCustomerInfoExpanded: boolean;
+  setIsCustomerInfoExpanded: React.Dispatch<React.SetStateAction<boolean>>;
+  customerInfoConfirmed: boolean;
+  handleConfirmCustomer: () => void;
+}
+
+function CustomerInformationPanel(props: CustomerInformationPanelProps) {
+  const {
+    customerInfo,
+    setCustomerInfo,
+    foundCustomer,
+    lookupLoading,
+    customerLookupStatus,
+    customerAddresses,
+    orderType,
+    handleOrderTypeChange,
+    orderTypeAutoSuggested,
+    deliveryAddress,
+    setDeliveryAddress,
+    selectedAddressId,
+    handleAddressSelection,
+    isCustomerInfoExpanded,
+    setIsCustomerInfoExpanded,
+    customerInfoConfirmed,
+    handleConfirmCustomer,
+  } = props;
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg">
+      {/* Panel Header */}
+      <div
+        className="flex justify-between items-center p-6 border-b border-gray-200 cursor-pointer"
+        onClick={() => setIsCustomerInfoExpanded(!isCustomerInfoExpanded)}
+      >
+        <h2 className="text-xl font-semibold text-gray-900">
+          {customerInfoConfirmed && !isCustomerInfoExpanded
+            ? `Order for: ${customerInfo.name} (${customerInfo.phone})`
+            : "Customer Information"}
+        </h2>
+        <div className="flex items-center gap-2">
+          {customerInfoConfirmed && (
+            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+              ✓ Confirmed
+            </span>
+          )}
+          <span className="text-blue-600 text-sm">
+            {isCustomerInfoExpanded ? "▲ Collapse" : "▼ Expand"}
+          </span>
+        </div>
+      </div>
+
+      {/* Panel Content */}
+      {isCustomerInfoExpanded && (
+        <div className="p-6 space-y-6">
+          {/* Customer Details Section */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Customer Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                Customer Details
+              </h3>
+
+              <div>
+                <label className={labelStyles}>Phone Number *</label>
+                <div className="relative">
                   <input
-                    type="text"
-                    placeholder="Enter customer name"
-                    value={customerInfo.name}
+                    type="tel"
+                    placeholder="(555) 123-4567"
+                    value={customerInfo.phone}
                     onChange={(e) =>
                       setCustomerInfo((prev) => ({
                         ...prev,
-                        name: e.target.value,
+                        phone: e.target.value,
                       }))
                     }
                     className={inputStyles}
                     required
                     disabled={customerInfoConfirmed}
                   />
+                  {lookupLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className={labelStyles}>Email (optional)</label>
-                  <input
-                    type="email"
-                    placeholder="customer@email.com"
-                    value={customerInfo.email}
-                    onChange={(e) =>
-                      setCustomerInfo((prev) => ({
-                        ...prev,
-                        email: e.target.value,
-                      }))
-                    }
-                    className={inputStyles}
-                    disabled={customerInfoConfirmed}
-                  />
-                </div>
-                {foundCustomer && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200 text-xs text-blue-800">
-                    Loyalty: {foundCustomer.loyalty_points} pts | Saved
-                    Addresses: {customerAddresses.length}
+                {customerLookupStatus === "searching" && (
+                  <p className="text-sm text-blue-600 mt-1">Searching...</p>
+                )}
+                {customerLookupStatus === "found" && foundCustomer && (
+                  <p className="text-sm text-green-600 mt-1">
+                    ✓ Customer: {foundCustomer.name} (
+                    {foundCustomer.total_orders} orders)
+                  </p>
+                )}
+                {customerLookupStatus === "not-found" &&
+                  customerInfo.phone.length >= 10 && (
+                    <p className="text-sm text-gray-700 mt-1">New customer</p>
+                  )}
+              </div>
+
+              <div>
+                <label className={labelStyles}>Customer Name *</label>
+                <input
+                  type="text"
+                  placeholder="Enter customer name"
+                  value={customerInfo.name}
+                  onChange={(e) =>
+                    setCustomerInfo((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
+                  }
+                  className={inputStyles}
+                  required
+                  disabled={customerInfoConfirmed}
+                />
+              </div>
+
+              <div>
+                <label className={labelStyles}>Email (optional)</label>
+                <input
+                  type="email"
+                  placeholder="customer@email.com"
+                  value={customerInfo.email}
+                  onChange={(e) =>
+                    setCustomerInfo((prev) => ({
+                      ...prev,
+                      email: e.target.value,
+                    }))
+                  }
+                  className={inputStyles}
+                  disabled={customerInfoConfirmed}
+                />
+              </div>
+
+              {foundCustomer && (
+                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-sm text-blue-800">
+                    <div>Loyalty Points: {foundCustomer.loyalty_points}</div>
+                    <div>Total Orders: {foundCustomer.total_orders}</div>
+                    <div>Saved Addresses: {customerAddresses.length}</div>
                     {customerAddresses.length > 0 &&
                       orderType === "pickup" &&
                       orderTypeAutoSuggested && (
                         <button
                           onClick={() => handleOrderTypeChange("delivery")}
-                          className="ml-1 text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded hover:bg-blue-600"
+                          className="mt-2 text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
                         >
                           Suggest Delivery?
                         </button>
                       )}
                   </div>
-                )}
-                {!customerInfoConfirmed && (
-                  <button
-                    type="button"
-                    onClick={handleConfirmCustomer}
-                    className="w-full mt-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                  >
-                    Confirm Customer & Continue
-                  </button>
-                )}
-              </div>
-            )}
-            {customerInfoConfirmed && isCustomerInfoExpanded && (
-              <button
-                type="button"
-                onClick={() => setIsCustomerInfoExpanded(false)} // just collapse
-                className="w-full mt-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium"
-              >
-                Done Editing Customer
-              </button>
-            )}
-          </div>
-
-          {/* Order Type and Delivery Address sections - only shown if customer info is confirmed */}
-          {customerInfoConfirmed && (
-            <>
-              {/* Order Type Selection */}
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                {/* ... existing order type JSX ... */}
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Order Type
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => handleOrderTypeChange("pickup")}
-                    className={`p-3 rounded-lg border-2 transition-all text-left ${
-                      orderType === "pickup"
-                        ? "border-blue-600 bg-blue-50"
-                        : "border-gray-300 bg-white hover:border-gray-400"
-                    }`}
-                  >
-                    <span className="font-medium text-gray-900 block">
-                      Pickup
-                    </span>
-                    <span className="text-xs text-gray-700">~25 min</span>
-                  </button>
-                  <button
-                    onClick={() => handleOrderTypeChange("delivery")}
-                    className={`p-3 rounded-lg border-2 transition-all text-left ${
-                      orderType === "delivery"
-                        ? "border-blue-600 bg-blue-50"
-                        : "border-gray-300 bg-white hover:border-gray-400"
-                    }`}
-                  >
-                    <span className="font-medium text-gray-900 block">
-                      Delivery
-                    </span>
-                    <span className="text-xs text-gray-700">
-                      +$3.99{" "}
-                      {customerAddresses.length > 0
-                        ? `(${customerAddresses.length} saved)`
-                        : ""}
-                    </span>
-                  </button>
                 </div>
+              )}
+            </div>
+
+            {/* Order Type and Delivery */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900">Order Type</h3>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleOrderTypeChange("pickup")}
+                  className={`p-4 rounded-lg border-2 transition-all text-left ${
+                    orderType === "pickup"
+                      ? "border-blue-600 bg-blue-50"
+                      : "border-gray-300 bg-white hover:border-gray-400"
+                  }`}
+                >
+                  <span className="font-medium text-gray-900 block">
+                    Pickup
+                  </span>
+                  <span className="text-sm text-gray-700">~25 min</span>
+                </button>
+                <button
+                  onClick={() => handleOrderTypeChange("delivery")}
+                  className={`p-4 rounded-lg border-2 transition-all text-left ${
+                    orderType === "delivery"
+                      ? "border-blue-600 bg-blue-50"
+                      : "border-gray-300 bg-white hover:border-gray-400"
+                  }`}
+                >
+                  <span className="font-medium text-gray-900 block">
+                    Delivery
+                  </span>
+                  <span className="text-sm text-gray-700">
+                    +$3.99 • ~45 min
+                    {customerAddresses.length > 0 &&
+                      ` • ${customerAddresses.length} saved`}
+                  </span>
+                </button>
               </div>
 
               {/* Delivery Address Section */}
-              <div
-                className={`border rounded-lg transition-all duration-300 space-y-4 ${
-                  orderType === "delivery"
-                    ? "bg-yellow-50 border-yellow-200 p-4"
-                    : "bg-gray-100 p-4 opacity-70"
-                }`}
-              >
-                {/* ... existing delivery address JSX ... */}
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Delivery Address{" "}
-                  {orderType === "pickup" && (
-                    <span className="text-sm font-normal text-gray-700">
-                      (for Delivery orders)
-                    </span>
-                  )}
-                </h3>
-                {orderType === "delivery" && customerAddresses.length > 0 && (
-                  <div className="space-y-2">
-                    <label className={labelStyles}>Saved Addresses</label>
-                    {customerAddresses.map((addr) => (
+              {orderType === "delivery" && (
+                <div className="space-y-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <h4 className="font-medium text-gray-900">
+                    Delivery Address
+                  </h4>
+
+                  {customerAddresses.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Saved Addresses
+                      </label>
+                      {customerAddresses.map((addr) => (
+                        <label
+                          key={addr.id}
+                          className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer ${
+                            selectedAddressId === addr.id
+                              ? "border-blue-500 bg-blue-50"
+                              : "border-gray-200 bg-white"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="savedAddress"
+                            value={addr.id}
+                            checked={selectedAddressId === addr.id}
+                            onChange={() => handleAddressSelection(addr.id)}
+                            className="mt-1"
+                          />
+                          <div className="text-sm">
+                            <div className="font-medium text-gray-900">
+                              {addr.address}, {addr.city} {addr.zip}
+                            </div>
+                            {addr.delivery_instructions && (
+                              <div className="text-blue-700 text-xs">
+                                {addr.delivery_instructions}
+                              </div>
+                            )}
+                            {addr.is_default && (
+                              <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                        </label>
+                      ))}
                       <label
-                        key={addr.id}
-                        className={`flex items-start space-x-3 p-2 rounded-lg border cursor-pointer ${
-                          selectedAddressId === addr.id
+                        className={`flex items-center p-3 rounded-lg border cursor-pointer ${
+                          selectedAddressId === null
                             ? "border-blue-500 bg-blue-50"
                             : "border-gray-200 bg-white"
                         }`}
@@ -720,404 +866,177 @@ function OrderCreationForm({
                         <input
                           type="radio"
                           name="savedAddress"
-                          value={addr.id}
-                          checked={selectedAddressId === addr.id}
-                          onChange={() => handleAddressSelection(addr.id)}
-                          className="mt-1"
+                          value="new"
+                          checked={selectedAddressId === null}
+                          onChange={() => {
+                            setSelectedAddressId(null);
+                            setDeliveryAddress({
+                              address: "",
+                              city: "",
+                              zip: "",
+                              instructions: "",
+                            });
+                          }}
+                          className="mr-2"
                         />
-                        <div className="text-sm">
-                          <div className="font-medium text-gray-900">
-                            {addr.address}, {addr.city} {addr.zip}
-                          </div>
-                          {addr.delivery_instructions && (
-                            <div className="text-xs text-blue-700">
-                              {addr.delivery_instructions}
-                            </div>
-                          )}
-                          {addr.is_default && (
-                            <span className="ml-1 text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
-                              Default
-                            </span>
-                          )}
-                        </div>
+                        <span className="text-sm font-medium text-gray-900">
+                          Enter new address
+                        </span>
                       </label>
-                    ))}
-                    <label
-                      className={`flex items-center p-2 rounded-lg border cursor-pointer ${
-                        selectedAddressId === null
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200 bg-white"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="savedAddress"
-                        value="new"
-                        checked={selectedAddressId === null}
-                        onChange={() => {
-                          setSelectedAddressId(null);
-                          setDeliveryAddress({
-                            address: "",
-                            city: "",
-                            zip: "",
-                            instructions: "",
-                          });
-                        }}
-                        className="mr-2"
-                      />
-                      <span className="text-sm font-medium text-gray-900">
-                        Enter new address
-                      </span>
-                    </label>
-                  </div>
-                )}
-                <div>
-                  <label className={labelStyles}>
-                    Street Address {orderType === "delivery" && "*"}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="123 Main Street"
-                    value={deliveryAddress.address}
-                    onChange={(e) =>
-                      setDeliveryAddress((prev) => ({
-                        ...prev,
-                        address: e.target.value,
-                      }))
-                    }
-                    disabled={orderType === "pickup"}
-                    className={inputStyles}
-                    required={orderType === "delivery"}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelStyles}>
-                      City {orderType === "delivery" && "*"}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="New Lenox"
-                      value={deliveryAddress.city}
-                      onChange={(e) =>
-                        setDeliveryAddress((prev) => ({
-                          ...prev,
-                          city: e.target.value,
-                        }))
-                      }
-                      disabled={orderType === "pickup"}
-                      className={inputStyles}
-                      required={orderType === "delivery"}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelStyles}>
-                      ZIP {orderType === "delivery" && "*"}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="60451"
-                      value={deliveryAddress.zip}
-                      onChange={(e) =>
-                        setDeliveryAddress((prev) => ({
-                          ...prev,
-                          zip: e.target.value,
-                        }))
-                      }
-                      disabled={orderType === "pickup"}
-                      className={inputStyles}
-                      required={orderType === "delivery"}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className={labelStyles}>Delivery Instructions</label>
-                  <textarea
-                    placeholder="Apt #, gate code..."
-                    value={deliveryAddress.instructions}
-                    onChange={(e) =>
-                      setDeliveryAddress((prev) => ({
-                        ...prev,
-                        instructions: e.target.value,
-                      }))
-                    }
-                    disabled={orderType === "pickup"}
-                    rows={2}
-                    className={inputStyles}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Column 2: Menu Items - only shown if customer info is confirmed */}
-        {customerInfoConfirmed && (
-          <div className="lg:col-span-4">
-            {/* ... existing menu items JSX ... */}
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Menu Items
-              </h3>
-              <div className="space-y-3 max-h-[600px] lg:max-h-[calc(100vh-250px)] overflow-y-auto pr-2">
-                {" "}
-                {/* Scrollable Menu */}
-                {menuItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`bg-white border rounded-lg p-3 transition-all duration-300 ${
-                      recentlyAdded === item.id
-                        ? "border-green-500 shadow-lg"
-                        : "border-gray-200 hover:shadow-md"
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h4 className="font-semibold text-gray-900">
-                          {item.name}
-                        </h4>
-                        <p className="text-xs text-gray-700">
-                          {item.description}
-                        </p>
-                        <p className="text-md font-bold text-green-600 mt-1">
-                          ${item.base_price.toFixed(2)}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => addItem(item)}
-                        className={`ml-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                          recentlyAdded === item.id
-                            ? "bg-green-600 text-white"
-                            : "bg-blue-600 text-white hover:bg-blue-700"
-                        }`}
-                      >
-                        {recentlyAdded === item.id ? "✓ Added" : "+ Add"}
-                      </button>
                     </div>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Street Address"
+                      value={deliveryAddress.address}
+                      onChange={(e) =>
+                        setDeliveryAddress((prev) => ({
+                          ...prev,
+                          address: e.target.value,
+                        }))
+                      }
+                      className={inputStyles}
+                      required
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        placeholder="City"
+                        value={deliveryAddress.city}
+                        onChange={(e) =>
+                          setDeliveryAddress((prev) => ({
+                            ...prev,
+                            city: e.target.value,
+                          }))
+                        }
+                        className={inputStyles}
+                        required
+                      />
+                      <input
+                        type="text"
+                        placeholder="ZIP Code"
+                        value={deliveryAddress.zip}
+                        onChange={(e) =>
+                          setDeliveryAddress((prev) => ({
+                            ...prev,
+                            zip: e.target.value,
+                          }))
+                        }
+                        className={inputStyles}
+                        required
+                      />
+                    </div>
+                    <textarea
+                      placeholder="Delivery instructions..."
+                      value={deliveryAddress.instructions}
+                      onChange={(e) =>
+                        setDeliveryAddress((prev) => ({
+                          ...prev,
+                          instructions: e.target.value,
+                        }))
+                      }
+                      rows={2}
+                      className={inputStyles}
+                    />
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
 
-        {/* Column 3: Order Summary - only shown if customer info is confirmed */}
-        {customerInfoConfirmed && (
-          <div className="lg:col-span-4 space-y-6">
-            {/* ... existing selected items and total JSX ... */}
-            {selectedItems.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Current Order ({selectedItems.length})
-                </h3>
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                  {" "}
-                  {/* Scrollable Cart */}
-                  {selectedItems.map((item) => (
-                    <div
-                      key={item.menuItem.id}
-                      className={`flex justify-between items-center bg-white p-2.5 rounded-lg border ${
-                        item.justAdded ? "border-green-500" : "border-gray-200"
-                      }`}
-                    >
-                      <div className="flex-1">
-                        <span className="font-medium text-sm text-gray-900">
-                          {item.menuItem.name}
-                        </span>
-                        <div className="text-xs text-gray-700">
-                          ${item.menuItem.base_price.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() =>
-                            updateQuantity(item.menuItem.id, item.quantity - 1)
-                          }
-                          className="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded-full text-sm font-bold"
-                        >
-                          -
-                        </button>
-                        <span className="font-semibold text-sm w-5 text-center">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() =>
-                            updateQuantity(item.menuItem.id, item.quantity + 1)
-                          }
-                          className="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded-full text-sm font-bold"
-                        >
-                          +
-                        </button>
-                        <span className="font-bold text-sm text-green-600 ml-2 w-16 text-right">
-                          $
-                          {(item.menuItem.base_price * item.quantity).toFixed(
-                            2
-                          )}
-                        </span>
-                        <button
-                          onClick={() => removeItem(item.menuItem.id)}
-                          className="bg-red-500 hover:bg-red-600 text-white w-7 h-7 rounded-full text-sm font-bold"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="bg-white border border-gray-300 rounded-lg p-4 shadow-md">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-800">Subtotal:</span>
-                  <span className="font-semibold text-gray-900">
-                    ${totals.subtotal.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-800">Tax (8%):</span>
-                  <span className="font-semibold text-gray-900">
-                    ${totals.tax.toFixed(2)}
-                  </span>
-                </div>
-                {orderType === "delivery" && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-800">Delivery Fee:</span>
-                    <span className="font-semibold text-gray-900">
-                      ${totals.deliveryFee.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                <div className="border-t border-gray-200 pt-2 mt-2">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span className="text-gray-900">Total:</span>
-                    <span className="text-green-600">
-                      ${totals.total.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
+          {/* Confirmation Button */}
+          {!customerInfoConfirmed && (
+            <div className="pt-4 border-t border-gray-200">
               <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !canSubmit}
-                className={`w-full mt-4 py-3 rounded-lg text-md font-bold transition-all ${
-                  canSubmit && !isSubmitting
-                    ? "bg-green-600 hover:bg-green-700 text-white"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
+                onClick={handleConfirmCustomer}
+                className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold text-lg transition-colors"
               >
-                {isSubmitting
-                  ? "Creating..."
-                  : canSubmit
-                  ? "Submit Order"
-                  : "Complete Form"}
+                Confirm Customer & Continue to Menu
               </button>
             </div>
-          </div>
-        )}
-        {!customerInfoConfirmed && (
-          <div className="lg:col-span-8 flex flex-col items-center justify-center text-center p-8 bg-gray-100 rounded-lg h-full">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="w-12 h-12 text-gray-400 mb-4"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
-              />
-            </svg>
-            <p className="text-gray-600 text-lg">
-              Please confirm customer information to proceed with the order.
-            </p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function OrderCard({ order }: { order: OrderWithItems }) {
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-
-  const updateOrderStatus = async (newStatus: string) => {
-    setUpdatingStatus(true);
-    try {
-      const response = await fetch(`/api/orders/${order.id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!response.ok) throw new Error("Failed to update status");
-      window.location.reload();
-    } catch (error) {
-      console.error("Error updating order status:", error);
-      alert("Error updating order status");
-    } finally {
-      setUpdatingStatus(false);
+/**
+ * Simple Order Card Component
+ *
+ * Displays recent orders in a clean, readable format.
+ */
+function SimpleOrderCard({ order }: { order: OrderWithItems }) {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "confirmed":
+        return "bg-blue-100 text-blue-800";
+      case "preparing":
+        return "bg-orange-100 text-orange-800";
+      case "ready":
+        return "bg-green-100 text-green-800";
+      case "completed":
+        return "bg-gray-100 text-gray-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
-  const statusColors = {
-    pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    confirmed: "bg-blue-100 text-blue-800 border-blue-200",
-    preparing: "bg-orange-100 text-orange-800 border-orange-200",
-    ready: "bg-green-100 text-green-800 border-green-200",
-    completed: "bg-gray-200 text-gray-900 border-gray-300", // Darker text
-    cancelled: "bg-red-100 text-red-800 border-red-200",
+  const timeAgo = (date: string) => {
+    const now = new Date();
+    const orderTime = new Date(date);
+    const diffInMinutes = Math.floor(
+      (now.getTime() - orderTime.getTime()) / (1000 * 60)
+    );
+
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    } else {
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      return `${diffInHours}h ago`;
+    }
   };
 
   return (
     <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
       <div className="flex justify-between items-start mb-3">
-        <h4 className="font-bold text-lg text-gray-900">
-          #{order.order_number}
-        </h4>
+        <div>
+          <h4 className="font-semibold text-gray-900">#{order.order_number}</h4>
+          <p className="text-sm text-gray-600">{timeAgo(order.created_at)}</p>
+        </div>
         <span
-          className={`px-3 py-1 rounded-full text-sm font-semibold border ${
-            statusColors[order.status as keyof typeof statusColors]
-          }`}
+          className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(
+            order.status
+          )}`}
         >
           {order.status.toUpperCase()}
         </span>
       </div>
-      <div className="space-y-1 text-sm text-gray-800">
+
+      <div className="space-y-1 text-sm">
         <p>
           <span className="font-medium">Customer:</span> {order.customer_name}
         </p>
         <p>
-          <span className="font-medium">Phone:</span> {order.customer_phone}
-        </p>
-        <p>
           <span className="font-medium">Type:</span> {order.order_type}
         </p>
-        {order.order_type === "delivery" && order.customer_address && (
-          <p>
-            <span className="font-medium">Address:</span>{" "}
-            {order.customer_address}, {order.customer_city} {order.customer_zip}
-          </p>
-        )}
         <p>
-          <span className="font-medium">Total:</span>{" "}
-          <span className="text-green-600 font-bold">
+          <span className="font-medium">Total:</span>
+          <span className="text-green-600 font-bold ml-1">
             ${order.total.toFixed(2)}
           </span>
         </p>
+        <p>
+          <span className="font-medium">Items:</span>{" "}
+          {order.order_items?.length || 0}
+        </p>
       </div>
-      {order.status === "pending" && (
-        <button
-          onClick={() => updateOrderStatus("confirmed")}
-          disabled={updatingStatus}
-          className="mt-3 w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-        >
-          {updatingStatus ? "Updating..." : "Confirm Order"}
-        </button>
-      )}
     </div>
   );
 }
