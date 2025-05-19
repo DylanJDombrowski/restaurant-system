@@ -166,7 +166,6 @@ export async function POST(
      * (who they are) and authorization (what they can do).
      */
     const staffRecord: InsertStaff = {
-      id: authUser.user.id, // This is the crucial link!
       restaurant_id,
       email,
       name,

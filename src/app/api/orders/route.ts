@@ -291,7 +291,7 @@ async function handleCustomerWithBetterErrorHandling(
         restaurant_id: orderData.restaurant_id,
         phone: orderData.customer_phone,
         name: orderData.customer_name,
-        email: orderData.customer_email || null,
+        email: orderData.customer_email,
         loyalty_points: 0,
         total_orders: 0,
         total_spent: 0,
@@ -436,7 +436,7 @@ async function handleDeliveryAddressWithErrorHandling(
       address: orderData.customer_address,
       city: orderData.customer_city,
       zip: orderData.customer_zip,
-      delivery_instructions: orderData.delivery_instructions || null,
+      delivery_instructions: orderData.delivery_instructions,
       is_default: isFirstAddress, // First address becomes default
     };
 

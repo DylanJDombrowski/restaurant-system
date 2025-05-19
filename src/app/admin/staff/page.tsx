@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Staff, Restaurant } from "@/lib/types";
+import { Staff, Restaurant, StaffRole } from "@/lib/types";
 import { useAuth } from "@/lib/auth/auth-context";
 
 /**
@@ -526,7 +526,10 @@ function StaffFormModal({
             <select
               value={formData.role}
               onChange={(e) =>
-                setFormData((prev) => ({ ...prev, role: e.target.value }))
+                setFormData((prev) => ({
+                  ...prev,
+                  role: e.target.value as StaffRole,
+                }))
               }
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
