@@ -26,6 +26,7 @@ export default function StaffOrdersPage() {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRecentOrdersVisible, setIsRecentOrdersVisible] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -136,24 +137,32 @@ export default function StaffOrdersPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-6 border-b pb-3">
               Recent Orders
             </h2>
-            <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-              {" "}
-              {/* Adjusted max height */}
-              {orders.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-gray-500 text-lg">
-                    No orders yet today
+            <button
+              onClick={() => setIsRecentOrdersVisible(!isRecentOrdersVisible)}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              {isRecentOrdersVisible ? "Hide" : "Show"}
+            </button>
+            {isRecentOrdersVisible && (
+              <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+                {" "}
+                {/* Adjusted max height */}
+                {orders.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="text-gray-500 text-lg">
+                      No orders yet today
+                    </div>
+                    <p className="text-gray-700 text-sm mt-2">
+                      Create your first order!
+                    </p>
                   </div>
-                  <p className="text-gray-700 text-sm mt-2">
-                    Create your first order!
-                  </p>
-                </div>
-              ) : (
-                orders
-                  .slice(0, 10)
-                  .map((order) => <OrderCard key={order.id} order={order} />)
-              )}
-            </div>
+                ) : (
+                  orders
+                    .slice(0, 10)
+                    .map((order) => <OrderCard key={order.id} order={order} />)
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
