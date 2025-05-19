@@ -5,6 +5,8 @@ import {
   InsertOrder,
   InsertCustomer,
   InsertCustomerAddress,
+  OrderWithItems,
+  ApiResponse,
 } from "@/lib/types";
 import { CartItemTransformer } from "@/lib/utils/cart-transformers";
 
@@ -40,6 +42,100 @@ interface EnhancedOrderItem {
     priceAdjustment: number;
   }>;
   specialInstructions?: string;
+}
+
+export async function GET(
+  request: NextRequest
+): Promise<NextResponse<ApiResponse<OrderWithItems[]>>> {
+  try {
+    const { searchParams } = new URL(request.url);
+    const restaurantId = searchParams.get("restaurant_id");
+    const statusesParam = searchParams.get("statuses");
+    const limitParam = searchParams.get("limit");
+
+    // Validate required parameters
+    if (!restaurantId) {
+      return NextResponse.json(
+        { error: "restaurant_id is required" },
+        { status: 400 }
+      );
+    }
+
+    console.log("Fetching orders for restaurant:", restaurantId);
+
+    // Parse optional parameters
+    const limit = limitParam ? parseInt(limitParam, 10) : 50;
+    const statuses = statusesParam ? statusesParam.split(",") : null;
+
+    // Build the query to fetch orders with all related data
+    let query = supabaseServer
+      .from("orders")
+      .select(
+        `
+        *,
+        order_items(
+          *,
+          menu_items(id, name, description),
+          menu_item_variants(id, name, price)
+        )
+      `
+      )
+      .eq("restaurant_id", restaurantId)
+      .order("created_at", { ascending: false });
+
+    // Add status filter if provided
+    if (statuses && statuses.length > 0) {
+      query = query.in("status", statuses);
+    }
+
+    // Add limit
+    query = query.limit(limit);
+
+    const { data: orders, error } = await query;
+
+    if (error) {
+      console.error("Database error fetching orders:", error);
+      return NextResponse.json(
+        { error: `Failed to fetch orders: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    // Transform the orders to include properly typed order items
+    const transformedOrders: OrderWithItems[] = (orders || []).map((order) => ({
+      ...order,
+      order_items:
+        order.order_items?.map(
+          (item: {
+            id: string;
+            menu_items?: { id: string; name: string; description: string };
+            menu_item_variants?: { id: string; name: string; price: number };
+            [key: string]: unknown;
+          }) => ({
+            ...item,
+            // Ensure proper structure for order items
+            menu_item: item.menu_items || null,
+            menu_item_variant: item.menu_item_variants || null,
+          })
+        ) || [],
+    }));
+
+    console.log(`Successfully fetched ${transformedOrders.length} orders`);
+
+    return NextResponse.json({
+      data: transformedOrders,
+      message: `Fetched ${transformedOrders.length} orders`,
+    });
+  } catch (error) {
+    console.error("Unexpected error fetching orders:", error);
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
