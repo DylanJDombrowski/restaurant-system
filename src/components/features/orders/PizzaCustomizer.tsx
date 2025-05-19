@@ -1,7 +1,7 @@
 // src/components/features/orders/PizzaCustomizer.tsx
 "use client";
-import { useState, useEffect, useMemo } from "react";
-import { ConfiguredCartItem } from "./EnhancedMenuItemSelector";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { ConfiguredCartItem } from "@/lib/types";
 
 /**
  * Pizza Customizer Component
@@ -21,6 +21,23 @@ import { ConfiguredCartItem } from "./EnhancedMenuItemSelector";
  */
 
 // Mock topping data - in production this comes from your database
+
+interface ToppingConfiguration {
+  id: string;
+  name: string;
+  amount: "none" | "light" | "normal" | "extra";
+  price: number;
+  isDefault: boolean;
+  category: string;
+}
+
+interface ModifierConfiguration {
+  id: string;
+  name: string;
+  priceAdjustment: number;
+  selected: boolean;
+}
+
 const AVAILABLE_TOPPINGS = [
   // Meats
   {
@@ -179,7 +196,6 @@ export default function PizzaCustomizer({
   onComplete,
   onCancel,
 }: PizzaCustomizerProps) {
-  // Initialize state from the cart item
   const [toppings, setToppings] = useState<ToppingConfiguration[]>([]);
   const [modifiers, setModifiers] = useState<ModifierConfiguration[]>([]);
   const [hasCheese, setHasCheese] = useState(true);
@@ -188,12 +204,8 @@ export default function PizzaCustomizer({
   );
 
   // Initialize topping configurations
-  useEffect(() => {
-    initializeToppings();
-    initializeModifiers();
-  }, [item]);
 
-  const initializeToppings = () => {
+  const initializeToppings = useCallback(() => {
     const toppingConfigs: ToppingConfiguration[] = [];
 
     // First, add all default toppings from the item
@@ -250,9 +262,9 @@ export default function PizzaCustomizer({
         t.id === "cheese" && t.isDefault
     );
     setHasCheese(hasDefaultCheese !== false);
-  };
+  }, [item]);
 
-  const initializeModifiers = () => {
+  const initializeModifiers = useCallback(() => {
     const modifierConfigs: ModifierConfiguration[] = AVAILABLE_MODIFIERS.map(
       (mod) => ({
         id: mod.id,
@@ -266,7 +278,12 @@ export default function PizzaCustomizer({
     );
 
     setModifiers(modifierConfigs);
-  };
+  }, [item]);
+
+  useEffect(() => {
+    initializeToppings();
+    initializeModifiers();
+  }, [initializeToppings, initializeModifiers]);
 
   // Calculate topping price based on amount and whether it's default
   const calculateToppingPrice = (

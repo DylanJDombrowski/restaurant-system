@@ -113,6 +113,7 @@ export interface ConfiguredTopping {
   amount: ToppingAmount;
   price: number;
   isDefault: boolean;
+  category?: string; // Add this for better organization
 }
 
 // Define the configured modifier interface
@@ -131,9 +132,9 @@ export interface ConfiguredCartItem {
   variantName?: string;
   quantity: number;
   basePrice: number;
-  selectedToppings?: ConfiguredTopping[];
-  selectedModifiers?: ConfiguredModifier[];
-  specialInstructions?: string;
+  selectedToppings: ConfiguredTopping[]; // Always array, never undefined
+  selectedModifiers: ConfiguredModifier[]; // Always array, never undefined
+  specialInstructions: string; // Always string, never undefined
   totalPrice: number;
   displayName: string;
 }

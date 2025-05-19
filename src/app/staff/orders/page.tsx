@@ -11,7 +11,7 @@ import {
   Modifier,
 } from "@/lib/types";
 import EnhancedMenuItemSelector from "@/components/features/orders/EnhancedMenuItemSelector";
-import type { ConfiguredCartItem } from "@/components/features/orders/EnhancedMenuItemSelector";
+import { ConfiguredCartItem } from "@/lib/types";
 import EnhancedCartSystem, {
   useCartStatistics,
 } from "@/components/features/orders/EnhancedCartSystem";
@@ -636,14 +636,16 @@ function CustomerInformationPanel(props: CustomerInformationPanelProps) {
     orderTypeAutoSuggested,
     deliveryAddress,
     setDeliveryAddress,
-    selectedAddressId,
+
     handleAddressSelection,
     isCustomerInfoExpanded,
     setIsCustomerInfoExpanded,
     customerInfoConfirmed,
     handleConfirmCustomer,
   } = props;
-
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
+    null
+  );
   return (
     <div className="bg-white rounded-xl shadow-lg">
       {/* Panel Header */}

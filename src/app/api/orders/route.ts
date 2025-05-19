@@ -6,6 +6,7 @@ import {
   InsertCustomer,
   InsertCustomerAddress,
 } from "@/lib/types";
+import { CartItemTransformer } from "@/lib/utils/cart-transformers";
 
 /**
  * Enhanced Order Creation API
@@ -23,9 +24,9 @@ import {
 
 interface EnhancedOrderItem {
   menuItemId: string;
-  variantId?: string; // For sized items like pizzas
+  variantId?: string;
   quantity: number;
-  unitPrice: number; // Total price per item including customizations
+  unitPrice: number;
   selectedToppings?: Array<{
     id: string;
     name: string;
@@ -76,14 +77,14 @@ export async function POST(request: NextRequest) {
     // Generate order number
     const orderNumber = generateOrderNumber();
 
-    // Handle customer creation/lookup (reusing existing logic)
+    // Handle customer creation/lookup
     let customerId = null;
     if (orderData.customer_phone) {
       customerId = await handleCustomerWithEnhancedErrorHandling(orderData);
     }
 
     // Create the order record
-    const orderInsert = {
+    const orderInsert: InsertOrder = {
       ...orderData,
       order_number: orderNumber,
       customer_id: customerId,
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Order created successfully:", order.id);
 
-    // Handle delivery address saving (reusing existing logic)
+    // Handle delivery address saving
     if (
       order.order_type === "delivery" &&
       customerId &&
@@ -112,31 +113,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Create enhanced order items with full customization data
-    const enhancedOrderItems = enhancedItems.map((item: EnhancedOrderItem) => {
-      // Validate pricing logic before storing
-      const expectedPrice = validateItemPricing(item);
-      if (Math.abs(expectedPrice - item.unitPrice) > 0.01) {
-        console.warn(
-          `Price discrepancy for item ${item.menuItemId}: expected ${expectedPrice}, got ${item.unitPrice}`
-        );
-      }
-
-      return {
-        order_id: order.id,
-        menu_item_id: item.menuItemId,
-        menu_item_variant_id: item.variantId || null,
+    // Transform the API format to match the database format
+    const orderItemsToInsert = enhancedItems.map((item) => {
+      // Convert API format to ConfiguredCartItem format, then to database format
+      const configuredItem = {
+        id: `temp-${Date.now()}-${Math.random()}`,
+        menuItemId: item.menuItemId,
+        menuItemName: "temp", // This will be populated later
+        variantId: item.variantId,
+        variantName: undefined,
         quantity: item.quantity,
-        unit_price: item.unitPrice,
-        total_price: item.unitPrice * item.quantity,
-        selected_toppings_json: item.selectedToppings || [],
-        selected_modifiers_json: item.selectedModifiers || [],
-        special_instructions: item.specialInstructions || null,
+        basePrice: item.unitPrice,
+        selectedToppings:
+          item.selectedToppings?.map((t) => ({
+            ...t,
+            category: "api", // Add required field
+          })) || [],
+        selectedModifiers: item.selectedModifiers || [],
+        specialInstructions: item.specialInstructions || "",
+        totalPrice: item.unitPrice,
+        displayName: "temp",
       };
+
+      return CartItemTransformer.toOrderItem(configuredItem, order.id);
     });
 
     const { data: createdOrderItems, error: itemsError } = await supabaseServer
       .from("order_items")
-      .insert(enhancedOrderItems).select(`
+      .insert(orderItemsToInsert).select(`
         *,
         menu_items(id, name, description),
         menu_item_variants(id, name, price)
@@ -154,7 +158,7 @@ export async function POST(request: NextRequest) {
       createdOrderItems.length
     );
 
-    // Update customer statistics (reusing existing logic)
+    // Update customer statistics if we have a customer
     if (customerId) {
       await updateCustomerStats(customerId, order.total);
     }
@@ -181,28 +185,6 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-/**
- * Validate Item Pricing
- *
- * This function validates that the pricing logic matches your business rules.
- * It ensures that toppings, modifiers, and variants are priced correctly
- * according to your specifications.
- */
-function validateItemPricing(item: EnhancedOrderItem): number {
-  // Start with base price (this should come from the variant or menu item)
-  // For now, we'll trust the frontend calculation, but in production
-  // you'd want to recalculate based on database prices
-
-  // In a production system, you would:
-  // 1. Look up the base price from menu_items or menu_item_variants
-  // 2. Add topping costs based on amount and default status
-  // 3. Add modifier costs
-  // 4. Apply any business rules (no credits for removed specialty pizza toppings)
-
-  // For now, we'll return the provided price but log any discrepancies
-  return item.unitPrice;
 }
 
 /**

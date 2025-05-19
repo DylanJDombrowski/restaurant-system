@@ -6,8 +6,6 @@ import {
   MenuItemVariant,
   Topping,
   Modifier,
-} from "@/lib/types";
-import {
   ConfiguredCartItem,
   ConfiguredTopping,
   ToppingAmount,
@@ -92,16 +90,14 @@ export default function EnhancedMenuItemSelector({
       variantName: variant?.name,
       quantity: 1,
       basePrice: variant?.price || item.base_price,
-      selectedToppings: getDefaultToppings(item),
-      selectedModifiers: [],
+      selectedToppings: getDefaultToppings(item), // This will always be an array
+      selectedModifiers: [], // Always initialize as empty array
       totalPrice: variant?.price || item.base_price,
       displayName: createDisplayName(item, variant),
-      specialInstructions: "",
+      specialInstructions: "", // Always initialize as empty string
     };
 
     onAddToCart(cartItem);
-
-    // Reset selection state
     setSelectedItem(null);
     setSelectedVariant(null);
   };
@@ -110,46 +106,51 @@ export default function EnhancedMenuItemSelector({
   const getDefaultToppings = (
     item: MenuItemWithVariants
   ): ConfiguredTopping[] => {
-    // If item has default toppings (like specialty pizzas), parse them
+    const defaultToppings: ConfiguredTopping[] = [];
+
     if (item.default_toppings_json && item.item_type === "pizza") {
       try {
-        const defaultConfig = item.default_toppings_json as {
-          toppings: { id: string; name: string; amount?: ToppingAmount }[];
+        const config = item.default_toppings_json as {
+          toppings: Array<{
+            id: string;
+            name: string;
+            amount?: ToppingAmount;
+          }>;
         };
-        if (defaultConfig && defaultConfig.toppings) {
-          return defaultConfig.toppings.map(
-            (topping: {
-              id: string;
-              name: string;
-              amount?: ToppingAmount;
-            }) => ({
+
+        if (config && config.toppings && Array.isArray(config.toppings)) {
+          config.toppings.forEach((topping) => {
+            defaultToppings.push({
               id: topping.id,
               name: topping.name,
               amount: topping.amount || "normal",
-              price: 0, // Default toppings don't add to price
+              price: 0,
               isDefault: true,
-            })
-          );
+              category: "default", // Add this field
+            });
+          });
         }
       } catch (error) {
         console.error("Error parsing default toppings:", error);
       }
     }
 
-    // For cheese default on pizzas
-    if (item.item_type === "pizza") {
-      return [
-        {
-          id: "cheese",
-          name: "Cheese",
-          amount: "normal" as const,
-          price: 0,
-          isDefault: true,
-        },
-      ];
+    // Always include cheese as default for pizzas
+    if (
+      item.item_type === "pizza" &&
+      !defaultToppings.some((t) => t.name.toLowerCase().includes("cheese"))
+    ) {
+      defaultToppings.push({
+        id: "cheese",
+        name: "Cheese",
+        amount: "normal",
+        price: 0,
+        isDefault: true,
+        category: "cheese",
+      });
     }
 
-    return [];
+    return defaultToppings;
   };
 
   // Create human-readable display name

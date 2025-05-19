@@ -1,7 +1,11 @@
 "use client";
 import { useState, useMemo } from "react";
-import { ConfiguredCartItem } from "./EnhancedMenuItemSelector";
-import { PizzaCustomizer } from "./PizzaCustomizer";
+import {
+  ConfiguredCartItem,
+  ConfiguredModifier,
+  ConfiguredTopping,
+} from "@/lib/types";
+import PizzaCustomizer from "./PizzaCustomizer";
 
 /**
  * Enhanced Cart System Component
@@ -192,21 +196,18 @@ function CartItemCard({
   const getItemDescription = (): string => {
     const parts: string[] = [];
 
-    // Add variant info
-    if (item.variantName) {
-      parts.push(item.variantName);
-    }
-
     // Add topping modifications
     if (item.selectedToppings && item.selectedToppings.length > 0) {
-      const addedToppings = item.selectedToppings.filter((t) => !t.isDefault);
+      const addedToppings = item.selectedToppings.filter(
+        (t: ConfiguredTopping) => !t.isDefault
+      );
       const removedDefaults = item.selectedToppings.filter(
-        (t) => t.isDefault && t.amount === "none"
+        (t: ConfiguredTopping) => t.isDefault && t.amount === "none"
       );
 
       if (addedToppings.length > 0) {
         const toppingList = addedToppings
-          .map((t) =>
+          .map((t: ConfiguredTopping) =>
             t.amount === "normal" ? t.name : `${t.amount} ${t.name}`
           )
           .join(", ");
@@ -214,14 +215,18 @@ function CartItemCard({
       }
 
       if (removedDefaults.length > 0) {
-        const removedList = removedDefaults.map((t) => t.name).join(", ");
+        const removedList = removedDefaults
+          .map((t: ConfiguredTopping) => t.name)
+          .join(", ");
         parts.push(`No: ${removedList}`);
       }
     }
 
     // Add modifier info
     if (item.selectedModifiers && item.selectedModifiers.length > 0) {
-      const modifierList = item.selectedModifiers.map((m) => m.name).join(", ");
+      const modifierList = item.selectedModifiers
+        .map((m: ConfiguredModifier) => m.name)
+        .join(", ");
       parts.push(modifierList);
     }
 
@@ -362,19 +367,20 @@ function OrderSummaryDisplay({ summary }: OrderSummaryDisplayProps) {
  */
 export function useCartStatistics(items: ConfiguredCartItem[]) {
   return useMemo(() => {
-    const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalItems = items.reduce(
+      (sum: number, item: ConfiguredCartItem) => sum + item.quantity,
+      0
+    );
     const uniqueItems = items.length;
     const subtotal = items.reduce(
-      (sum, item) => sum + item.totalPrice * item.quantity,
+      (sum: number, item: ConfiguredCartItem) =>
+        sum + item.totalPrice * item.quantity,
       0
     );
 
     // Calculate tax (8% as per your system)
     const tax = subtotal * 0.08;
-
-    // Delivery fee would be determined elsewhere based on order type
     const deliveryFee = 0; // This will be set by parent component
-
     const total = subtotal + tax + deliveryFee;
 
     return {
