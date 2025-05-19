@@ -23,7 +23,9 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
               <Link href="/staff" className="text-xl font-bold text-blue-600">
                 Pizza Mia - Staff
               </Link>
-              <div className="ml-4 text-sm text-gray-600">
+              <div className="ml-4 text-sm text-gray-800">
+                {" "}
+                {/* Darker text */}
                 {restaurant?.name} • {staff?.name} ({staff?.role})
               </div>
             </div>
@@ -32,7 +34,7 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
               {/* Core staff features - available to all authenticated staff */}
               <Link
                 href="/staff/orders"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md"
+                className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium" // Darker text
               >
                 Orders
               </Link>
@@ -41,7 +43,7 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
               {isManager && (
                 <Link
                   href="/staff/menu"
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md"
+                  className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium" // Darker text
                 >
                   Menu
                 </Link>
@@ -51,7 +53,7 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
               {isAdmin && (
                 <Link
                   href="/admin"
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md"
+                  className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium" // Darker text
                 >
                   Admin
                 </Link>
@@ -59,7 +61,7 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
 
               <Link
                 href="/kitchen"
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium"
               >
                 Kitchen Display
               </Link>
@@ -67,7 +69,7 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
               {/* Sign out button */}
               <button
                 onClick={signOut}
-                className="text-gray-700 hover:text-red-600 px-3 py-2 rounded-md border border-gray-300 hover:border-red-300"
+                className="text-gray-900 hover:text-red-600 px-3 py-2 rounded-md border border-gray-300 hover:border-red-400 font-medium" // Darker text
               >
                 Sign Out
               </button>

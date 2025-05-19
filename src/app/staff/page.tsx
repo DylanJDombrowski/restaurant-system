@@ -58,7 +58,7 @@ export default function StaffDashboard() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="text-lg">Loading dashboard...</div>
+        <div className="text-lg text-gray-900">Loading dashboard...</div>
       </div>
     );
   }
@@ -69,7 +69,7 @@ export default function StaffDashboard() {
         <div className="text-red-600 text-lg font-semibold mb-4">
           Error Loading Dashboard
         </div>
-        <p className="text-gray-600">{error}</p>
+        <p className="text-gray-900">{error}</p>
         <button
           onClick={() => window.location.reload()}
           className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -108,55 +108,57 @@ export default function StaffDashboard() {
 
       {/* Dashboard Stats Grid */}
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">
+        <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-blue-500">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">
             Today&apos;s Orders
           </h2>
           <p className="text-3xl font-bold text-blue-600">
             {todayOrders.length}
           </p>
-          <p className="text-gray-600 text-sm">Total orders today</p>
+          <p className="text-gray-800 text-sm">Total orders today</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">
+        <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-green-500">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">
             Today&apos;s Revenue
           </h2>
           <p className="text-3xl font-bold text-green-600">
             ${todayRevenue.toFixed(2)}
           </p>
-          <p className="text-gray-600 text-sm">Revenue today</p>
+          <p className="text-gray-800 text-sm">Revenue today</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-orange-500">
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">
+        <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-orange-500">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">
             Active Orders
           </h2>
           <p className="text-3xl font-bold text-orange-600">
             {confirmedOrders.length + preparingOrders.length}
           </p>
-          <p className="text-gray-600 text-sm">In kitchen queue</p>
+          <p className="text-gray-800 text-sm">In kitchen queue</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-purple-500">
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">
+        <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-purple-500">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">
             Available Items
           </h2>
           <p className="text-3xl font-bold text-purple-600">
             {menuItems.length}
           </p>
-          <p className="text-gray-600 text-sm">Menu items</p>
+          <p className="text-gray-800 text-sm">Menu items</p>
         </div>
       </div>
 
       {/* Order Status Overview */}
       <div className="grid lg:grid-cols-2 gap-8 mb-8">
         {/* Order Status Breakdown */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Order Status</h2>
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            Order Status
+          </h2>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-gray-700">Pending Confirmation</span>
+              <span className="text-gray-900">Pending Confirmation</span>
               <div className="flex items-center gap-2">
                 <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-sm font-medium">
                   {pendingOrders.length}
@@ -172,7 +174,7 @@ export default function StaffDashboard() {
               </div>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-700">Confirmed (Kitchen)</span>
+              <span className="text-gray-900">Confirmed (Kitchen)</span>
               <div className="flex items-center gap-2">
                 <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-medium">
                   {confirmedOrders.length}
@@ -188,7 +190,7 @@ export default function StaffDashboard() {
               </div>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-700">Preparing</span>
+              <span className="text-gray-900">Preparing</span>
               <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-sm font-medium">
                 {preparingOrders.length}
               </span>
@@ -197,8 +199,10 @@ export default function StaffDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            Quick Actions
+          </h2>
           <div className="space-y-3">
             <Link
               href="/staff/orders"
@@ -223,10 +227,12 @@ export default function StaffDashboard() {
       </div>
 
       {/* Recent Orders */}
-      <div className="bg-white rounded-lg shadow-md">
+      <div className="bg-white rounded-lg shadow-lg">
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Recent Orders</h2>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Recent Orders
+            </h2>
             <Link
               href="/staff/orders"
               className="text-blue-600 hover:text-blue-800 text-sm underline"
@@ -239,8 +245,8 @@ export default function StaffDashboard() {
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {orders.length === 0 ? (
               <div className="text-center py-8">
-                <div className="text-gray-400 text-lg">No orders yet today</div>
-                <p className="text-gray-500 text-sm mt-2">
+                <div className="text-gray-500 text-lg">No orders yet today</div>
+                <p className="text-gray-800 text-sm mt-2">
                   Create your first order to get started!
                 </p>
               </div>
@@ -254,21 +260,21 @@ export default function StaffDashboard() {
       </div>
 
       {/* Restaurant Info */}
-      <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">
+      <div className="mt-8 bg-white p-6 rounded-lg shadow-lg">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">
           Restaurant Information
         </h2>
         <div className="grid md:grid-cols-3 gap-4 text-sm">
           <div>
-            <span className="text-gray-500">Restaurant:</span>
-            <p className="font-medium">{restaurant?.name}</p>
+            <span className="text-gray-700">Restaurant:</span>
+            <p className="font-medium text-gray-900">{restaurant?.name}</p>
           </div>
           <div>
-            <span className="text-gray-500">Location:</span>
-            <p className="font-medium">New Lenox, IL</p>
+            <span className="text-gray-700">Location:</span>
+            <p className="font-medium text-gray-900">New Lenox, IL</p>
           </div>
           <div>
-            <span className="text-gray-500">System Status:</span>
+            <span className="text-gray-700">System Status:</span>
             <p className="font-medium text-green-600">✅ Online</p>
           </div>
         </div>
@@ -277,7 +283,6 @@ export default function StaffDashboard() {
   );
 }
 
-// Simplified Order Card Component (read-only)
 function OrderCard({ order }: { order: OrderWithItems }) {
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -290,11 +295,11 @@ function OrderCard({ order }: { order: OrderWithItems }) {
       case "ready":
         return "bg-green-100 text-green-800 border-green-200";
       case "completed":
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return "bg-gray-100 text-gray-900 border-gray-200";
       case "cancelled":
         return "bg-red-100 text-red-800 border-red-200";
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return "bg-gray-100 text-gray-900 border-gray-200";
     }
   };
 
@@ -317,8 +322,10 @@ function OrderCard({ order }: { order: OrderWithItems }) {
     <div className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
       <div className="flex justify-between items-start mb-3">
         <div>
-          <h4 className="font-semibold text-lg">Order #{order.order_number}</h4>
-          <p className="text-sm text-gray-600">{timeAgo(order.created_at)}</p>
+          <h4 className="font-semibold text-lg text-gray-900">
+            Order #{order.order_number}
+          </h4>
+          <p className="text-sm text-gray-700">{timeAgo(order.created_at)}</p>
         </div>
         <span
           className={`px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(
@@ -331,19 +338,19 @@ function OrderCard({ order }: { order: OrderWithItems }) {
 
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <span className="text-gray-500">Customer:</span>
-          <p className="font-medium">{order.customer_name}</p>
-          <p className="text-gray-600">{order.customer_phone}</p>
+          <span className="text-gray-700">Customer:</span>
+          <p className="font-medium text-gray-900">{order.customer_name}</p>
+          <p className="text-gray-700">{order.customer_phone}</p>
         </div>
         <div>
-          <span className="text-gray-500">Order:</span>
-          <p className="font-medium">{order.order_type}</p>
+          <span className="text-gray-700">Order:</span>
+          <p className="font-medium text-gray-900">{order.order_type}</p>
           <p className="text-green-600 font-bold">${order.total}</p>
         </div>
       </div>
 
       <div className="mt-3 pt-3 border-t border-gray-100">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-700">
           {order.order_items?.length || 0} item
           {(order.order_items?.length || 0) !== 1 ? "s" : ""}
         </p>
