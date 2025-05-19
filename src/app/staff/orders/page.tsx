@@ -119,34 +119,32 @@ export default function StaffOrdersPage() {
         </div>
       </div>
 
-      {/* Main content area using a single top-level grid for OrderCreationForm and RecentOrders */}
+      {/* Main content area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        <div className="lg:col-span-2">
+        {/* Order Creation Form - Dynamically adjust column span */}
+        <div
+          className={isRecentOrdersVisible ? "lg:col-span-2" : "lg:col-span-3"}
+        >
           <OrderCreationForm
             menuItems={menuItems}
             restaurantId={restaurant?.id || ""}
             onOrderCreated={() => {
-              // Consider a more subtle way to refresh data if possible,
-              // but window.location.reload() works for now.
               window.location.reload();
             }}
           />
         </div>
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 border-b pb-3">
-              Recent Orders
-            </h2>
-            <button
-              onClick={() => setIsRecentOrdersVisible(!isRecentOrdersVisible)}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              {isRecentOrdersVisible ? "Hide" : "Show"}
-            </button>
-            {isRecentOrdersVisible && (
+
+        {/* Recent Orders - Conditionally render the entire column */}
+        {isRecentOrdersVisible && (
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex justify-between items-center mb-6 border-b pb-3">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Recent Orders
+                </h2>
+                {/* Button to toggle visibility is now better placed, perhaps in a page header or a dedicated toggle bar if needed */}
+              </div>
               <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-                {" "}
-                {/* Adjusted max height */}
                 {orders.length === 0 ? (
                   <div className="text-center py-8">
                     <div className="text-gray-500 text-lg">
@@ -162,9 +160,18 @@ export default function StaffOrdersPage() {
                     .map((order) => <OrderCard key={order.id} order={order} />)
                 )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
+      </div>
+      {/* Button to toggle recent orders visibility could be placed outside the grid, e.g., in page header or a floating button */}
+      <div className="mt-4 text-right">
+        <button
+          onClick={() => setIsRecentOrdersVisible(!isRecentOrdersVisible)}
+          className="bg-slate-200 text-slate-700 hover:bg-slate-300 px-4 py-2 rounded-md text-sm font-medium"
+        >
+          {isRecentOrdersVisible ? "Hide Recent Orders" : "Show Recent Orders"}
+        </button>
       </div>
     </div>
   );
@@ -226,6 +233,8 @@ function OrderCreationForm({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
+  const [isCustomerInfoExpanded, setIsCustomerInfoExpanded] = useState(true); // Start with customer info expanded
+  const [customerInfoConfirmed, setCustomerInfoConfirmed] = useState(false);
 
   const lookupCustomer = useCallback(
     async (phone: string) => {
@@ -324,6 +333,20 @@ function OrderCreationForm({
     }, 500);
     return () => clearTimeout(timeoutId);
   }, [customerInfo.phone, lookupCustomer]);
+
+  const handleConfirmCustomer = () => {
+    if (customerInfo.name && customerInfo.phone) {
+      setCustomerInfoConfirmed(true);
+      setIsCustomerInfoExpanded(false); // Collapse after confirmation
+    } else {
+      alert("Please enter customer name and phone number.");
+    }
+  };
+
+  // const handleEditCustomer = () => {
+  //   setCustomerInfoConfirmed(false);
+  //   setIsCustomerInfoExpanded(true);
+  // };
 
   const addItem = (menuItem: MenuItemWithCategory) => {
     setSelectedItems((prev) => {
@@ -470,455 +493,550 @@ function OrderCreationForm({
       <h2 className="text-2xl font-bold text-gray-900 mb-6 border-b pb-3">
         Create New Order
       </h2>
+      {/* Use a single top-level grid for the form's internal layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Column 1: Customer, Order Type, Delivery Address (Span 4 of 12 on lg) */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Customer Information Section */}
+        {/* Column 1: Customer, Order Type, Delivery Address */}
+        {/* This column will now house the collapsible customer section and other details */}
+        <div
+          className={`lg:col-span-4 space-y-6 ${
+            !isCustomerInfoExpanded && customerInfoConfirmed ? "lg:h-auto" : ""
+          }`}
+        >
+          {/* Customer Information Section - Collapsible */}
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Customer Information
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className={labelStyles}>Phone Number *</label>
-                <div className="relative">
+            <div
+              className="flex justify-between items-center cursor-pointer"
+              onClick={() =>
+                customerInfoConfirmed
+                  ? setIsCustomerInfoExpanded(!isCustomerInfoExpanded)
+                  : setIsCustomerInfoExpanded(true)
+              }
+            >
+              <h3 className="text-lg font-semibold text-gray-900">
+                {customerInfoConfirmed && !isCustomerInfoExpanded
+                  ? `Customer: ${customerInfo.name}`
+                  : "Customer Information"}
+              </h3>
+              {customerInfoConfirmed ? (
+                isCustomerInfoExpanded ? (
+                  <span className="text-blue-600 text-sm">▲ Collapse</span>
+                ) : (
+                  <span className="text-blue-600 text-sm">
+                    ▼ Expand to Edit
+                  </span>
+                )
+              ) : (
+                <span className="text-gray-500 text-sm">
+                  {isCustomerInfoExpanded ? "▲" : "▼"}
+                </span>
+              )}
+            </div>
+
+            {isCustomerInfoExpanded && (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className={labelStyles}>Phone Number *</label>
+                  <div className="relative">
+                    <input
+                      type="tel"
+                      placeholder="(555) 123-4567"
+                      value={customerInfo.phone}
+                      onChange={(e) =>
+                        setCustomerInfo((prev) => ({
+                          ...prev,
+                          phone: e.target.value,
+                        }))
+                      }
+                      className={inputStyles}
+                      required
+                      disabled={customerInfoConfirmed}
+                    />
+                    {lookupLoading && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                      </div>
+                    )}
+                  </div>
+                  {customerLookupStatus === "searching" && (
+                    <p className="text-sm text-blue-600 mt-1">Searching...</p>
+                  )}
+                  {customerLookupStatus === "found" && foundCustomer && (
+                    <p className="text-sm text-green-600 mt-1">
+                      ✓ Customer: {foundCustomer.name} (
+                      {foundCustomer.total_orders} orders)
+                    </p>
+                  )}
+                  {customerLookupStatus === "not-found" &&
+                    customerInfo.phone.length >= 10 && (
+                      <p className="text-sm text-gray-700 mt-1">
+                        New customer.
+                      </p>
+                    )}
+                </div>
+                <div>
+                  <label className={labelStyles}>Customer Name *</label>
                   <input
-                    type="tel"
-                    placeholder="(555) 123-4567"
-                    value={customerInfo.phone}
+                    type="text"
+                    placeholder="Enter customer name"
+                    value={customerInfo.name}
                     onChange={(e) =>
                       setCustomerInfo((prev) => ({
                         ...prev,
-                        phone: e.target.value,
+                        name: e.target.value,
                       }))
                     }
                     className={inputStyles}
                     required
+                    disabled={customerInfoConfirmed}
                   />
-                  {lookupLoading && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                    </div>
-                  )}
                 </div>
-                {customerLookupStatus === "searching" && (
-                  <p className="text-sm text-blue-600 mt-1">Searching...</p>
+                <div>
+                  <label className={labelStyles}>Email (optional)</label>
+                  <input
+                    type="email"
+                    placeholder="customer@email.com"
+                    value={customerInfo.email}
+                    onChange={(e) =>
+                      setCustomerInfo((prev) => ({
+                        ...prev,
+                        email: e.target.value,
+                      }))
+                    }
+                    className={inputStyles}
+                    disabled={customerInfoConfirmed}
+                  />
+                </div>
+                {foundCustomer && (
+                  <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200 text-xs text-blue-800">
+                    Loyalty: {foundCustomer.loyalty_points} pts | Saved
+                    Addresses: {customerAddresses.length}
+                    {customerAddresses.length > 0 &&
+                      orderType === "pickup" &&
+                      orderTypeAutoSuggested && (
+                        <button
+                          onClick={() => handleOrderTypeChange("delivery")}
+                          className="ml-1 text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded hover:bg-blue-600"
+                        >
+                          Suggest Delivery?
+                        </button>
+                      )}
+                  </div>
                 )}
-                {customerLookupStatus === "found" && foundCustomer && (
-                  <p className="text-sm text-green-600 mt-1">
-                    ✓ Customer: {foundCustomer.name} (
-                    {foundCustomer.total_orders} orders)
-                  </p>
+                {!customerInfoConfirmed && (
+                  <button
+                    type="button"
+                    onClick={handleConfirmCustomer}
+                    className="w-full mt-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                  >
+                    Confirm Customer & Continue
+                  </button>
                 )}
-                {customerLookupStatus === "not-found" &&
-                  customerInfo.phone.length >= 10 && (
-                    <p className="text-sm text-gray-700 mt-1">New customer.</p>
-                  )}
               </div>
-              <div>
-                <label className={labelStyles}>Customer Name *</label>
-                <input
-                  type="text"
-                  placeholder="Enter customer name"
-                  value={customerInfo.name}
-                  onChange={(e) =>
-                    setCustomerInfo((prev) => ({
-                      ...prev,
-                      name: e.target.value,
-                    }))
-                  }
-                  className={inputStyles}
-                  required
-                />
-              </div>
-              <div>
-                <label className={labelStyles}>Email (optional)</label>
-                <input
-                  type="email"
-                  placeholder="customer@email.com"
-                  value={customerInfo.email}
-                  onChange={(e) =>
-                    setCustomerInfo((prev) => ({
-                      ...prev,
-                      email: e.target.value,
-                    }))
-                  }
-                  className={inputStyles}
-                />
-              </div>
-            </div>
-            {foundCustomer && (
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-800">
-                Loyalty Points: {foundCustomer.loyalty_points} | Addresses
-                Saved: {customerAddresses.length}
-                {customerAddresses.length > 0 &&
-                  orderType === "pickup" &&
-                  orderTypeAutoSuggested && (
-                    <button
-                      onClick={() => handleOrderTypeChange("delivery")}
-                      className="ml-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded hover:bg-blue-700"
-                    >
-                      Suggest Delivery?
-                    </button>
-                  )}
-              </div>
+            )}
+            {customerInfoConfirmed && isCustomerInfoExpanded && (
+              <button
+                type="button"
+                onClick={() => setIsCustomerInfoExpanded(false)} // just collapse
+                className="w-full mt-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium"
+              >
+                Done Editing Customer
+              </button>
             )}
           </div>
 
-          {/* Order Type Selection */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Order Type
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleOrderTypeChange("pickup")}
-                className={`p-3 rounded-lg border-2 transition-all text-left ${
-                  orderType === "pickup"
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-300 bg-white hover:border-gray-400"
-                }`}
-              >
-                <span className="font-medium text-gray-900 block">Pickup</span>
-                <span className="text-xs text-gray-700">~25 min</span>
-              </button>
-              <button
-                onClick={() => handleOrderTypeChange("delivery")}
-                className={`p-3 rounded-lg border-2 transition-all text-left ${
-                  orderType === "delivery"
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-300 bg-white hover:border-gray-400"
-                }`}
-              >
-                <span className="font-medium text-gray-900 block">
-                  Delivery
-                </span>
-                <span className="text-xs text-gray-700">
-                  +$3.99{" "}
-                  {customerAddresses.length > 0
-                    ? `(${customerAddresses.length} saved)`
-                    : ""}
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* Delivery Address Section */}
-          <div
-            className={`border rounded-lg transition-all duration-300 space-y-4 ${
-              orderType === "delivery"
-                ? "bg-yellow-50 border-yellow-200 p-4"
-                : "bg-gray-100 p-4 opacity-70"
-            }`}
-          >
-            <h3 className="text-lg font-semibold text-gray-900">
-              Delivery Address{" "}
-              {orderType === "pickup" && (
-                <span className="text-sm font-normal text-gray-700">
-                  (for Delivery orders)
-                </span>
-              )}
-            </h3>
-            {orderType === "delivery" && customerAddresses.length > 0 && (
-              <div className="space-y-2">
-                <label className={labelStyles}>Saved Addresses</label>
-                {customerAddresses.map((addr) => (
-                  <label
-                    key={addr.id}
-                    className={`flex items-start space-x-3 p-2 rounded-lg border cursor-pointer ${
-                      selectedAddressId === addr.id
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 bg-white"
+          {/* Order Type and Delivery Address sections - only shown if customer info is confirmed */}
+          {customerInfoConfirmed && (
+            <>
+              {/* Order Type Selection */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                {/* ... existing order type JSX ... */}
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Order Type
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleOrderTypeChange("pickup")}
+                    className={`p-3 rounded-lg border-2 transition-all text-left ${
+                      orderType === "pickup"
+                        ? "border-blue-600 bg-blue-50"
+                        : "border-gray-300 bg-white hover:border-gray-400"
                     }`}
                   >
-                    <input
-                      type="radio"
-                      name="savedAddress"
-                      value={addr.id}
-                      checked={selectedAddressId === addr.id}
-                      onChange={() => handleAddressSelection(addr.id)}
-                      className="mt-1"
-                    />
-                    <div className="text-sm">
-                      <div className="font-medium text-gray-900">
-                        {addr.address}, {addr.city} {addr.zip}
-                      </div>
-                      {addr.delivery_instructions && (
-                        <div className="text-xs text-blue-700">
-                          {addr.delivery_instructions}
-                        </div>
-                      )}
-                      {addr.is_default && (
-                        <span className="ml-1 text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
-                          Default
-                        </span>
-                      )}
-                    </div>
-                  </label>
-                ))}
-                <label
-                  className={`flex items-center p-2 rounded-lg border cursor-pointer ${
-                    selectedAddressId === null
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 bg-white"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="savedAddress"
-                    value="new"
-                    checked={selectedAddressId === null}
-                    onChange={() => {
-                      setSelectedAddressId(null);
-                      setDeliveryAddress({
-                        address: "",
-                        city: "",
-                        zip: "",
-                        instructions: "",
-                      });
-                    }}
-                    className="mr-2"
-                  />
-                  <span className="text-sm font-medium text-gray-900">
-                    Enter new address
-                  </span>
-                </label>
+                    <span className="font-medium text-gray-900 block">
+                      Pickup
+                    </span>
+                    <span className="text-xs text-gray-700">~25 min</span>
+                  </button>
+                  <button
+                    onClick={() => handleOrderTypeChange("delivery")}
+                    className={`p-3 rounded-lg border-2 transition-all text-left ${
+                      orderType === "delivery"
+                        ? "border-blue-600 bg-blue-50"
+                        : "border-gray-300 bg-white hover:border-gray-400"
+                    }`}
+                  >
+                    <span className="font-medium text-gray-900 block">
+                      Delivery
+                    </span>
+                    <span className="text-xs text-gray-700">
+                      +$3.99{" "}
+                      {customerAddresses.length > 0
+                        ? `(${customerAddresses.length} saved)`
+                        : ""}
+                    </span>
+                  </button>
+                </div>
               </div>
-            )}
-            <div>
-              <label className={labelStyles}>
-                Street Address {orderType === "delivery" && "*"}
-              </label>
-              <input
-                type="text"
-                placeholder="123 Main Street"
-                value={deliveryAddress.address}
-                onChange={(e) =>
-                  setDeliveryAddress((prev) => ({
-                    ...prev,
-                    address: e.target.value,
-                  }))
-                }
-                disabled={orderType === "pickup"}
-                className={inputStyles}
-                required={orderType === "delivery"}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelStyles}>
-                  City {orderType === "delivery" && "*"}
-                </label>
-                <input
-                  type="text"
-                  placeholder="New Lenox"
-                  value={deliveryAddress.city}
-                  onChange={(e) =>
-                    setDeliveryAddress((prev) => ({
-                      ...prev,
-                      city: e.target.value,
-                    }))
-                  }
-                  disabled={orderType === "pickup"}
-                  className={inputStyles}
-                  required={orderType === "delivery"}
-                />
-              </div>
-              <div>
-                <label className={labelStyles}>
-                  ZIP {orderType === "delivery" && "*"}
-                </label>
-                <input
-                  type="text"
-                  placeholder="60451"
-                  value={deliveryAddress.zip}
-                  onChange={(e) =>
-                    setDeliveryAddress((prev) => ({
-                      ...prev,
-                      zip: e.target.value,
-                    }))
-                  }
-                  disabled={orderType === "pickup"}
-                  className={inputStyles}
-                  required={orderType === "delivery"}
-                />
-              </div>
-            </div>
-            <div>
-              <label className={labelStyles}>Delivery Instructions</label>
-              <textarea
-                placeholder="Apt #, gate code..."
-                value={deliveryAddress.instructions}
-                onChange={(e) =>
-                  setDeliveryAddress((prev) => ({
-                    ...prev,
-                    instructions: e.target.value,
-                  }))
-                }
-                disabled={orderType === "pickup"}
-                rows={2}
-                className={inputStyles}
-              />
-            </div>
-          </div>
-        </div>
 
-        {/* Column 2: Menu Items (Span 4 of 12 on lg) */}
-        <div className="lg:col-span-4">
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Menu Items
-            </h3>
-            <div className="space-y-3 max-h-[600px] lg:max-h-[calc(100vh-250px)] overflow-y-auto pr-2">
-              {" "}
-              {/* Scrollable Menu */}
-              {menuItems.map((item) => (
-                <div
-                  key={item.id}
-                  className={`bg-white border rounded-lg p-3 transition-all duration-300 ${
-                    recentlyAdded === item.id
-                      ? "border-green-500 shadow-lg"
-                      : "border-gray-200 hover:shadow-md"
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="font-semibold text-gray-900">
-                        {item.name}
-                      </h4>
-                      <p className="text-xs text-gray-700">
-                        {item.description}
-                      </p>
-                      <p className="text-md font-bold text-green-600 mt-1">
-                        ${item.base_price.toFixed(2)}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => addItem(item)}
-                      className={`ml-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                        recentlyAdded === item.id
-                          ? "bg-green-600 text-white"
-                          : "bg-blue-600 text-white hover:bg-blue-700"
+              {/* Delivery Address Section */}
+              <div
+                className={`border rounded-lg transition-all duration-300 space-y-4 ${
+                  orderType === "delivery"
+                    ? "bg-yellow-50 border-yellow-200 p-4"
+                    : "bg-gray-100 p-4 opacity-70"
+                }`}
+              >
+                {/* ... existing delivery address JSX ... */}
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Delivery Address{" "}
+                  {orderType === "pickup" && (
+                    <span className="text-sm font-normal text-gray-700">
+                      (for Delivery orders)
+                    </span>
+                  )}
+                </h3>
+                {orderType === "delivery" && customerAddresses.length > 0 && (
+                  <div className="space-y-2">
+                    <label className={labelStyles}>Saved Addresses</label>
+                    {customerAddresses.map((addr) => (
+                      <label
+                        key={addr.id}
+                        className={`flex items-start space-x-3 p-2 rounded-lg border cursor-pointer ${
+                          selectedAddressId === addr.id
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 bg-white"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="savedAddress"
+                          value={addr.id}
+                          checked={selectedAddressId === addr.id}
+                          onChange={() => handleAddressSelection(addr.id)}
+                          className="mt-1"
+                        />
+                        <div className="text-sm">
+                          <div className="font-medium text-gray-900">
+                            {addr.address}, {addr.city} {addr.zip}
+                          </div>
+                          {addr.delivery_instructions && (
+                            <div className="text-xs text-blue-700">
+                              {addr.delivery_instructions}
+                            </div>
+                          )}
+                          {addr.is_default && (
+                            <span className="ml-1 text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
+                              Default
+                            </span>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                    <label
+                      className={`flex items-center p-2 rounded-lg border cursor-pointer ${
+                        selectedAddressId === null
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-200 bg-white"
                       }`}
                     >
-                      {recentlyAdded === item.id ? "✓ Added" : "+ Add"}
-                    </button>
+                      <input
+                        type="radio"
+                        name="savedAddress"
+                        value="new"
+                        checked={selectedAddressId === null}
+                        onChange={() => {
+                          setSelectedAddressId(null);
+                          setDeliveryAddress({
+                            address: "",
+                            city: "",
+                            zip: "",
+                            instructions: "",
+                          });
+                        }}
+                        className="mr-2"
+                      />
+                      <span className="text-sm font-medium text-gray-900">
+                        Enter new address
+                      </span>
+                    </label>
+                  </div>
+                )}
+                <div>
+                  <label className={labelStyles}>
+                    Street Address {orderType === "delivery" && "*"}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="123 Main Street"
+                    value={deliveryAddress.address}
+                    onChange={(e) =>
+                      setDeliveryAddress((prev) => ({
+                        ...prev,
+                        address: e.target.value,
+                      }))
+                    }
+                    disabled={orderType === "pickup"}
+                    className={inputStyles}
+                    required={orderType === "delivery"}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelStyles}>
+                      City {orderType === "delivery" && "*"}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="New Lenox"
+                      value={deliveryAddress.city}
+                      onChange={(e) =>
+                        setDeliveryAddress((prev) => ({
+                          ...prev,
+                          city: e.target.value,
+                        }))
+                      }
+                      disabled={orderType === "pickup"}
+                      className={inputStyles}
+                      required={orderType === "delivery"}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelStyles}>
+                      ZIP {orderType === "delivery" && "*"}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="60451"
+                      value={deliveryAddress.zip}
+                      onChange={(e) =>
+                        setDeliveryAddress((prev) => ({
+                          ...prev,
+                          zip: e.target.value,
+                        }))
+                      }
+                      disabled={orderType === "pickup"}
+                      className={inputStyles}
+                      required={orderType === "delivery"}
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div>
+                  <label className={labelStyles}>Delivery Instructions</label>
+                  <textarea
+                    placeholder="Apt #, gate code..."
+                    value={deliveryAddress.instructions}
+                    onChange={(e) =>
+                      setDeliveryAddress((prev) => ({
+                        ...prev,
+                        instructions: e.target.value,
+                      }))
+                    }
+                    disabled={orderType === "pickup"}
+                    rows={2}
+                    className={inputStyles}
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Column 3: Order Summary (Span 4 of 12 on lg) */}
-        <div className="lg:col-span-4 space-y-6">
-          {selectedItems.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        {/* Column 2: Menu Items - only shown if customer info is confirmed */}
+        {customerInfoConfirmed && (
+          <div className="lg:col-span-4">
+            {/* ... existing menu items JSX ... */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Current Order ({selectedItems.length})
+                Menu Items
               </h3>
-              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[600px] lg:max-h-[calc(100vh-250px)] overflow-y-auto pr-2">
                 {" "}
-                {/* Scrollable Cart */}
-                {selectedItems.map((item) => (
+                {/* Scrollable Menu */}
+                {menuItems.map((item) => (
                   <div
-                    key={item.menuItem.id}
-                    className={`flex justify-between items-center bg-white p-2.5 rounded-lg border ${
-                      item.justAdded ? "border-green-500" : "border-gray-200"
+                    key={item.id}
+                    className={`bg-white border rounded-lg p-3 transition-all duration-300 ${
+                      recentlyAdded === item.id
+                        ? "border-green-500 shadow-lg"
+                        : "border-gray-200 hover:shadow-md"
                     }`}
                   >
-                    <div className="flex-1">
-                      <span className="font-medium text-sm text-gray-900">
-                        {item.menuItem.name}
-                      </span>
-                      <div className="text-xs text-gray-700">
-                        ${item.menuItem.base_price.toFixed(2)}
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-semibold text-gray-900">
+                          {item.name}
+                        </h4>
+                        <p className="text-xs text-gray-700">
+                          {item.description}
+                        </p>
+                        <p className="text-md font-bold text-green-600 mt-1">
+                          ${item.base_price.toFixed(2)}
+                        </p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() =>
-                          updateQuantity(item.menuItem.id, item.quantity - 1)
-                        }
-                        className="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded-full text-sm font-bold"
+                        onClick={() => addItem(item)}
+                        className={`ml-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                          recentlyAdded === item.id
+                            ? "bg-green-600 text-white"
+                            : "bg-blue-600 text-white hover:bg-blue-700"
+                        }`}
                       >
-                        -
-                      </button>
-                      <span className="font-semibold text-sm w-5 text-center">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() =>
-                          updateQuantity(item.menuItem.id, item.quantity + 1)
-                        }
-                        className="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded-full text-sm font-bold"
-                      >
-                        +
-                      </button>
-                      <span className="font-bold text-sm text-green-600 ml-2 w-16 text-right">
-                        ${(item.menuItem.base_price * item.quantity).toFixed(2)}
-                      </span>
-                      <button
-                        onClick={() => removeItem(item.menuItem.id)}
-                        className="bg-red-500 hover:bg-red-600 text-white w-7 h-7 rounded-full text-sm font-bold"
-                      >
-                        ×
+                        {recentlyAdded === item.id ? "✓ Added" : "+ Add"}
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          )}
-
-          <div className="bg-white border border-gray-300 rounded-lg p-4 shadow-md">
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-800">Subtotal:</span>
-                <span className="font-semibold text-gray-900">
-                  ${totals.subtotal.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-800">Tax (8%):</span>
-                <span className="font-semibold text-gray-900">
-                  ${totals.tax.toFixed(2)}
-                </span>
-              </div>
-              {orderType === "delivery" && (
-                <div className="flex justify-between">
-                  <span className="text-gray-800">Delivery Fee:</span>
-                  <span className="font-semibold text-gray-900">
-                    ${totals.deliveryFee.toFixed(2)}
-                  </span>
-                </div>
-              )}
-              <div className="border-t border-gray-200 pt-2 mt-2">
-                <div className="flex justify-between text-lg font-bold">
-                  <span className="text-gray-900">Total:</span>
-                  <span className="text-green-600">
-                    ${totals.total.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !canSubmit}
-              className={`w-full mt-4 py-3 rounded-lg text-md font-bold transition-all ${
-                canSubmit && !isSubmitting
-                  ? "bg-green-600 hover:bg-green-700 text-white"
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
-              }`}
-            >
-              {isSubmitting
-                ? "Creating..."
-                : canSubmit
-                ? "Submit Order"
-                : "Complete Form"}
-            </button>
           </div>
-        </div>
+        )}
+
+        {/* Column 3: Order Summary - only shown if customer info is confirmed */}
+        {customerInfoConfirmed && (
+          <div className="lg:col-span-4 space-y-6">
+            {/* ... existing selected items and total JSX ... */}
+            {selectedItems.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Current Order ({selectedItems.length})
+                </h3>
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                  {" "}
+                  {/* Scrollable Cart */}
+                  {selectedItems.map((item) => (
+                    <div
+                      key={item.menuItem.id}
+                      className={`flex justify-between items-center bg-white p-2.5 rounded-lg border ${
+                        item.justAdded ? "border-green-500" : "border-gray-200"
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <span className="font-medium text-sm text-gray-900">
+                          {item.menuItem.name}
+                        </span>
+                        <div className="text-xs text-gray-700">
+                          ${item.menuItem.base_price.toFixed(2)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() =>
+                            updateQuantity(item.menuItem.id, item.quantity - 1)
+                          }
+                          className="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded-full text-sm font-bold"
+                        >
+                          -
+                        </button>
+                        <span className="font-semibold text-sm w-5 text-center">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() =>
+                            updateQuantity(item.menuItem.id, item.quantity + 1)
+                          }
+                          className="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded-full text-sm font-bold"
+                        >
+                          +
+                        </button>
+                        <span className="font-bold text-sm text-green-600 ml-2 w-16 text-right">
+                          $
+                          {(item.menuItem.base_price * item.quantity).toFixed(
+                            2
+                          )}
+                        </span>
+                        <button
+                          onClick={() => removeItem(item.menuItem.id)}
+                          className="bg-red-500 hover:bg-red-600 text-white w-7 h-7 rounded-full text-sm font-bold"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white border border-gray-300 rounded-lg p-4 shadow-md">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-800">Subtotal:</span>
+                  <span className="font-semibold text-gray-900">
+                    ${totals.subtotal.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-800">Tax (8%):</span>
+                  <span className="font-semibold text-gray-900">
+                    ${totals.tax.toFixed(2)}
+                  </span>
+                </div>
+                {orderType === "delivery" && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-800">Delivery Fee:</span>
+                    <span className="font-semibold text-gray-900">
+                      ${totals.deliveryFee.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                <div className="border-t border-gray-200 pt-2 mt-2">
+                  <div className="flex justify-between text-lg font-bold">
+                    <span className="text-gray-900">Total:</span>
+                    <span className="text-green-600">
+                      ${totals.total.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !canSubmit}
+                className={`w-full mt-4 py-3 rounded-lg text-md font-bold transition-all ${
+                  canSubmit && !isSubmitting
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                {isSubmitting
+                  ? "Creating..."
+                  : canSubmit
+                  ? "Submit Order"
+                  : "Complete Form"}
+              </button>
+            </div>
+          </div>
+        )}
+        {!customerInfoConfirmed && (
+          <div className="lg:col-span-8 flex flex-col items-center justify-center text-center p-8 bg-gray-100 rounded-lg h-full">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="w-12 h-12 text-gray-400 mb-4"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
+              />
+            </svg>
+            <p className="text-gray-600 text-lg">
+              Please confirm customer information to proceed with the order.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
