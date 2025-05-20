@@ -190,7 +190,9 @@ export default function MenuManagement() {
       {/* Category Filters */}
       <div className="bg-white shadow rounded-lg">
         <div className="p-4 border-b border-stone-200">
-          <h2 className="text-lg font-semibold">Filter by Category</h2>
+          <h2 className="text-lg font-semibold text-stone-950">
+            Filter by Category
+          </h2>
         </div>
         <div className="p-4 flex flex-wrap gap-2">
           {categoryLoading ? (
@@ -222,7 +224,7 @@ export default function MenuManagement() {
       {/* Menu Items Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="p-4 border-b border-stone-200">
-          <h2 className="text-lg font-semibold">Menu Items</h2>
+          <h2 className="text-lg font-semibold text-stone-950">Menu Items</h2>
         </div>
 
         {itemsLoading ? (
@@ -280,7 +282,7 @@ export default function MenuManagement() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-stone-200">
+              <tbody className="bg-white divide-y divide-stone-950">
                 {menuItems.map((item) => (
                   <tr key={item.id} className="hover:bg-stone-50">
                     <td className="px-6 py-4 whitespace-nowrap">
