@@ -355,7 +355,7 @@ export default function EnhancedStaffOrdersPage() {
         tax_amount: orderSummary.tax,
         delivery_fee: orderSummary.deliveryFee,
         total: orderSummary.total,
-        status: "pending" as const,
+        status: "confirmed" as const,
         ...(orderType === "delivery" && {
           customer_address: deliveryAddress.address,
           customer_city: deliveryAddress.city,
