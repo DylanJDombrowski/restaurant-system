@@ -170,7 +170,7 @@ export default function MenuManagement() {
     <div className="space-y-6">
       {/* Page Header with Action Buttons */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-stine-950">Menu Management</h1>
+        <h1 className="text-3xl font-bold text-stone-950">Menu Management</h1>
         <div className="space-x-2">
           <Link
             href="/admin/menu/categories"
