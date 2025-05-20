@@ -11,18 +11,6 @@ import {
   ToppingAmount,
 } from "@/lib/types";
 
-/**
- * Enhanced Menu Item Selector Component
- *
- * This component transforms the simple menu selection into a sophisticated
- * item configuration system. It handles the progressive disclosure approach:
- * 1. Show available menu items
- * 2. If item has variants, show variant selection
- * 3. Add basic item to cart with option to customize
- *
- * Think of this as the conversation starter between staff and customer.
- */
-
 interface EnhancedMenuItemSelectorProps {
   menuItems: MenuItemWithVariants[];
   toppings: Topping[];
@@ -196,10 +184,7 @@ export default function EnhancedMenuItemSelector({
 /**
  * Variant Selector Component
  *
- * This component handles size and crust selection for pizzas.
- * It's organized according to your specifications:
- * 1. Size selection first
- * 2. Then crust type (regular thin, specialty, double dough, deep dish)
+ * This is the properly reconstructed component to show pizza size options
  */
 interface VariantSelectorProps {
   item: MenuItemWithVariants;
@@ -212,24 +197,36 @@ function VariantSelector({
   onVariantSelect,
   onBack,
 }: VariantSelectorProps) {
-  // Group variants by size and crust type for organization
-  const variantsBySize = useMemo(() => {
-    const grouped = item.variants.reduce((acc, variant) => {
-      // Extract size from variant name (e.g., "Small 10\"" -> "Small")
-      const sizeMatch = variant.name.match(/^(Small|Medium|Large|Extra Large)/);
-      const size = sizeMatch ? sizeMatch[1] : "Unknown";
+  // Sort variants by size category using a more reliable method
+  const orderedVariants = useMemo(() => {
+    // Define size order for proper sorting
+    const sizeOrder = {
+      Small: 1,
+      Medium: 2,
+      Large: 3,
+      "Extra Large": 4,
+    };
 
-      if (!acc[size]) {
-        acc[size] = [];
-      }
-      acc[size].push(variant);
-      return acc;
-    }, {} as Record<string, MenuItemVariant[]>);
+    // Extract size from variant name and provide a sort value
+    return [...item.variants].sort((a, b) => {
+      // Extract sizes from variant names
+      const aSize =
+        Object.keys(sizeOrder).find((size) =>
+          a.name.toLowerCase().includes(size.toLowerCase())
+        ) || "";
 
-    return grouped;
+      const bSize =
+        Object.keys(sizeOrder).find((size) =>
+          b.name.toLowerCase().includes(size.toLowerCase())
+        ) || "";
+
+      // Compare using our size order
+      const aOrder = sizeOrder[aSize as keyof typeof sizeOrder] || 999;
+      const bOrder = sizeOrder[bSize as keyof typeof sizeOrder] || 999;
+
+      return aOrder - bOrder;
+    });
   }, [item.variants]);
-
-  const sizeOrder = ["Small", "Medium", "Large", "Extra Large"];
 
   return (
     <div className="space-y-6">
@@ -241,45 +238,30 @@ function VariantSelector({
         ← Back to Menu
       </button>
 
-      {/* Size selection */}
+      {/* Show all variants */}
       <div>
         <h4 className="text-md font-semibold text-gray-900 mb-3">
           Choose Size for {item.name}
         </h4>
 
         <div className="grid grid-cols-2 gap-3">
-          {sizeOrder.map((size) => {
-            const variants = variantsBySize[size];
-            if (!variants) return null;
-
-            return variants.map((variant) => (
-              <button
-                key={variant.id}
-                onClick={() => onVariantSelect(variant)}
-                className="bg-white border border-gray-300 rounded-lg p-4 text-left hover:border-blue-500 hover:shadow-md transition-all"
-              >
-                <div className="font-semibold text-gray-900">
-                  {variant.name}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {variant.serves && `${variant.serves} • `}
-                  {variant.crust_type && `${variant.crust_type} crust`}
-                </div>
-                <div className="text-lg font-bold text-green-600 mt-2">
-                  ${variant.price.toFixed(2)}
-                </div>
-              </button>
-            ));
-          })}
+          {orderedVariants.map((variant) => (
+            <button
+              key={variant.id}
+              onClick={() => onVariantSelect(variant)}
+              className="bg-white border border-gray-300 rounded-lg p-4 text-left hover:border-blue-500 hover:shadow-md transition-all"
+            >
+              <div className="font-semibold text-gray-900">{variant.name}</div>
+              <div className="text-sm text-gray-600">
+                {variant.serves && `${variant.serves} • `}
+                {variant.crust_type && `${variant.crust_type} crust`}
+              </div>
+              <div className="text-lg font-bold text-green-600 mt-2">
+                ${variant.price.toFixed(2)}
+              </div>
+            </button>
+          ))}
         </div>
-      </div>
-
-      {/* Information about customization */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <p className="text-sm text-blue-800">
-          💡 After adding to cart, you can click Customize to modify toppings,
-          cooking instructions, and other preferences.
-        </p>
       </div>
     </div>
   );

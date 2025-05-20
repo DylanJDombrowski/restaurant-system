@@ -1,26 +1,14 @@
 // src/components/features/orders/PizzaCustomizer.tsx
 "use client";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { ConfiguredCartItem } from "@/lib/types";
+import { ConfiguredCartItem, Topping, Modifier } from "@/lib/types";
 
 /**
  * Pizza Customizer Component
  *
- * This is the sophisticated customization interface that handles the complex
- * business logic you outlined. It understands:
- *
- * 1. Specialty pizzas start with their default toppings at full price
- * 2. Removing default toppings doesn't provide credits
- * 3. Adding new toppings costs extra
- * 4. Topping amounts (light/normal/extra) affect pricing
- * 5. Cheese can be removed entirely (NO CHEESE option)
- * 6. Modifiers can add cooking instructions and preferences
- *
- * Think of this as the digital equivalent of a skilled order-taker who
- * understands the nuances of pizza pricing and preparation.
+ * This is the sophisticated customization interface that handles pizza customization
+ * with data fetched from your database instead of hardcoded values.
  */
-
-// Mock topping data - in production this comes from your database
 
 interface ToppingConfiguration {
   id: string;
@@ -29,6 +17,8 @@ interface ToppingConfiguration {
   price: number;
   isDefault: boolean;
   category: string;
+  isPremium?: boolean;
+  basePrice: number;
 }
 
 interface ModifierConfiguration {
@@ -37,137 +27,6 @@ interface ModifierConfiguration {
   priceAdjustment: number;
   selected: boolean;
 }
-
-const AVAILABLE_TOPPINGS = [
-  // Meats
-  {
-    id: "pepperoni",
-    name: "Pepperoni",
-    category: "meats",
-    basePrice: 2.0,
-    isPremium: false,
-  },
-  {
-    id: "italian-sausage",
-    name: "Italian Sausage",
-    category: "meats",
-    basePrice: 2.0,
-    isPremium: false,
-  },
-  {
-    id: "ground-beef",
-    name: "Ground Beef",
-    category: "meats",
-    basePrice: 2.0,
-    isPremium: false,
-  },
-  {
-    id: "canadian-bacon",
-    name: "Canadian Bacon",
-    category: "meats",
-    basePrice: 2.5,
-    isPremium: true,
-  },
-  {
-    id: "prosciutto",
-    name: "Prosciutto",
-    category: "meats",
-    basePrice: 3.0,
-    isPremium: true,
-  },
-
-  // Vegetables
-  {
-    id: "mushrooms",
-    name: "Mushrooms",
-    category: "vegetables",
-    basePrice: 1.5,
-    isPremium: false,
-  },
-  {
-    id: "green-peppers",
-    name: "Green Peppers",
-    category: "vegetables",
-    basePrice: 1.5,
-    isPremium: false,
-  },
-  {
-    id: "red-onions",
-    name: "Red Onions",
-    category: "vegetables",
-    basePrice: 1.5,
-    isPremium: false,
-  },
-  {
-    id: "black-olives",
-    name: "Black Olives",
-    category: "vegetables",
-    basePrice: 1.5,
-    isPremium: false,
-  },
-  {
-    id: "roma-tomatoes",
-    name: "Roma Tomatoes",
-    category: "vegetables",
-    basePrice: 1.5,
-    isPremium: false,
-  },
-  {
-    id: "hot-giardiniera",
-    name: "Hot Giardiniera",
-    category: "vegetables",
-    basePrice: 1.75,
-    isPremium: false,
-  },
-  {
-    id: "roasted-red-peppers",
-    name: "Roasted Red Peppers",
-    category: "vegetables",
-    basePrice: 2.0,
-    isPremium: true,
-  },
-
-  // Cheese
-  {
-    id: "extra-cheese",
-    name: "Extra Cheese",
-    category: "cheese",
-    basePrice: 2.0,
-    isPremium: false,
-  },
-  {
-    id: "fresh-mozzarella",
-    name: "Fresh Mozzarella",
-    category: "cheese",
-    basePrice: 2.5,
-    isPremium: true,
-  },
-  {
-    id: "goat-cheese",
-    name: "Goat Cheese",
-    category: "cheese",
-    basePrice: 3.0,
-    isPremium: true,
-  },
-  {
-    id: "ricotta",
-    name: "Ricotta",
-    category: "cheese",
-    basePrice: 2.0,
-    isPremium: false,
-  },
-];
-
-// Mock modifier data
-const AVAILABLE_MODIFIERS = [
-  { id: "well-done", name: "Well Done", priceAdjustment: 0.0 },
-  { id: "light-bake", name: "Light Bake", priceAdjustment: 0.0 },
-  { id: "cut-squares", name: "Cut in Squares", priceAdjustment: 0.0 },
-  { id: "no-cut", name: "Don't Cut", priceAdjustment: 0.0 },
-  { id: "extra-sauce", name: "Extra Sauce", priceAdjustment: 1.0 },
-  { id: "light-sauce", name: "Light Sauce", priceAdjustment: 0.0 },
-  { id: "no-sauce", name: "No Sauce", priceAdjustment: 0.0 },
-];
 
 interface PizzaCustomizerProps {
   item: ConfiguredCartItem;
@@ -175,27 +34,18 @@ interface PizzaCustomizerProps {
   onCancel: () => void;
 }
 
-interface ToppingConfiguration {
-  id: string;
-  name: string;
-  amount: "none" | "light" | "normal" | "extra";
-  price: number;
-  isDefault: boolean;
-  category: string;
-}
-
-interface ModifierConfiguration {
-  id: string;
-  name: string;
-  priceAdjustment: number;
-  selected: boolean;
-}
-
 export default function PizzaCustomizer({
   item,
   onComplete,
   onCancel,
 }: PizzaCustomizerProps) {
+  // State for database data
+  const [availableToppings, setAvailableToppings] = useState<Topping[]>([]);
+  const [availableModifiers, setAvailableModifiers] = useState<Modifier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // State for customization
   const [toppings, setToppings] = useState<ToppingConfiguration[]>([]);
   const [modifiers, setModifiers] = useState<ModifierConfiguration[]>([]);
   const [hasCheese, setHasCheese] = useState(true);
@@ -203,44 +53,88 @@ export default function PizzaCustomizer({
     item.specialInstructions || ""
   );
 
-  // Initialize topping configurations
+  // Fetch toppings and modifiers from the database
+  useEffect(() => {
+    async function fetchToppingsAndModifiers() {
+      try {
+        setLoading(true);
+        setError(null);
 
+        // Using restaurant ID from your authenticated context or first restaurant
+        // For now, we'll use a default restaurant ID from your system
+        const response = await fetch("/api/restaurants");
+        const restaurantData = await response.json();
+        const restaurantId = restaurantData.data?.id;
+
+        if (!restaurantId) {
+          throw new Error("Failed to get restaurant ID");
+        }
+
+        // Fetch toppings
+        const toppingsResponse = await fetch(
+          `/api/menu/toppings?restaurant_id=${restaurantId}`
+        );
+        if (!toppingsResponse.ok) {
+          throw new Error(
+            `Failed to fetch toppings: ${toppingsResponse.status}`
+          );
+        }
+        const toppingsData = await toppingsResponse.json();
+        setAvailableToppings(toppingsData.data || []);
+
+        // Fetch modifiers
+        const modifiersResponse = await fetch(
+          `/api/menu/modifiers?restaurant_id=${restaurantId}`
+        );
+        if (!modifiersResponse.ok) {
+          throw new Error(
+            `Failed to fetch modifiers: ${modifiersResponse.status}`
+          );
+        }
+        const modifiersData = await modifiersResponse.json();
+        setAvailableModifiers(modifiersData.data || []);
+      } catch (error) {
+        console.error("Error fetching pizza customization options:", error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load customization options"
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchToppingsAndModifiers();
+  }, []);
+
+  // Initialize toppings configurations
   const initializeToppings = useCallback(() => {
     const toppingConfigs: ToppingConfiguration[] = [];
 
     // First, add all default toppings from the item
     if (item.selectedToppings) {
-      item.selectedToppings.forEach(
-        (selectedTopping: {
-          id: string;
-          name: string;
-          amount: "none" | "light" | "normal" | "extra";
-          price: number;
-          isDefault: boolean;
-        }) => {
-          const availableTopping = AVAILABLE_TOPPINGS.find(
-            (t) => t.id === selectedTopping.id
-          );
-          if (availableTopping) {
-            toppingConfigs.push({
-              id: selectedTopping.id,
-              name: selectedTopping.name,
-              amount: selectedTopping.amount,
-              price: calculateToppingPrice(
-                availableTopping,
-                selectedTopping.amount,
-                selectedTopping.isDefault
-              ),
-              isDefault: selectedTopping.isDefault,
-              category: availableTopping.category,
-            });
-          }
+      item.selectedToppings.forEach((selectedTopping) => {
+        const availableTopping = availableToppings.find(
+          (t) => t.id === selectedTopping.id
+        );
+        if (availableTopping) {
+          toppingConfigs.push({
+            id: selectedTopping.id,
+            name: selectedTopping.name,
+            amount: selectedTopping.amount,
+            price: selectedTopping.price,
+            isDefault: selectedTopping.isDefault,
+            category: selectedTopping.category || availableTopping.category,
+            isPremium: availableTopping.is_premium,
+            basePrice: availableTopping.is_premium ? 3.0 : 2.0, // Default pricing logic
+          });
         }
-      );
+      });
     }
 
     // Then, add all other available toppings as "none"
-    AVAILABLE_TOPPINGS.forEach((availableTopping) => {
+    availableToppings.forEach((availableTopping) => {
       const existing = toppingConfigs.find((t) => t.id === availableTopping.id);
       if (!existing) {
         toppingConfigs.push({
@@ -250,6 +144,8 @@ export default function PizzaCustomizer({
           price: 0,
           isDefault: false,
           category: availableTopping.category,
+          isPremium: availableTopping.is_premium,
+          basePrice: availableTopping.is_premium ? 3.0 : 2.0, // Default pricing logic
         });
       }
     });
@@ -258,36 +154,42 @@ export default function PizzaCustomizer({
 
     // Check if item has cheese by default
     const hasDefaultCheese = item.selectedToppings?.some(
-      (t: { id: string; isDefault: boolean }) =>
-        t.id === "cheese" && t.isDefault
+      (t) => t.name.toLowerCase().includes("cheese") && t.isDefault
     );
     setHasCheese(hasDefaultCheese !== false);
-  }, [item]);
+  }, [availableToppings, item.selectedToppings]);
 
+  // Initialize modifiers
   const initializeModifiers = useCallback(() => {
-    const modifierConfigs: ModifierConfiguration[] = AVAILABLE_MODIFIERS.map(
+    const modifierConfigs: ModifierConfiguration[] = availableModifiers.map(
       (mod) => ({
         id: mod.id,
         name: mod.name,
-        priceAdjustment: mod.priceAdjustment,
-        selected:
-          item.selectedModifiers?.some(
-            (m: { id: string }) => m.id === mod.id
-          ) || false,
+        priceAdjustment: mod.price_adjustment,
+        selected: item.selectedModifiers?.some((m) => m.id === mod.id) || false,
       })
     );
 
     setModifiers(modifierConfigs);
-  }, [item]);
+  }, [availableModifiers, item.selectedModifiers]);
 
+  // Initialize toppings from database data
   useEffect(() => {
-    initializeToppings();
-    initializeModifiers();
-  }, [initializeToppings, initializeModifiers]);
+    if (availableToppings.length > 0) {
+      initializeToppings();
+    }
+  }, [availableToppings, initializeToppings, item.selectedToppings]);
+
+  // Initialize modifiers from database data
+  useEffect(() => {
+    if (availableModifiers.length > 0) {
+      initializeModifiers();
+    }
+  }, [availableModifiers, initializeModifiers, item.selectedModifiers]);
 
   // Calculate topping price based on amount and whether it's default
   const calculateToppingPrice = (
-    topping: (typeof AVAILABLE_TOPPINGS)[0],
+    topping: ToppingConfiguration,
     amount: "none" | "light" | "normal" | "extra",
     isDefault: boolean
   ): number => {
@@ -319,11 +221,8 @@ export default function PizzaCustomizer({
     setToppings((prev) =>
       prev.map((topping) => {
         if (topping.id === toppingId) {
-          const availableTopping = AVAILABLE_TOPPINGS.find(
-            (t) => t.id === toppingId
-          )!;
           const newPrice = calculateToppingPrice(
-            availableTopping,
+            topping,
             newAmount,
             topping.isDefault
           );
@@ -397,6 +296,7 @@ export default function PizzaCustomizer({
           amount: t.amount,
           price: t.price,
           isDefault: t.isDefault,
+          category: t.category,
         })),
       selectedModifiers: modifiers
         .filter((m) => m.selected)
@@ -444,6 +344,42 @@ export default function PizzaCustomizer({
 
     return baseName;
   };
+
+  // Display loading state
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white p-8">
+        <div>
+          <div className="text-lg font-medium text-gray-900 mb-2">
+            Loading pizza options...
+          </div>
+          <div className="text-sm text-gray-500">
+            Getting all the freshest toppings for you
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Display error state
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white p-8">
+        <div className="text-center">
+          <div className="text-lg font-medium text-red-600 mb-2">
+            Error loading pizza customization options
+          </div>
+          <div className="text-sm text-gray-800 mb-4">{error}</div>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -591,8 +527,6 @@ export default function PizzaCustomizer({
 
 /**
  * Topping Selector Component
- *
- * Handles individual topping amount selection with clear pricing display.
  */
 interface ToppingSelectorProps {
   topping: ToppingConfiguration;
@@ -600,18 +534,12 @@ interface ToppingSelectorProps {
 }
 
 function ToppingSelector({ topping, onChange }: ToppingSelectorProps) {
-  const availableTopping = AVAILABLE_TOPPINGS.find((t) => t.id === topping.id)!;
-
   // Calculate price preview for each amount option
   const pricePreview = {
     none: 0,
-    light: calculateToppingPrice(availableTopping, "light", topping.isDefault),
-    normal: calculateToppingPrice(
-      availableTopping,
-      "normal",
-      topping.isDefault
-    ),
-    extra: calculateToppingPrice(availableTopping, "extra", topping.isDefault),
+    light: calculateToppingPrice(topping, "light", topping.isDefault),
+    normal: calculateToppingPrice(topping, "normal", topping.isDefault),
+    extra: calculateToppingPrice(topping, "extra", topping.isDefault),
   };
 
   const formatPrice = (price: number) => {
@@ -635,7 +563,7 @@ function ToppingSelector({ topping, onChange }: ToppingSelectorProps) {
               Default
             </span>
           )}
-          {availableTopping.isPremium && (
+          {topping.isPremium && (
             <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
               Premium
             </span>
@@ -676,8 +604,6 @@ function ToppingSelector({ topping, onChange }: ToppingSelectorProps) {
 
 /**
  * Modifier Selector Component
- *
- * Handles cooking instructions and other modifications.
  */
 interface ModifierSelectorProps {
   modifier: ModifierConfiguration;
@@ -716,9 +642,11 @@ function ModifierSelector({ modifier, onChange }: ModifierSelectorProps) {
   );
 }
 
-// Helper function to calculate topping prices (same as in component)
+/**
+ * Helper function to calculate topping prices
+ */
 function calculateToppingPrice(
-  topping: (typeof AVAILABLE_TOPPINGS)[0],
+  topping: ToppingConfiguration,
   amount: "none" | "light" | "normal" | "extra",
   isDefault: boolean
 ): number {
