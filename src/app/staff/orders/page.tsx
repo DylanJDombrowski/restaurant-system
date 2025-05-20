@@ -521,15 +521,13 @@ export default function EnhancedStaffOrdersPage() {
                 <button
                   onClick={handleSubmitOrder}
                   disabled={isSubmitting}
-                  className={`w-full py-4 rounded-lg text-lg font-bold transition-all ${
-                    !isSubmitting
-                      ? "bg-green-600 hover:bg-green-700 text-white transform hover:scale-105"
-                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  }`}
+                  className="w-full py-4 rounded-lg text-lg font-bold bg-green-600 text-white"
                 >
-                  {isSubmitting
-                    ? "Creating Order..."
-                    : `Submit Order - $${orderSummary.total.toFixed(2)}`}
+                  {
+                    isSubmitting
+                      ? "Creating Order..."
+                      : "Confirm & Send to Kitchen" // Clearer call to action
+                  }
                 </button>
               )}
             </div>

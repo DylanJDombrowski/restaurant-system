@@ -469,7 +469,7 @@ export default function PizzaCustomizer({
 
       {/* Customization Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 space-y-8">
+        <div className="p-4 space-y-6">
           {/* Cheese Options */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900">Cheese</h3>
@@ -504,7 +504,7 @@ export default function PizzaCustomizer({
                 <h3 className="text-lg font-semibold text-gray-900 capitalize">
                   {category}
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {categoryToppings.map((topping) => (
                     <ToppingSelector
                       key={topping.id}
