@@ -89,6 +89,8 @@ export interface MenuItemVariant {
   crust_type?: string; // For pizzas - "thin", "thick", etc.
   sort_order: number;
   is_available: boolean;
+  prep_time_minutes: number;
+  size_code: string;
 }
 
 /**

@@ -1,12 +1,10 @@
 // src/app/admin/menu/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { MenuItemWithCategory, MenuCategory } from "@/lib/types";
 
 export default function MenuManagement() {
-  const router = useRouter();
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItemWithCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);

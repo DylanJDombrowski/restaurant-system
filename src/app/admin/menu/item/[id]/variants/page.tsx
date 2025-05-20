@@ -1,7 +1,7 @@
 // src/app/admin/menu/item/[id]/variants/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { MenuItem, MenuItemVariant } from "@/lib/types";
 
@@ -19,22 +19,23 @@ interface VariantFormData {
 
 export default function VariantManagement() {
   const params = useParams();
-  const router = useRouter();
   const itemId = params?.id as string;
-  
+
   // State
   const [menuItem, setMenuItem] = useState<MenuItem | null>(null);
   const [variants, setVariants] = useState<MenuItemVariant[]>([]);
-  const [editingVariant, setEditingVariant] = useState<VariantFormData | null>(null);
+  const [editingVariant, setEditingVariant] = useState<VariantFormData | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Load menu item and its variants
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        
+
         // Fetch menu item
         const itemResponse = await fetch(`/api/admin/menu/items/${itemId}`);
         if (!itemResponse.ok) {
@@ -42,15 +43,16 @@ export default function VariantManagement() {
         }
         const itemData = await itemResponse.json();
         setMenuItem(itemData.data);
-        
+
         // Fetch variants
-        const variantsResponse = await fetch(`/api/admin/menu/items/${itemId}/variants`);
+        const variantsResponse = await fetch(
+          `/api/admin/menu/items/${itemId}/variants`
+        );
         if (!variantsResponse.ok) {
           throw new Error("Failed to load variants");
         }
         const variantsData = await variantsResponse.json();
         setVariants(variantsData.data || []);
-        
       } catch (err) {
         console.error("Error loading data:", err);
         setError(err instanceof Error ? err.message : "Failed to load data");
@@ -58,26 +60,27 @@ export default function VariantManagement() {
         setLoading(false);
       }
     }
-    
+
     loadData();
   }, [itemId]);
-  
+
   // Start creating a new variant
   const handleAddVariant = () => {
     // Set next sort order to be after the last one
-    const nextSortOrder = variants.length > 0
-      ? Math.max(...variants.map(v => v.sort_order || 0)) + 10
-      : 10;
-      
+    const nextSortOrder =
+      variants.length > 0
+        ? Math.max(...variants.map((v) => v.sort_order || 0)) + 10
+        : 10;
+
     setEditingVariant({
       name: "",
       price: menuItem?.base_price || 0,
       sort_order: nextSortOrder,
       is_available: true,
-      prep_time_minutes: menuItem?.prep_time_minutes
+      prep_time_minutes: menuItem?.prep_time_minutes,
     });
   };
-  
+
   // Start editing an existing variant
   const handleEditVariant = (variant: MenuItemVariant) => {
     setEditingVariant({
@@ -89,98 +92,99 @@ export default function VariantManagement() {
       crust_type: variant.crust_type,
       sort_order: variant.sort_order,
       is_available: variant.is_available,
-      prep_time_minutes: variant.prep_time_minutes
+      prep_time_minutes: variant.prep_time_minutes,
     });
   };
-  
+
   // Delete a variant
   const handleDeleteVariant = async (variantId: string) => {
     if (!confirm("Are you sure you want to delete this variant?")) {
       return;
     }
-    
+
     try {
       const response = await fetch(`/api/admin/menu/variants/${variantId}`, {
-        method: "DELETE"
+        method: "DELETE",
       });
-      
+
       if (!response.ok) {
         throw new Error("Failed to delete variant");
       }
-      
+
       // Remove from UI
-      setVariants(variants.filter(v => v.id !== variantId));
-      
+      setVariants(variants.filter((v) => v.id !== variantId));
     } catch (err) {
       console.error("Error deleting variant:", err);
       alert("Failed to delete variant");
     }
   };
-  
+
   // Update variant form field
   const handleVariantInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     if (!editingVariant) return;
-    
+
     const { name, value, type } = e.target;
-    
+
     setEditingVariant({
       ...editingVariant,
-      [name]: type === "number" 
-        ? parseFloat(value) || 0
-        : type === "checkbox"
-        ? (e.target as HTMLInputElement).checked
-        : value
+      [name]:
+        type === "number"
+          ? parseFloat(value) || 0
+          : type === "checkbox"
+          ? (e.target as HTMLInputElement).checked
+          : value,
     });
   };
-  
+
   // Save variant (create or update)
   const handleSaveVariant = async () => {
     if (!editingVariant) return;
-    
+
     try {
       const isEdit = !!editingVariant.id;
       const method = isEdit ? "PATCH" : "POST";
       const url = isEdit
         ? `/api/admin/menu/variants/${editingVariant.id}`
         : `/api/admin/menu/items/${itemId}/variants`;
-        
+
       const response = await fetch(url, {
         method,
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           ...editingVariant,
-          menu_item_id: itemId
-        })
+          menu_item_id: itemId,
+        }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to ${isEdit ? "update" : "create"} variant`);
       }
-      
+
       const resultData = await response.json();
-      
+
       // Update UI
       if (isEdit) {
-        setVariants(variants.map(v => 
-          v.id === editingVariant.id ? resultData.data : v
-        ));
+        setVariants(
+          variants.map((v) =>
+            v.id === editingVariant.id ? resultData.data : v
+          )
+        );
       } else {
         setVariants([...variants, resultData.data]);
       }
-      
+
       // Close the form
       setEditingVariant(null);
-      
     } catch (err) {
       console.error("Error saving variant:", err);
       alert("Failed to save variant");
     }
   };
-  
+
   // Cancel variant editing
   const handleCancelVariant = () => {
     setEditingVariant(null);
@@ -189,7 +193,7 @@ export default function VariantManagement() {
   // Helper function to get type-specific fields
   const getVariantTypeFields = () => {
     if (!menuItem || !editingVariant) return null;
-    
+
     switch (menuItem.item_type) {
       case "pizza":
         return (
@@ -211,7 +215,7 @@ export default function VariantManagement() {
                 <option value="Extra Large">Extra Large</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Crust Type
@@ -231,7 +235,7 @@ export default function VariantManagement() {
             </div>
           </>
         );
-        
+
       case "chicken_meal":
         return (
           <>
@@ -256,7 +260,7 @@ export default function VariantManagement() {
                 <option value="50pc">50 Pieces</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Type
@@ -274,7 +278,7 @@ export default function VariantManagement() {
             </div>
           </>
         );
-      
+
       case "appetizer":
         return (
           <div>
@@ -291,12 +295,12 @@ export default function VariantManagement() {
             />
           </div>
         );
-        
+
       default:
         return null;
     }
   };
-  
+
   if (loading) {
     return <div className="text-center py-10">Loading variants...</div>;
   }
@@ -306,7 +310,7 @@ export default function VariantManagement() {
       <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded my-4">
         <h3 className="font-bold">Error</h3>
         <p>{error}</p>
-        <button 
+        <button
           onClick={() => window.location.reload()}
           className="mt-2 bg-red-600 text-white px-4 py-2 rounded"
         >
@@ -320,9 +324,7 @@ export default function VariantManagement() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Manage Variants
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900">Manage Variants</h1>
           <p className="text-gray-600">
             {menuItem?.name} - {menuItem?.item_type}
           </p>
@@ -334,15 +336,15 @@ export default function VariantManagement() {
           >
             Add Variant
           </button>
-          <Link 
-            href="/admin/menu" 
+          <Link
+            href="/admin/menu"
             className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300"
           >
             Back to Menu
           </Link>
         </div>
       </div>
-      
+
       {/* Variant Editor Modal */}
       {editingVariant && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -352,7 +354,7 @@ export default function VariantManagement() {
                 {editingVariant.id ? "Edit Variant" : "Add Variant"}
               </h2>
             </div>
-            
+
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -362,13 +364,13 @@ export default function VariantManagement() {
                   type="text"
                   name="name"
                   required
-                  placeholder="e.g., Small 10\" Thin Crust"
+                  placeholder='e.g., Small 10" Thin Crust'
                   value={editingVariant.name}
                   onChange={handleVariantInputChange}
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Price <span className="text-red-600">*</span>
@@ -389,12 +391,12 @@ export default function VariantManagement() {
                   />
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 {/* Type-specific fields */}
                 {getVariantTypeFields()}
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Serves
@@ -408,7 +410,7 @@ export default function VariantManagement() {
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -422,7 +424,7 @@ export default function VariantManagement() {
                     className="w-full border border-gray-300 rounded-md px-3 py-2"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Prep Time (minutes)
@@ -436,7 +438,7 @@ export default function VariantManagement() {
                   />
                 </div>
               </div>
-              
+
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -446,12 +448,15 @@ export default function VariantManagement() {
                   onChange={handleVariantInputChange}
                   className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                 />
-                <label htmlFor="is_available" className="ml-2 text-sm text-gray-700">
+                <label
+                  htmlFor="is_available"
+                  className="ml-2 text-sm text-gray-700"
+                >
                   Variant is available for ordering
                 </label>
               </div>
             </div>
-            
+
             <div className="px-6 py-4 bg-gray-50 flex justify-end space-x-2 rounded-b-lg">
               <button
                 type="button"
@@ -471,7 +476,7 @@ export default function VariantManagement() {
           </div>
         </div>
       )}
-      
+
       {/* Variants List */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="p-6 border-b border-gray-200">
@@ -480,7 +485,7 @@ export default function VariantManagement() {
             Add different sizes or variants with their specific prices.
           </p>
         </div>
-        
+
         {variants.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             <p>No variants added yet.</p>
@@ -535,11 +540,13 @@ export default function VariantManagement() {
                         ${variant.price.toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          variant.is_available
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}>
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            variant.is_available
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
                           {variant.is_available ? "Available" : "Unavailable"}
                         </span>
                       </td>
