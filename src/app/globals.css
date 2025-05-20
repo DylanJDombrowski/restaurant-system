@@ -24,11 +24,3 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
-
-.text-gray-500 {
-  color: #4b5563 !important; /* Darker than default */
-}
-
-.text-gray-600 {
-  color: #374151 !important; /* Darker than default */
-}

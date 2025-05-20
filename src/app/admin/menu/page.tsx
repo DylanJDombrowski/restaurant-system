@@ -170,7 +170,7 @@ export default function MenuManagement() {
     <div className="space-y-6">
       {/* Page Header with Action Buttons */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Menu Management</h1>
+        <h1 className="text-3xl font-bold text-black-900">Menu Management</h1>
         <div className="space-x-2">
           <Link
             href="/admin/menu/categories"
@@ -189,7 +189,7 @@ export default function MenuManagement() {
 
       {/* Category Filters */}
       <div className="bg-white shadow rounded-lg">
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-black-200">
           <h2 className="text-lg font-semibold">Filter by Category</h2>
         </div>
         <div className="p-4 flex flex-wrap gap-2">
@@ -209,7 +209,7 @@ export default function MenuManagement() {
                 className={`px-4 py-2 rounded-lg ${
                   selectedCategory === category.id
                     ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                    : "bg-black-100 text-black-800 hover:bg-black-200"
                 }`}
               >
                 {category.name}
@@ -221,7 +221,7 @@ export default function MenuManagement() {
 
       {/* Menu Items Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-black-200">
           <h2 className="text-lg font-semibold">Menu Items</h2>
         </div>
 
@@ -249,7 +249,7 @@ export default function MenuManagement() {
           </div>
         ) : menuItems.length === 0 ? (
           // Empty state remains unchanged
-          <div className="p-8 text-center text-gray-500">
+          <div className="p-8 text-center text-black-500">
             <p>No menu items found in this category.</p>
             <Link
               href="/admin/menu/item/new"
@@ -261,34 +261,34 @@ export default function MenuManagement() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-black-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black-500 uppercase tracking-wider">
                     Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black-500 uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black-500 uppercase tracking-wider">
                     Base Price
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-black-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-black-200">
                 {menuItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
+                  <tr key={item.id} className="hover:bg-black-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium text-black-900">
                         {item.name}
                       </div>
                       {item.description && (
-                        <div className="text-sm text-gray-500 truncate max-w-md">
+                        <div className="text-sm text-black-500 truncate max-w-md">
                           {item.description}
                         </div>
                       )}
