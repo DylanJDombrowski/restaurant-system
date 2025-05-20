@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { MenuItemWithCategory, MenuCategory } from "@/lib/types";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function MenuManagement() {
   const [categories, setCategories] = useState<MenuCategory[]>([]);
@@ -10,12 +11,15 @@ export default function MenuManagement() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [categoryLoading, setCategoryLoading] = useState(true);
+  const [itemsLoading, setItemsLoading] = useState(true);
 
   // Fetch categories and menu items
   useEffect(() => {
     async function fetchMenuData() {
       try {
         setLoading(true);
+        setCategoryLoading(true);
 
         // Fetch categories
         const categoryResponse = await fetch("/api/admin/menu/categories");
@@ -27,6 +31,7 @@ export default function MenuManagement() {
         const categoryData = await categoryResponse.json();
         const categories = categoryData.data || [];
         setCategories(categories);
+        setCategoryLoading(false);
 
         // Set initial selected category
         if (categories.length > 0 && !selectedCategory) {
@@ -35,6 +40,7 @@ export default function MenuManagement() {
 
         // Fetch items if we have a category
         if (selectedCategory || categories.length > 0) {
+          setItemsLoading(true);
           const categoryId = selectedCategory || categories[0].id;
           const itemsResponse = await fetch(
             `/api/admin/menu/items?category_id=${categoryId}`
@@ -48,6 +54,7 @@ export default function MenuManagement() {
 
           const itemsData = await itemsResponse.json();
           setMenuItems(itemsData.data || []);
+          setItemsLoading(false);
         }
       } catch (err) {
         console.error("Error fetching menu data:", err);
@@ -186,19 +193,29 @@ export default function MenuManagement() {
           <h2 className="text-lg font-semibold">Filter by Category</h2>
         </div>
         <div className="p-4 flex flex-wrap gap-2">
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setSelectedCategory(category.id)}
-              className={`px-4 py-2 rounded-lg ${
-                selectedCategory === category.id
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {category.name}
-            </button>
-          ))}
+          {categoryLoading ? (
+            // Skeleton loaders for categories
+            <>
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-32" />
+              <Skeleton className="h-10 w-28" />
+              <Skeleton className="h-10 w-20" />
+            </>
+          ) : (
+            categories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                className={`px-4 py-2 rounded-lg ${
+                  selectedCategory === category.id
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                }`}
+              >
+                {category.name}
+              </button>
+            ))
+          )}
         </div>
       </div>
 
@@ -208,7 +225,30 @@ export default function MenuManagement() {
           <h2 className="text-lg font-semibold">Menu Items</h2>
         </div>
 
-        {menuItems.length === 0 ? (
+        {itemsLoading ? (
+          <div className="p-4 space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="flex justify-between items-start border rounded-lg p-4"
+              >
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-64" />
+                  <div className="flex gap-2 mt-1">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-16" />
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <Skeleton className="h-6 w-20" />
+                  <Skeleton className="h-8 w-24" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : menuItems.length === 0 ? (
+          // Empty state remains unchanged
           <div className="p-8 text-center text-gray-500">
             <p>No menu items found in this category.</p>
             <Link
