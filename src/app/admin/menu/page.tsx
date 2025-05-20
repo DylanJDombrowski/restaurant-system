@@ -1,100 +1,178 @@
 // src/app/admin/menu/page.tsx
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "@/lib/auth/auth-context";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { MenuItemWithCategory, MenuCategory } from "@/lib/types";
 
 export default function MenuManagement() {
-  const { restaurant } = useAuth();
-  type Category = { id: string | number; name: string };
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<
-    string | number | null
-  >(null);
-
-  type MenuItem = {
-    id: string | number;
-    name: string;
-    description?: string;
-    item_type?: string;
-    base_price?: number;
-    // Add other fields as needed
-  };
-
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const router = useRouter();
+  const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItemWithCategory[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCategories = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `/api/menu/categories?restaurant_id=${restaurant?.id}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch categories: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setCategories(data.data || []);
-
-      if (data.data && data.data.length > 0 && !selectedCategory) {
-        setSelectedCategory(data.data[0].id);
-      }
-    } catch (err) {
-      console.error("Error fetching categories:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to load categories"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [restaurant?.id, selectedCategory]);
-
-  const fetchMenuItems = useCallback(
-    async (categoryId: string | number) => {
+  // Fetch categories and menu items
+  useEffect(() => {
+    async function fetchMenuData() {
       try {
         setLoading(true);
-        const response = await fetch(
-          `/api/menu?restaurant_id=${restaurant?.id}&category_id=${categoryId}`
-        );
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch menu items: ${response.status}`);
+        // Fetch categories
+        const categoryResponse = await fetch("/api/admin/menu/categories");
+        if (!categoryResponse.ok) {
+          throw new Error(
+            `Failed to fetch categories: ${categoryResponse.status}`
+          );
+        }
+        const categoryData = await categoryResponse.json();
+        const categories = categoryData.data || [];
+        setCategories(categories);
+
+        // Set initial selected category
+        if (categories.length > 0 && !selectedCategory) {
+          setSelectedCategory(categories[0].id);
         }
 
-        const data = await response.json();
-        setMenuItems(data.data || []);
+        // Fetch items if we have a category
+        if (selectedCategory || categories.length > 0) {
+          const categoryId = selectedCategory || categories[0].id;
+          const itemsResponse = await fetch(
+            `/api/admin/menu/items?category_id=${categoryId}`
+          );
+
+          if (!itemsResponse.ok) {
+            throw new Error(
+              `Failed to fetch menu items: ${itemsResponse.status}`
+            );
+          }
+
+          const itemsData = await itemsResponse.json();
+          setMenuItems(itemsData.data || []);
+        }
       } catch (err) {
-        console.error("Error fetching menu items:", err);
+        console.error("Error fetching menu data:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to load menu items"
+          err instanceof Error ? err.message : "Error loading menu data"
         );
       } finally {
         setLoading(false);
       }
-    },
-    [restaurant?.id]
-  );
-
-  useEffect(() => {
-    if (restaurant) {
-      fetchCategories();
     }
-  }, [fetchCategories, restaurant]);
 
-  useEffect(() => {
-    if (selectedCategory) {
-      fetchMenuItems(selectedCategory);
+    fetchMenuData();
+  }, [selectedCategory]);
+
+  // Function to delete menu item
+  async function deleteMenuItem(itemId: string) {
+    if (
+      !confirm(
+        "Are you sure you want to delete this menu item? This cannot be undone."
+      )
+    ) {
+      return;
     }
-  }, [fetchMenuItems, selectedCategory]);
+
+    try {
+      const response = await fetch(`/api/admin/menu/items/${itemId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete item: ${response.status}`);
+      }
+
+      // Remove from UI
+      setMenuItems((items) => items.filter((item) => item.id !== itemId));
+    } catch (err) {
+      console.error("Error deleting item:", err);
+      alert("Failed to delete item. Please try again.");
+    }
+  }
+
+  // Function to toggle item availability
+  async function toggleItemAvailability(
+    itemId: string,
+    currentStatus: boolean
+  ) {
+    try {
+      const response = await fetch(`/api/admin/menu/items/${itemId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          is_available: !currentStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to update item availability: ${response.status}`
+        );
+      }
+
+      // Update in UI
+      setMenuItems((items) =>
+        items.map((item) => {
+          if (item.id === itemId) {
+            return { ...item, is_available: !currentStatus };
+          }
+          return item;
+        })
+      );
+    } catch (err) {
+      console.error("Error updating item:", err);
+      alert("Failed to update item availability. Please try again.");
+    }
+  }
+
+  // Get a friendly label for item types
+  function getItemTypeLabel(type: string): string {
+    const typeMap: Record<string, string> = {
+      pizza: "Pizza",
+      sandwich: "Sandwich",
+      chicken_meal: "Chicken Meal",
+      chicken_piece: "Chicken Piece",
+      appetizer: "Appetizer",
+      side: "Side",
+      beverage: "Beverage",
+    };
+    return typeMap[type] || type;
+  }
+
+  if (loading) {
+    return <div className="text-center py-10">Loading menu items...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded my-4">
+        <h3 className="font-bold">Error Loading Menu</h3>
+        <p>{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-2 bg-red-600 text-white px-4 py-2 rounded"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {/* Page Header with Action Buttons */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">Menu Management</h1>
         <div className="space-x-2">
+          <Link
+            href="/admin/menu/categories"
+            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+          >
+            Manage Categories
+          </Link>
           <Link
             href="/admin/menu/item/new"
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -104,86 +182,128 @@ export default function MenuManagement() {
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error}
+      {/* Category Filters */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold">Filter by Category</h2>
         </div>
-      )}
+        <div className="p-4 flex flex-wrap gap-2">
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              onClick={() => setSelectedCategory(category.id)}
+              className={`px-4 py-2 rounded-lg ${
+                selectedCategory === category.id
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {category.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {/* Category Tabs */}
-      {categories.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-2 p-2 overflow-x-auto">
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
-                  className={`px-4 py-2 rounded-lg ${
-                    selectedCategory === category.id
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </nav>
+      {/* Menu Items Table */}
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold">Menu Items</h2>
+        </div>
+
+        {menuItems.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            <p>No menu items found in this category.</p>
+            <Link
+              href="/admin/menu/item/new"
+              className="text-blue-600 underline mt-2 inline-block"
+            >
+              Add your first item
+            </Link>
           </div>
-
-          <div className="p-4">
-            {loading ? (
-              <div className="text-center py-8">Loading menu items...</div>
-            ) : menuItems.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No items in this category yet.
-              </div>
-            ) : (
-              <div className="space-y-4">
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Base Price
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
                 {menuItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
-                  >
-                    <div className="flex justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">
-                          {item.name}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-medium text-gray-900">
+                        {item.name}
+                      </div>
+                      {item.description && (
+                        <div className="text-sm text-gray-500 truncate max-w-md">
                           {item.description}
-                        </p>
-                        <div className="mt-2 flex gap-2">
-                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                            {item.item_type}
-                          </span>
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
-                            ${item.base_price}
-                          </span>
                         </div>
-                      </div>
-                      <div className="space-x-2">
-                        <Link
-                          href={`/admin/menu/item/${item.id}`}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          Edit
-                        </Link>
-                        <Link
-                          href={`/admin/menu/item/${item.id}/variants`}
-                          className="text-purple-600 hover:text-purple-800"
-                        >
-                          Variants
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                        {getItemTypeLabel(item.item_type || "unknown")}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      ${item.base_price?.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() =>
+                          toggleItemAvailability(item.id, item.is_available)
+                        }
+                        className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          item.is_available
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {item.is_available ? "Available" : "Unavailable"}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                      <Link
+                        href={`/admin/menu/item/${item.id}/variants`}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        Variants
+                      </Link>
+                      <Link
+                        href={`/admin/menu/item/${item.id}`}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        Edit
+                      </Link>
+                      <button
+                        onClick={() => deleteMenuItem(item.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            )}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
