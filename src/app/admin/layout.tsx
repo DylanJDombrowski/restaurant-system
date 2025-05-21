@@ -17,10 +17,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-gray-100">
       {/* Admin Sidebar */}
       <div className="flex">
-        <aside className="w-64 bg-white shadow-md min-h-screen">
+        <aside className="w-64 min-w-64 bg-white shadow-md min-h-screen">
           <div className="p-6">
-            <h2 className="text-xl font-bold text-gray-800">Admin Panel</h2>
-            <div className="mt-2 text-sm text-gray-600">
+            <h2 className="text-xl font-bold text-stone-950">Admin Panel</h2>
+            <div className="mt-2 text-sm text-stone-800">
               <div>{restaurant?.name}</div>
               <div className="font-medium">{staff?.name}</div>
               <div className="text-xs text-blue-600">
