@@ -46,6 +46,10 @@ export function MenuContextProvider({
 
   // Function to fetch all data with robust error handling
   const fetchData = useCallback(async () => {
+    console.log("FETCH DATA CALLED, selectedCategory:", selectedCategory);
+    console.log("FILTERING EFFECT RUN, selectedCategory:", selectedCategory);
+    console.log("ALL MENU ITEMS:", allMenuItems);
+    console.log("FILTERED MENU ITEMS:", filteredMenuItems);
     try {
       console.log("Menu context: Fetching data...");
       setLoading(true);
@@ -98,7 +102,7 @@ export function MenuContextProvider({
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory]);
+  }, []);
 
   // Fetch data on initial mount
   useEffect(() => {
