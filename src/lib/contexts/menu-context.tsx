@@ -135,7 +135,8 @@ export function MenuContextProvider({
     }
 
     console.log("FILTERED MENU ITEMS:", filteredMenuItems);
-  }, [selectedCategory, allMenuItems, filteredMenuItems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, allMenuItems]);
 
   const contextValue = {
     categories,
