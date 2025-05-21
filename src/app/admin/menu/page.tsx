@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { MenuItemWithCategory } from "@/lib/types";
-import { useMenuContext } from "./menu-context";
+import { useMenuContext } from "@/lib/contexts/menu-context";
 
 export default function MenuManagement() {
   const { selectedCategory, loading: categoryLoading } = useMenuContext();

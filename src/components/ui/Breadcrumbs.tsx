@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 
 interface BreadcrumbItem {
   label: string;
@@ -13,66 +13,66 @@ interface BreadcrumbItem {
 
 export function Breadcrumbs() {
   const pathname = usePathname();
-  const [items, setItems] = useState<BreadcrumbItem[]>([]);
 
-  useEffect(() => {
+  const breadcrumbs = useMemo(() => {
     // Convert the path to breadcrumb items
     const pathSegments = pathname.split("/").filter(Boolean);
+    const items: BreadcrumbItem[] = [];
 
-    // Create breadcrumb items from path segments
-    const breadcrumbs: BreadcrumbItem[] = [];
-
-    // Start with Home
-    breadcrumbs.push({ label: "Admin", href: "/admin" });
+    // Start with Home/Admin
+    if (pathSegments[0] === "admin") {
+      items.push({ label: "Admin", href: "/admin" });
+    } else {
+      items.push({ label: "Home", href: "/" });
+    }
 
     // Build up the rest of the path
-    let currentPath = "/admin";
+    let currentPath = `/${pathSegments[0]}`;
 
     for (let i = 1; i < pathSegments.length; i++) {
       const segment = pathSegments[i];
       currentPath += `/${segment}`;
+
+      // Skip adding IDs as breadcrumbs, or create a friendly label
+      if (segment.match(/^[0-9a-f-]{36}$/)) {
+        continue; // Skip UUID segments
+      }
 
       // Create a label from the segment (capitalize, remove hyphens)
       let label = segment.replace(/-/g, " ");
 
       // Special cases for better labels
       if (segment === "menu") {
-        label = "Menu";
+        label = "Menu Management";
       } else if (segment === "item") {
-        // Skip "item" in the breadcrumb as it's just a route organization
-        continue;
-      } else if (segment === "new") {
-        label = "New Item";
+        continue; // Skip "item" in breadcrumbs
       } else if (segment === "variants") {
-        label = "Size & Variants";
+        label = "Variants";
       } else if (segment === "categories") {
         label = "Categories";
-      } else if (
-        segment.match(
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-        )
-      ) {
-        // This is a UUID, try to get a better label from the page
-        // For now, we'll use "Item Details"
-        label = "Item Details";
+      } else if (segment === "new") {
+        label = "New Item";
       }
 
-      breadcrumbs.push({
-        label: label.charAt(0).toUpperCase() + label.slice(1),
+      // Capitalize first letter
+      label = label.charAt(0).toUpperCase() + label.slice(1);
+
+      items.push({
+        label,
         href: currentPath,
         current: i === pathSegments.length - 1,
       });
     }
 
-    setItems(breadcrumbs);
+    return items;
   }, [pathname]);
 
-  if (items.length <= 1) return null;
+  if (breadcrumbs.length <= 1) return null;
 
   return (
     <nav className="flex mb-4" aria-label="Breadcrumb">
       <ol className="inline-flex items-center space-x-1 md:space-x-3">
-        {items.map((item, index) => (
+        {breadcrumbs.map((item, index) => (
           <li key={item.href} className="inline-flex items-center">
             {index > 0 && (
               <svg
