@@ -4,7 +4,7 @@ import { MenuItemWithCategory, Restaurant, OrderWithItems } from "@/lib/types";
 import Link from "next/link";
 
 export default function StaffDashboard() {
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [, setRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItemWithCategory[]>([]);
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +85,7 @@ export default function StaffDashboard() {
     (order) =>
       new Date(order.created_at).toDateString() === new Date().toDateString()
   );
-  const todayRevenue = todayOrders.reduce((sum, order) => sum + order.total, 0);
+
   const pendingOrders = orders.filter((order) => order.status === "pending");
   const confirmedOrders = orders.filter(
     (order) => order.status === "confirmed"
@@ -107,7 +107,7 @@ export default function StaffDashboard() {
       </div>
 
       {/* Dashboard Stats Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-blue-500">
           <h2 className="text-lg font-semibold text-gray-900 mb-2">
             Today&apos;s Orders
@@ -116,16 +116,6 @@ export default function StaffDashboard() {
             {todayOrders.length}
           </p>
           <p className="text-gray-800 text-sm">Total orders today</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-green-500">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">
-            Today&apos;s Revenue
-          </h2>
-          <p className="text-3xl font-bold text-green-600">
-            ${todayRevenue.toFixed(2)}
-          </p>
-          <p className="text-gray-800 text-sm">Revenue today</p>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-orange-500">
@@ -174,7 +164,7 @@ export default function StaffDashboard() {
               </div>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-900">Confirmed (Kitchen)</span>
+              <span className="text-gray-900">In Progress (Kitchen)</span>
               <div className="flex items-center gap-2">
                 <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-medium">
                   {confirmedOrders.length}
@@ -255,27 +245,6 @@ export default function StaffDashboard() {
                 .slice(0, 10)
                 .map((order) => <OrderCard key={order.id} order={order} />)
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Restaurant Info */}
-      <div className="mt-8 bg-white p-6 rounded-lg shadow-lg">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Restaurant Information
-        </h2>
-        <div className="grid md:grid-cols-3 gap-4 text-sm">
-          <div>
-            <span className="text-gray-700">Restaurant:</span>
-            <p className="font-medium text-gray-900">{restaurant?.name}</p>
-          </div>
-          <div>
-            <span className="text-gray-700">Location:</span>
-            <p className="font-medium text-gray-900">New Lenox, IL</p>
-          </div>
-          <div>
-            <span className="text-gray-700">System Status:</span>
-            <p className="font-medium text-green-600">✅ Online</p>
           </div>
         </div>
       </div>
