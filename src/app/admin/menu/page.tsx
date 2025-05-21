@@ -6,7 +6,12 @@ import { MenuItemWithCategory } from "@/lib/types";
 import { useMenuContext } from "@/lib/contexts/menu-context";
 
 export default function MenuManagement() {
-  const { selectedCategory, loading: categoryLoading } = useMenuContext();
+  const {
+    categories,
+    selectedCategory,
+    setSelectedCategory,
+    loading: categoryLoading,
+  } = useMenuContext();
   const [menuItems, setMenuItems] = useState<MenuItemWithCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +141,31 @@ export default function MenuManagement() {
 
   return (
     <div>
+      <div className="p-4 border-b border-stone-200">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-stone-950">Menu Items</h2>
+
+          {/* Add Category Selector */}
+          <div className="flex items-center space-x-2">
+            <label htmlFor="categorySelect" className="text-sm text-stone-700">
+              Filter by Category:
+            </label>
+            <select
+              id="categorySelect"
+              value={selectedCategory || ""}
+              onChange={(e) => setSelectedCategory(e.target.value || null)}
+              className="border border-stone-300 rounded-md px-3 py-1 text-sm"
+              disabled={loading || categoryLoading}
+            >
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
       <div className="p-4 border-b border-stone-200">
         <h2 className="text-lg font-semibold text-stone-950">Menu Items</h2>
       </div>
