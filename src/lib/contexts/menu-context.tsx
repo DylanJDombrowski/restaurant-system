@@ -102,7 +102,7 @@ export function MenuContextProvider({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [allMenuItems, filteredMenuItems, selectedCategory]);
 
   // Fetch data on initial mount
   useEffect(() => {
