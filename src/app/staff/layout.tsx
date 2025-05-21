@@ -1,7 +1,7 @@
 // src/app/staff/layout.tsx - Protected Staff Layout
 "use client";
 import Link from "next/link";
-import { ProtectedRoute, useAuth } from "@/lib/auth/auth-context";
+import { ProtectedRoute, useAuth } from "@/lib/contexts/auth-context";
 
 /**
  * Protected Staff Layout

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Staff, Restaurant, StaffRole } from "@/lib/types";
-import { useAuth } from "@/lib/auth/auth-context";
+import { useAuth } from "@/lib/contexts/auth-context";
 
 /**
  * Staff Management Component
