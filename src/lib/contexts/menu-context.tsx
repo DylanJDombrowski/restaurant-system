@@ -7,6 +7,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import { MenuCategory, MenuItemWithCategory } from "@/lib/types";
 
@@ -44,12 +45,12 @@ export function MenuContextProvider({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Use a ref to track initialization
+  const initialLoadComplete = useRef(false);
+
   // Function to fetch all data with robust error handling
+  // CRITICAL CHANGE: Remove selectedCategory from dependency array
   const fetchData = useCallback(async () => {
-    console.log("FETCH DATA CALLED, selectedCategory:", selectedCategory);
-    console.log("FILTERING EFFECT RUN, selectedCategory:", selectedCategory);
-    console.log("ALL MENU ITEMS:", allMenuItems);
-    console.log("FILTERED MENU ITEMS:", filteredMenuItems);
     try {
       console.log("Menu context: Fetching data...");
       setLoading(true);
@@ -91,26 +92,36 @@ export function MenuContextProvider({
         console.error("Error fetching menu items:", itemsError);
         setError("Failed to load menu items. Please try again.");
       }
-
-      // Set initial selected category if we have categories and none is selected
-      if (fetchedCategories.length > 0 && !selectedCategory) {
-        setSelectedCategory(fetchedCategories[0].id);
-      }
     } catch (err) {
       console.error("Error in menu context data loading:", err);
       setError(err instanceof Error ? err.message : "Failed to load menu data");
     } finally {
       setLoading(false);
     }
-  }, [allMenuItems, filteredMenuItems, selectedCategory]);
+  }, []); // REMOVE selectedCategory from dependencies
 
-  // Fetch data on initial mount
+  // Initial data fetch only once
   useEffect(() => {
-    fetchData();
+    if (!initialLoadComplete.current) {
+      console.log("Initial load effect running");
+      fetchData();
+      initialLoadComplete.current = true;
+    }
   }, [fetchData]);
+
+  // Set initial selected category once categories are loaded
+  useEffect(() => {
+    if (categories.length > 0 && !selectedCategory) {
+      console.log("Setting initial category:", categories[0].id);
+      setSelectedCategory(categories[0].id);
+    }
+  }, [categories, selectedCategory]);
 
   // Filter items when selected category changes or items change
   useEffect(() => {
+    console.log("FILTERING EFFECT RUN, selectedCategory:", selectedCategory);
+    console.log("ALL MENU ITEMS:", allMenuItems);
+
     if (selectedCategory) {
       const filtered = allMenuItems.filter(
         (item) => item.category_id === selectedCategory
@@ -122,7 +133,9 @@ export function MenuContextProvider({
     } else {
       setFilteredMenuItems(allMenuItems);
     }
-  }, [selectedCategory, allMenuItems]);
+
+    console.log("FILTERED MENU ITEMS:", filteredMenuItems);
+  }, [selectedCategory, allMenuItems, filteredMenuItems]);
 
   const contextValue = {
     categories,
