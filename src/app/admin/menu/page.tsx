@@ -146,23 +146,30 @@ export default function MenuManagement() {
           <h2 className="text-lg font-semibold text-stone-950">Menu Items</h2>
 
           {/* Add Category Selector */}
-          <div className="flex items-center space-x-2">
-            <label htmlFor="categorySelect" className="text-sm text-stone-700">
-              Filter by Category:
-            </label>
-            <select
-              id="categorySelect"
-              value={selectedCategory || ""}
-              onChange={(e) => setSelectedCategory(e.target.value || null)}
-              className="border border-stone-300 rounded-md px-3 py-1 text-sm"
-              disabled={loading || categoryLoading}
+          <div className="flex flex-wrap gap-2 mt-2">
+            <button
+              onClick={() => setSelectedCategory(null)}
+              className={`px-3 py-1 text-sm rounded-full ${
+                selectedCategory === null
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
             >
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              All
+            </button>
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                className={`px-3 py-1 text-sm rounded-full ${
+                  selectedCategory === category.id
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                {category.name}
+              </button>
+            ))}
           </div>
         </div>
       </div>
