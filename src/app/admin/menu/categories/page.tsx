@@ -71,6 +71,37 @@ export default function CategoriesManagement() {
     }
   };
 
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this category? This cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/menu/categories/${categoryId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete category");
+      }
+
+      // Update the UI by removing the deleted category
+      setCategories(
+        categories.filter((category) => category.id !== categoryId)
+      );
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      alert(
+        "Failed to delete category: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
+    }
+  };
+
   if (loading) {
     return <div className="p-4">Loading categories...</div>;
   }
@@ -142,7 +173,10 @@ export default function CategoriesManagement() {
                     >
                       Edit
                     </button>
-                    <button className="text-red-600 hover:text-red-900">
+                    <button
+                      onClick={() => handleDeleteCategory(category.id)}
+                      className="text-red-600 hover:text-red-900"
+                    >
                       Delete
                     </button>
                   </td>

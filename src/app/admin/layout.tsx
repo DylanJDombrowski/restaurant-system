@@ -31,22 +31,22 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
           <nav className="mt-6">
             <Link
-              href="/admin"
+              href="/admin/analytics"
               className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
             >
-              Dashboard
+              Analytics
+            </Link>
+            <Link
+              href="/admin/menu"
+              className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+            >
+              Menu Management
             </Link>
             <Link
               href="/admin/staff"
               className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
             >
               Staff Management
-            </Link>
-            <Link
-              href="/admin/analytics"
-              className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-            >
-              Analytics
             </Link>
 
             <div className="mt-8 border-t pt-4">
