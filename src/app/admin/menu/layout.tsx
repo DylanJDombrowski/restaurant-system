@@ -1,8 +1,9 @@
-// src/app/admin/menu/layout.tsx - Simplified
+// src/app/admin/menu/layout.tsx
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 
 export default function MenuLayout({
   children,
@@ -13,6 +14,10 @@ export default function MenuLayout({
 
   // Determine if we're in a deep item edit route
   const isItemEditRoute = pathname.includes("/admin/menu/item/");
+
+  // Determine active tab
+  const isMenuItemsTab = pathname === "/admin/menu";
+  const isCategoriesTab = pathname === "/admin/menu/categories";
 
   return (
     <div className="space-y-6">
@@ -29,6 +34,9 @@ export default function MenuLayout({
         </div>
       </div>
 
+      {/* Breadcrumbs */}
+      <Breadcrumbs />
+
       {/* Only show tab navigation on main list pages, not on item edit pages */}
       {!isItemEditRoute && (
         <div className="border-b border-gray-200">
@@ -36,7 +44,7 @@ export default function MenuLayout({
             <Link
               href="/admin/menu"
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                pathname === "/admin/menu"
+                isMenuItemsTab
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
@@ -46,7 +54,7 @@ export default function MenuLayout({
             <Link
               href="/admin/menu/categories"
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                pathname === "/admin/menu/categories"
+                isCategoriesTab
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
