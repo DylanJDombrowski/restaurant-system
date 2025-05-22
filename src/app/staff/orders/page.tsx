@@ -176,8 +176,10 @@ export default function EnhancedStaffOrdersPage() {
         setOrderTypeAutoSuggested(false);
         return;
       }
+
       setLookupLoading(true);
       setCustomerLookupStatus("searching");
+
       try {
         const response = await fetch(
           `/api/customers/lookup?phone=${encodeURIComponent(
@@ -185,6 +187,7 @@ export default function EnhancedStaffOrdersPage() {
           )}&restaurant_id=${restaurant!.id}`
         );
         const data = await response.json();
+
         if (data.data && data.data.customer) {
           const customer = data.data.customer;
           setFoundCustomer(customer);
@@ -194,17 +197,18 @@ export default function EnhancedStaffOrdersPage() {
             phone: customer.phone,
             email: customer.email || "",
           });
+
+          // Fetch addresses in parallel, not dependent on lookup function recreation
           const addressResponse = await fetch(
             `/api/customers/${customer.id}/addresses`
           );
           const addressData = await addressResponse.json();
           const addresses = addressData.data?.addresses || [];
           setCustomerAddresses(addresses);
-          if (
-            addresses.length > 0 &&
-            orderType === "pickup" &&
-            !orderTypeAutoSuggested
-          ) {
+
+          // Handle order type suggestion logic separately
+          // This runs once per successful lookup, not on every function recreation
+          if (addresses.length > 0 && orderType === "pickup") {
             setOrderTypeAutoSuggested(true);
           }
         } else {
@@ -220,7 +224,7 @@ export default function EnhancedStaffOrdersPage() {
         setLookupLoading(false);
       }
     },
-    [restaurant, orderType, orderTypeAutoSuggested]
+    [restaurant, orderType]
   );
 
   const handleAddressSelection = useCallback(
