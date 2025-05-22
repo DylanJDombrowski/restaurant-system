@@ -10,6 +10,28 @@ import {
   ConfiguredTopping,
   ToppingAmount,
 } from "@/lib/types";
+import FullScreenPizzaCustomizer from "./FullScreenPizzaCustomizer";
+
+/**
+ * Enhanced Menu Item Selector with Full-Screen Customizer Integration
+ *
+ * This component represents the evolution of your menu selection system.
+ * It implements a sophisticated routing strategy where different types of
+ * menu items are handled by different workflows:
+ *
+ * SIMPLE ITEMS: Beverages, simple appetizers → Direct to cart
+ * VARIANT ITEMS: Items with size options but no customization → Size selection then cart
+ * CUSTOMIZABLE ITEMS: Pizzas, complex items → Full-screen customizer experience
+ *
+ * This approach eliminates the friction of forcing every item through the same
+ * workflow, while providing rich customization for items that need it.
+ *
+ * Key Educational Concepts:
+ * - Strategy Pattern: Different item types get different handling strategies
+ * - State Management: Managing multiple UI states cleanly
+ * - Component Composition: Combining simple components into complex workflows
+ * - Progressive Enhancement: Simple items stay simple, complex items get rich features
+ */
 
 interface EnhancedMenuItemSelectorProps {
   menuItems: MenuItemWithVariants[];
@@ -20,15 +42,45 @@ interface EnhancedMenuItemSelectorProps {
 
 export default function EnhancedMenuItemSelector({
   menuItems,
+  toppings, // Now we're actually using these props!
+  modifiers, // These get passed to the customizer
   onAddToCart,
 }: EnhancedMenuItemSelectorProps) {
+  // ==========================================
+  // STATE MANAGEMENT FOR MULTIPLE UI MODES
+  // ==========================================
+
+  /**
+   * We manage several different UI states here:
+   * 1. Menu browsing (default state)
+   * 2. Size selection for multi-variant items
+   * 3. Full-screen customization for complex items
+   *
+   * This state management pattern is called "finite state machine" thinking -
+   * the component can be in exactly one state at a time, and the transitions
+   * between states are clearly defined.
+   */
+
   const [selectedItem, setSelectedItem] = useState<MenuItemWithVariants | null>(
     null
   );
   const [selectedVariant, setSelectedVariant] =
     useState<MenuItemVariant | null>(null);
 
-  // Group menu items by category for better organization
+  // NEW: State for managing the full-screen customizer
+  const [showCustomizer, setShowCustomizer] = useState(false);
+  const [customizerItem, setCustomizerItem] =
+    useState<ConfiguredCartItem | null>(null);
+
+  // ==========================================
+  // MENU ORGANIZATION AND DISPLAY LOGIC
+  // ==========================================
+
+  /**
+   * Group menu items by category for intuitive browsing.
+   * This makes the interface more navigable and matches how customers
+   * think about restaurant menus (appetizers, entrees, desserts, etc.)
+   */
   const itemsByCategory = useMemo(() => {
     const grouped = menuItems.reduce((acc, item) => {
       const categoryName = item.category?.name || "Other";
@@ -42,30 +94,132 @@ export default function EnhancedMenuItemSelector({
     return grouped;
   }, [menuItems]);
 
-  // Handle item selection - determines if we need variant selection
+  // ==========================================
+  // ITEM SELECTION STRATEGY IMPLEMENTATION
+  // ==========================================
+
+  /**
+   * This is the heart of our routing logic. When a staff member selects
+   * an item, we need to intelligently decide what should happen next.
+   *
+   * The decision tree looks like this:
+   * 1. Is it customizable OR has multiple sizes? → Full-screen customizer
+   * 2. Has exactly one size variant? → Add directly with that size
+   * 3. No variants at all? → Add as basic item
+   *
+   * This ensures that simple items (like beverages) don't get forced through
+   * unnecessary complexity, while complex items get the rich experience they need.
+   */
   const handleItemSelect = (item: MenuItemWithVariants) => {
     setSelectedItem(item);
 
-    // If item has variants, show variant selection
-    if (item.variants && item.variants.length > 0) {
-      setSelectedVariant(null);
-    } else {
-      // No variants, add directly to cart with basic configuration
+    // STRATEGY 1: Complex items get the full customization experience
+    if (
+      item.allows_custom_toppings ||
+      (item.variants && item.variants.length > 1)
+    ) {
+      openFullScreenCustomizer(item);
+    }
+    // STRATEGY 2: Single variant items go straight to cart
+    else if (item.variants && item.variants.length === 1) {
+      addBasicItemToCart(item, item.variants[0]);
+    }
+    // STRATEGY 3: No variants, add as basic item
+    else {
       addBasicItemToCart(item);
     }
   };
 
-  // Handle variant selection - adds item to cart or opens customizer
+  /**
+   * THE MISSING PIECE: Opening the full-screen customizer
+   *
+   * This function creates the bridge between item selection and customization.
+   * It prepares a basic cart item with defaults, then opens the customizer
+   * where the customer can modify everything.
+   *
+   * Educational concept: This is "progressive enhancement" - we start with
+   * a working basic configuration, then allow enhancement through customization.
+   */
+  const openFullScreenCustomizer = (
+    item: MenuItemWithVariants,
+    variant?: MenuItemVariant
+  ) => {
+    // Create a basic cart item to pass to the customizer
+    // This ensures the customizer always has a valid starting point
+    const cartItem: ConfiguredCartItem = {
+      id: generateCartItemId(),
+      menuItemId: item.id,
+      menuItemName: item.name,
+      variantId: variant?.id,
+      variantName: variant?.name,
+      quantity: 1,
+      basePrice: variant?.price || item.base_price,
+      selectedToppings: getDefaultToppings(item),
+      selectedModifiers: [],
+      totalPrice: variant?.price || item.base_price,
+      displayName: createDisplayName(item, variant),
+      specialInstructions: "",
+    };
+
+    // Set up the customizer state
+    setCustomizerItem(cartItem);
+    setShowCustomizer(true);
+  };
+
+  /**
+   * Handle customizer completion
+   *
+   * When the customizer finishes (either save or quick-add), we clean up
+   * the state and pass the configured item to the parent component.
+   * This maintains the clean separation between selection and customization.
+   */
+  const handleCustomizerComplete = (configuredItem: ConfiguredCartItem) => {
+    onAddToCart(configuredItem);
+    // Clean up customizer state
+    setShowCustomizer(false);
+    setCustomizerItem(null);
+    setSelectedItem(null);
+  };
+
+  /**
+   * Handle customizer cancellation
+   *
+   * If the user cancels customization, we return to the menu selection state.
+   * This provides a clear escape path from the customizer back to browsing.
+   */
+  const handleCustomizerCancel = () => {
+    setShowCustomizer(false);
+    setCustomizerItem(null);
+    setSelectedItem(null);
+  };
+
+  // ==========================================
+  // VARIANT SELECTION HANDLING
+  // ==========================================
+
+  /**
+   * Handle variant selection for items that have multiple sizes but
+   * don't need full customization (like different sized sodas).
+   *
+   * This preserves the existing variant selection workflow for items
+   * that don't benefit from the full-screen experience.
+   */
   const handleVariantSelect = (variant: MenuItemVariant) => {
     if (!selectedItem) return;
 
     setSelectedVariant(variant);
-
-    // Add basic item to cart (customer can customize later if needed)
     addBasicItemToCart(selectedItem, variant);
   };
 
-  // Add item to cart with basic configuration
+  // ==========================================
+  // CART ITEM CREATION LOGIC
+  // ==========================================
+
+  /**
+   * Create a basic cart item for simple items or as a starting point
+   * for customization. This function encapsulates the business logic
+   * of how menu items transform into cart items.
+   */
   const addBasicItemToCart = (
     item: MenuItemWithVariants,
     variant?: MenuItemVariant
@@ -78,11 +232,11 @@ export default function EnhancedMenuItemSelector({
       variantName: variant?.name,
       quantity: 1,
       basePrice: variant?.price || item.base_price,
-      selectedToppings: getDefaultToppings(item), // This will always be an array
-      selectedModifiers: [], // Always initialize as empty array
+      selectedToppings: getDefaultToppings(item),
+      selectedModifiers: [],
       totalPrice: variant?.price || item.base_price,
       displayName: createDisplayName(item, variant),
-      specialInstructions: "", // Always initialize as empty string
+      specialInstructions: "",
     };
 
     onAddToCart(cartItem);
@@ -90,7 +244,13 @@ export default function EnhancedMenuItemSelector({
     setSelectedVariant(null);
   };
 
-  // Get default toppings for specialty pizzas
+  /**
+   * Extract default toppings for specialty pizzas from the database configuration.
+   *
+   * This function demonstrates how to safely parse JSON data from your database
+   * while handling edge cases gracefully. The business logic here ensures that
+   * specialty pizzas (like Margherita) come with their signature ingredients.
+   */
   const getDefaultToppings = (
     item: MenuItemWithVariants
   ): ConfiguredTopping[] => {
@@ -112,18 +272,19 @@ export default function EnhancedMenuItemSelector({
               id: topping.id,
               name: topping.name,
               amount: topping.amount || "normal",
-              price: 0,
+              price: 0, // Default toppings are included in base price
               isDefault: true,
-              category: "default", // Add this field
+              category: "default",
             });
           });
         }
       } catch (error) {
         console.error("Error parsing default toppings:", error);
+        // Graceful degradation - if parsing fails, we continue without defaults
       }
     }
 
-    // Always include cheese as default for pizzas
+    // Business rule: All pizzas should have cheese unless explicitly configured otherwise
     if (
       item.item_type === "pizza" &&
       !defaultToppings.some((t) => t.name.toLowerCase().includes("cheese"))
@@ -141,7 +302,11 @@ export default function EnhancedMenuItemSelector({
     return defaultToppings;
   };
 
-  // Create human-readable display name
+  /**
+   * Create human-readable display names for cart items.
+   * This ensures that staff and customers can easily identify items
+   * in the cart and on orders.
+   */
   const createDisplayName = (
     item: MenuItemWithVariants,
     variant?: MenuItemVariant
@@ -152,11 +317,50 @@ export default function EnhancedMenuItemSelector({
     return item.name;
   };
 
-  // Generate unique cart item ID
+  /**
+   * Generate unique identifiers for cart items.
+   * This ensures that even identical items can be tracked separately
+   * in the cart (important for modifications and order tracking).
+   */
   const generateCartItemId = (): string => {
     return `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   };
 
+  // ==========================================
+  // RENDER LOGIC WITH CONDITIONAL DISPLAY
+  // ==========================================
+
+  /**
+   * CRITICAL: Conditional rendering for the full-screen customizer
+   *
+   * When the customizer is active, it takes over the entire interface.
+   * This creates an immersive experience that eliminates distractions
+   * and focuses entirely on building the perfect order.
+   *
+   * Educational concept: This is called "modal interaction" - the user
+   * can only interact with the customizer until they complete or cancel it.
+   */
+  if (showCustomizer && customizerItem && selectedItem) {
+    return (
+      <FullScreenPizzaCustomizer
+        item={customizerItem}
+        menuItemWithVariants={selectedItem}
+        availableToppings={toppings}
+        availableModifiers={modifiers}
+        onComplete={handleCustomizerComplete}
+        onCancel={handleCustomizerCancel}
+        isEditMode={false} // This is a new item, not editing an existing one
+      />
+    );
+  }
+
+  /**
+   * DEFAULT RENDER: Menu selection interface
+   *
+   * When not customizing, we show either the main menu or variant selection.
+   * This maintains the familiar browsing experience while providing access
+   * to the advanced customization features when needed.
+   */
   return (
     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -181,10 +385,16 @@ export default function EnhancedMenuItemSelector({
   );
 }
 
+// ==========================================
+// VARIANT SELECTOR COMPONENT
+// ==========================================
+
 /**
- * Variant Selector Component
+ * Specialized component for selecting item variants (sizes, portions, etc.)
  *
- * This is the properly reconstructed component to show pizza size options
+ * This component handles the intermediate step for items that have multiple
+ * sizes but don't need full customization. It provides a clean, focused
+ * interface for size selection with clear pricing information.
  */
 interface VariantSelectorProps {
   item: MenuItemWithVariants;
@@ -197,9 +407,14 @@ function VariantSelector({
   onVariantSelect,
   onBack,
 }: VariantSelectorProps) {
-  // Sort variants by size category using a more reliable method
+  /**
+   * Sort variants by size in logical order.
+   *
+   * This ensures that sizes appear in the order customers expect
+   * (Small → Medium → Large → Extra Large) rather than random
+   * database order.
+   */
   const orderedVariants = useMemo(() => {
-    // Define size order for proper sorting
     const sizeOrder = {
       Small: 1,
       Medium: 2,
@@ -207,9 +422,7 @@ function VariantSelector({
       "Extra Large": 4,
     };
 
-    // Extract size from variant name and provide a sort value
     return [...item.variants].sort((a, b) => {
-      // Extract sizes from variant names
       const aSize =
         Object.keys(sizeOrder).find((size) =>
           a.name.toLowerCase().includes(size.toLowerCase())
@@ -220,7 +433,6 @@ function VariantSelector({
           b.name.toLowerCase().includes(size.toLowerCase())
         ) || "";
 
-      // Compare using our size order
       const aOrder = sizeOrder[aSize as keyof typeof sizeOrder] || 999;
       const bOrder = sizeOrder[bSize as keyof typeof sizeOrder] || 999;
 
@@ -230,7 +442,6 @@ function VariantSelector({
 
   return (
     <div className="space-y-6">
-      {/* Back button */}
       <button
         onClick={onBack}
         className="flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium"
@@ -238,7 +449,6 @@ function VariantSelector({
         ← Back to Menu
       </button>
 
-      {/* Show all variants */}
       <div>
         <h4 className="text-md font-semibold text-gray-900 mb-3">
           Choose Size for {item.name}
@@ -267,11 +477,16 @@ function VariantSelector({
   );
 }
 
+// ==========================================
+// MENU ITEM GRID COMPONENT
+// ==========================================
+
 /**
- * Menu Item Grid Component
+ * Main menu browsing interface with search and category organization.
  *
- * Displays menu items organized by category with clear indicators
- * for items that have variants or customization options.
+ * This component provides the familiar menu browsing experience that
+ * staff expect, with enhancements like search and clear visual indicators
+ * for different types of items.
  */
 interface MenuItemGridProps {
   itemsByCategory: Record<string, MenuItemWithVariants[]>;
@@ -281,7 +496,12 @@ interface MenuItemGridProps {
 function MenuItemGrid({ itemsByCategory, onItemSelect }: MenuItemGridProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Filter items based on search
+  /**
+   * Real-time search filtering across all menu items.
+   *
+   * This helps staff quickly find specific items during busy periods
+   * without having to scroll through entire categories.
+   */
   const filteredCategories = useMemo(() => {
     if (!searchTerm) return itemsByCategory;
 
@@ -302,7 +522,7 @@ function MenuItemGrid({ itemsByCategory, onItemSelect }: MenuItemGridProps) {
 
   return (
     <div className="space-y-6">
-      {/* Search bar */}
+      {/* Search functionality for quick item location */}
       <div>
         <input
           type="text"
@@ -313,7 +533,7 @@ function MenuItemGrid({ itemsByCategory, onItemSelect }: MenuItemGridProps) {
         />
       </div>
 
-      {/* Menu categories */}
+      {/* Category-organized menu display */}
       <div className="space-y-6 max-h-[500px] overflow-y-auto">
         {Object.entries(filteredCategories).map(([category, items]) => (
           <div key={category}>
@@ -335,7 +555,7 @@ function MenuItemGrid({ itemsByCategory, onItemSelect }: MenuItemGridProps) {
 
         {Object.keys(filteredCategories).length === 0 && (
           <div className="text-center py-8 text-gray-500">
-            No items found matching {searchTerm}
+            No items found matching &quot;{searchTerm}&quot;
           </div>
         )}
       </div>
@@ -343,10 +563,15 @@ function MenuItemGrid({ itemsByCategory, onItemSelect }: MenuItemGridProps) {
   );
 }
 
+// ==========================================
+// MENU ITEM CARD COMPONENT
+// ==========================================
+
 /**
- * Menu Item Card Component
+ * Individual menu item display with smart pricing and capability indicators.
  *
- * Displays individual menu items with indicators for variants and customization.
+ * This component shows each menu item with appropriate visual cues about
+ * what will happen when selected (size selection, customization, direct add).
  */
 interface MenuItemCardProps {
   item: MenuItemWithVariants;
@@ -357,7 +582,12 @@ function MenuItemCard({ item, onSelect }: MenuItemCardProps) {
   const hasVariants = item.variants && item.variants.length > 0;
   const allowsCustomization = item.allows_custom_toppings;
 
-  // Determine pricing display
+  /**
+   * Smart pricing display that adapts to the item type.
+   *
+   * Single price for fixed items, price range for variants.
+   * This gives staff immediate pricing context for customer questions.
+   */
   const getPriceDisplay = () => {
     if (hasVariants) {
       const prices = item.variants.map((v) => v.price);
@@ -387,6 +617,7 @@ function MenuItemCard({ item, onSelect }: MenuItemCardProps) {
             <p className="text-sm text-gray-600 mb-2">{item.description}</p>
           )}
 
+          {/* Visual indicators for item capabilities */}
           <div className="flex items-center gap-2 text-xs">
             {hasVariants && (
               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
