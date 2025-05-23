@@ -137,7 +137,7 @@ export interface ConfiguredCartItem {
   basePrice: number;
   selectedToppings: ConfiguredTopping[]; // Always array, never undefined
   selectedModifiers: ConfiguredModifier[]; // Always array, never undefined
-  specialInstructions: string; // Always string, never undefined
+  specialInstructions: string | null; // Always string, never undefined
   totalPrice: number;
   displayName: string;
 }
