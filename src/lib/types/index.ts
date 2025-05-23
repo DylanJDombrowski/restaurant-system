@@ -130,8 +130,9 @@ export interface ConfiguredCartItem {
   id: string;
   menuItemId: string;
   menuItemName: string;
-  variantId?: string;
-  variantName?: string;
+  // FIXED: Allow both null and undefined for database compatibility
+  variantId?: string | null;
+  variantName?: string | null;
   quantity: number;
   basePrice: number;
   selectedToppings: ConfiguredTopping[]; // Always array, never undefined
@@ -303,6 +304,7 @@ export type InsertMenuItem = Omit<MenuItem, "id" | "created_at" | "updated_at">;
 export type InsertMenuItemVariant = Omit<MenuItemVariant, "id">;
 export type InsertTopping = Omit<Topping, "id">;
 export type InsertModifier = Omit<Modifier, "id">;
+export type SafeString = string | null | undefined;
 
 /**
  * ===================================================================
@@ -370,6 +372,19 @@ export function isCustomizableItem(item: MenuItem): boolean {
  */
 export function isPizzaItem(item: MenuItem): boolean {
   return item.item_type === "pizza";
+}
+
+// Helper function to safely handle null/undefined strings
+export function safeString(
+  value: SafeString,
+  defaultValue: string = ""
+): string {
+  return value ?? defaultValue;
+}
+
+// Helper function to safely handle null/undefined optional strings
+export function safeOptionalString(value: SafeString): string | undefined {
+  return value === null ? undefined : value ?? undefined;
 }
 
 /**
