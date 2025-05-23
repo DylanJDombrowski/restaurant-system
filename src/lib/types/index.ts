@@ -164,6 +164,7 @@ export interface Customer {
   loyalty_points: number;
   total_orders: number;
   total_spent: number;
+  last_order_date?: string; // 🆕 ADD THIS LINE
   created_at: string;
   updated_at: string;
 }
