@@ -28,7 +28,7 @@ interface EnhancedMenuItemSelectorProps {
   onAddToCart: (configuredItem: ConfiguredCartItem) => void;
 }
 
-export default function EnhancedMenuItemSelector({
+export function EnhancedMenuItemSelector({
   menuItems,
   toppings,
   modifiers,
