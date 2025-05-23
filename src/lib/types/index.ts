@@ -130,14 +130,13 @@ export interface ConfiguredCartItem {
   id: string;
   menuItemId: string;
   menuItemName: string;
-  // FIXED: Allow both null and undefined for database compatibility
   variantId?: string | null;
   variantName?: string | null;
   quantity: number;
   basePrice: number;
-  selectedToppings: ConfiguredTopping[]; // Always array, never undefined
-  selectedModifiers: ConfiguredModifier[]; // Always array, never undefined
-  specialInstructions: string | null; // Always string, never undefined
+  selectedToppings: ConfiguredTopping[];
+  selectedModifiers: ConfiguredModifier[];
+  specialInstructions: string | null;
   totalPrice: number;
   displayName: string;
 }

@@ -127,7 +127,21 @@ export default function EnhancedCartSystem({
 
   // Handle customization request
   const handleCustomizeItem = async (item: ConfiguredCartItem) => {
-    setCustomizingItem(item);
+    // ADDED: Safety check to ensure the item is valid
+    if (!item || !item.id) {
+      console.error("Invalid item passed to handleCustomizeItem:", item);
+      return;
+    }
+
+    // ADDED: Ensure specialInstructions is never null
+    const safeItem = {
+      ...item,
+      specialInstructions: item.specialInstructions || "",
+      selectedToppings: item.selectedToppings || [],
+      selectedModifiers: item.selectedModifiers || [],
+    };
+
+    setCustomizingItem(safeItem);
     await loadCustomizerData();
     setShowCustomizer(true);
   };
@@ -208,15 +222,16 @@ export default function EnhancedCartSystem({
         )}
       </div>
 
-      {/* Modal Customizer */}
-      <ModalPizzaCustomizer
-        item={customizingItem!}
-        availableToppings={availableToppings}
-        availableModifiers={availableModifiers}
-        onComplete={handleCustomizationComplete}
-        onCancel={handleCustomizationCancel}
-        isOpen={showCustomizer}
-      />
+      {showCustomizer && customizingItem && (
+        <ModalPizzaCustomizer
+          item={customizingItem} // ✅ Now safe - we know it's not null
+          availableToppings={availableToppings}
+          availableModifiers={availableModifiers}
+          onComplete={handleCustomizationComplete}
+          onCancel={handleCustomizationCancel}
+          isOpen={showCustomizer}
+        />
+      )}
     </>
   );
 }
@@ -328,7 +343,7 @@ function CartItemCard({
             </div>
           )}
           {/* Special instructions - only if they exist */}
-          {item.specialInstructions && (
+          {item.specialInstructions && item.specialInstructions.trim() && (
             <div className="text-sm text-blue-600 mt-1 italic">
               Note: {item.specialInstructions}
             </div>
