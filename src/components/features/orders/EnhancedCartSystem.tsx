@@ -1,21 +1,10 @@
-// src/components/features/orders/EnhancedCartSystem.tsx
+// src/components/features/orders/EnhancedCartSystem.tsx - CLEANED VERSION
 "use client";
 import { useState, useMemo } from "react";
-import { ConfiguredCartItem, ConfiguredModifier, ConfiguredTopping, Topping, Modifier, Customer } from "@/lib/types";
+import { ConfiguredCartItem, ConfiguredModifier, ConfiguredTopping, Topping, Modifier, Customer, MenuItemWithVariants } from "@/lib/types";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
 import InlineCustomerInfo from "./InlineCustomerInfo";
 import SandwichCustomizer from "./SandwichCustomizer";
-
-/**
- * 🚀 ENHANCED Cart System with Inline Customer Info Integration
- *
- * Major improvements:
- * ✅ Integrated inline customer info collection
- * ✅ Better visual hierarchy and layout
- * ✅ Smart suggestions and workflow optimization
- * ✅ Loyalty points integration
- * ✅ Order type selection within cart
- */
 
 interface EnhancedCartSystemProps {
   items: ConfiguredCartItem[];
@@ -28,17 +17,14 @@ interface EnhancedCartSystemProps {
     deliveryFee: number;
     total: number;
   };
-  // 🆕 NEW: Customer info integration
   customerInfo: { name: string; phone: string; email: string };
   setCustomerInfo: React.Dispatch<React.SetStateAction<{ name: string; phone: string; email: string }>>;
   foundCustomer: Customer | null;
   onCustomerLookup: (phone: string) => void;
   lookupLoading: boolean;
   customerLookupStatus: "idle" | "searching" | "found" | "not-found";
-  // 🆕 NEW: Order type integration
   orderType: "pickup" | "delivery";
   setOrderType: (type: "pickup" | "delivery") => void;
-  // 🆕 NEW: Completion callback
   onCompleteOrder: () => void;
 }
 
@@ -59,19 +45,19 @@ export default function EnhancedCartSystem({
   onCompleteOrder,
 }: EnhancedCartSystemProps) {
   // ==========================================
-  // STATE MANAGEMENT
+  // STATE MANAGEMENT - CLEANED
   // ==========================================
 
-  // Modal states
+  // Pizza customizer states
   const [customizingItem, setCustomizingItem] = useState<ConfiguredCartItem | null>(null);
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [availableToppings, setAvailableToppings] = useState<Topping[]>([]);
   const [availableModifiers, setAvailableModifiers] = useState<Modifier[]>([]);
   const [loadingCustomizerData, setLoadingCustomizerData] = useState(false);
+
+  // Sandwich customizer states
   const [showSandwichCustomizer, setShowSandwichCustomizer] = useState(false);
-  const [customizingSandwichItem, setCustomizingSandwichItem] = useState(null);
-  const [customizingMenuItem, setCustomizingMenuItem] = useState(null);
-  const [showSimpleEditor, setShowSimpleEditor] = useState(false);
+  const [customizingSandwichItem, setCustomizingSandwichItem] = useState<MenuItemWithVariants | null>(null);
 
   // Order notes
   const [orderNotes, setOrderNotes] = useState("");
@@ -117,7 +103,7 @@ export default function EnhancedCartSystem({
   };
 
   // ==========================================
-  // CART ITEM MANAGEMENT
+  // CART ITEM MANAGEMENT - FIXED TYPES
   // ==========================================
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
@@ -134,11 +120,8 @@ export default function EnhancedCartSystem({
       return;
     }
 
-    // 🆕 NEW: Type-aware customization routing
-    // We need to determine what type of item this is
     console.log("🔧 Cart customize for item:", item.menuItemName);
 
-    // First, get the menu item details to determine routing
     try {
       const menuResponse = await fetch(`/api/menu/full?restaurant_id=${restaurantId}`);
       if (!menuResponse.ok) {
@@ -147,7 +130,8 @@ export default function EnhancedCartSystem({
       }
 
       const menuData = await menuResponse.json();
-      const fullMenuItem = menuData.data.menu_items.find((mi: any) => mi.id === item.menuItemId);
+      // FIXED: Proper typing instead of 'any'
+      const fullMenuItem = menuData.data.menu_items.find((mi: MenuItemWithVariants) => mi.id === item.menuItemId);
 
       if (!fullMenuItem) {
         console.error("Menu item not found for customization");
@@ -161,15 +145,9 @@ export default function EnhancedCartSystem({
         allows_custom_toppings: fullMenuItem.allows_custom_toppings,
       });
 
-      // 🎯 ROUTING LOGIC: Same as SmartMenuItemSelector
-
-      // Check if it's a sandwich
+      // ROUTING LOGIC: Same as SmartMenuItemSelector
       if (fullMenuItem.category?.name === "Sandwiches") {
         console.log("🥪 Opening sandwich customizer");
-        // Import and show SandwichCustomizer
-        const { default: SandwichCustomizer } = await import("./SandwichCustomizer");
-
-        // Set up sandwich customizer state
         setCustomizingSandwichItem(fullMenuItem);
         setShowSandwichCustomizer(true);
         return;
@@ -187,16 +165,14 @@ export default function EnhancedCartSystem({
         };
 
         setCustomizingItem(safeItem);
-        setCustomizingMenuItem(fullMenuItem); // Store full menu item
         await loadCustomizerData();
         setShowCustomizer(true);
         return;
       }
 
-      // For other items, show a simple quantity/notes editor
-      console.log("📝 Opening simple editor");
-      setCustomizingItem(item);
-      setShowSimpleEditor(true);
+      // For other items, just show a simple alert for now
+      console.log("📝 Item doesn't need customization");
+      alert("This item doesn't have customization options.");
     } catch (error) {
       console.error("Error determining customization type:", error);
 
@@ -214,6 +190,7 @@ export default function EnhancedCartSystem({
     }
   };
 
+  // SANDWICH CUSTOMIZATION HANDLERS
   const handleSandwichCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
     onUpdateItem(updatedItem.id, updatedItem);
     setShowSandwichCustomizer(false);
@@ -225,6 +202,7 @@ export default function EnhancedCartSystem({
     setCustomizingSandwichItem(null);
   };
 
+  // PIZZA CUSTOMIZATION HANDLERS
   const handleCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
     onUpdateItem(updatedItem.id, updatedItem);
     setShowCustomizer(false);
@@ -237,7 +215,7 @@ export default function EnhancedCartSystem({
   };
 
   // ==========================================
-  // 🆕 ORDER COMPLETION LOGIC
+  // ORDER COMPLETION LOGIC
   // ==========================================
 
   const canCompleteOrder = () => {
@@ -257,7 +235,7 @@ export default function EnhancedCartSystem({
   return (
     <>
       <div className="space-y-4">
-        {/* 🆕 INLINE CUSTOMER INFO */}
+        {/* INLINE CUSTOMER INFO */}
         <InlineCustomerInfo
           customerInfo={customerInfo}
           setCustomerInfo={setCustomerInfo}
@@ -268,7 +246,7 @@ export default function EnhancedCartSystem({
           restaurantId={restaurantId}
         />
 
-        {/* 🆕 ORDER TYPE SELECTION (when items exist) */}
+        {/* ORDER TYPE SELECTION */}
         {items.length > 0 && (
           <div className="bg-white border border-gray-300 rounded-lg p-4">
             <h4 className="font-medium text-gray-900 mb-3">Order Type</h4>
@@ -342,12 +320,11 @@ export default function EnhancedCartSystem({
             </div>
           )}
 
-          {/* 🆕 ENHANCED CART SUMMARY */}
+          {/* CART SUMMARY */}
           {items.length > 0 && (
             <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
               <OrderSummaryDisplay summary={orderSummary} />
 
-              {/* 🆕 COMPLETION BUTTON */}
               <button
                 onClick={onCompleteOrder}
                 disabled={!canCompleteOrder()}
@@ -362,7 +339,7 @@ export default function EnhancedCartSystem({
         </div>
       </div>
 
-      {/* Modal Customizer */}
+      {/* PIZZA MODAL CUSTOMIZER */}
       {showCustomizer && customizingItem && (
         <ModalPizzaCustomizer
           item={customizingItem}
@@ -373,6 +350,8 @@ export default function EnhancedCartSystem({
           isOpen={showCustomizer}
         />
       )}
+
+      {/* SANDWICH MODAL CUSTOMIZER */}
       {showSandwichCustomizer && customizingSandwichItem && (
         <SandwichCustomizer
           item={customizingSandwichItem}
@@ -386,7 +365,7 @@ export default function EnhancedCartSystem({
 }
 
 // ==========================================
-// HELPER COMPONENTS (enhanced)
+// HELPER COMPONENTS
 // ==========================================
 
 function CartEmptyState() {
@@ -458,7 +437,6 @@ function CartItemCard({ item, onQuantityChange, onCustomize, onRemove, customiza
         </div>
 
         <div className="ml-4 flex items-center gap-3">
-          {/* Quantity controls */}
           <div className="flex items-center gap-1">
             <button
               onClick={() => onQuantityChange(item.quantity - 1)}
@@ -479,7 +457,6 @@ function CartItemCard({ item, onQuantityChange, onCustomize, onRemove, customiza
         </div>
       </div>
 
-      {/* Action buttons */}
       <div className="flex gap-2 mt-3">
         {canCustomize && (
           <button
@@ -542,7 +519,6 @@ function OrderSummaryDisplay({ summary }: OrderSummaryDisplayProps) {
   );
 }
 
-// Export the cart statistics hook
 export function useCartStatistics(items: ConfiguredCartItem[]) {
   return useMemo(() => {
     const totalItems = items.reduce((sum: number, item: ConfiguredCartItem) => sum + item.quantity, 0);
@@ -550,16 +526,9 @@ export function useCartStatistics(items: ConfiguredCartItem[]) {
     const subtotal = items.reduce((sum: number, item: ConfiguredCartItem) => sum + item.totalPrice * item.quantity, 0);
 
     const tax = subtotal * 0.08;
-    const deliveryFee = 0; // This will be set by parent component
+    const deliveryFee = 0;
     const total = subtotal + tax + deliveryFee;
 
-    return {
-      totalItems,
-      uniqueItems,
-      subtotal,
-      tax,
-      deliveryFee,
-      total,
-    };
+    return { totalItems, uniqueItems, subtotal, tax, deliveryFee, total };
   }, [items]);
 }
