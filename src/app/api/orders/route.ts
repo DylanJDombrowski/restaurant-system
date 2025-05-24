@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import {
-  InsertOrder,
-  InsertCustomer,
-  OrderWithItems,
-  ApiResponse,
-  Customer,
-  OrderItem,
-  MenuItem,
-  MenuItemVariant,
-  OrderType,
-  OrderStatus,
-} from "@/lib/types";
+import { InsertOrder, InsertCustomer, OrderWithItems, ApiResponse, MenuItem, MenuItemVariant, OrderType, OrderStatus } from "@/lib/types";
 
 interface EnhancedOrderItem {
   menuItemId: string;
