@@ -1,27 +1,30 @@
 // src/components/features/orders/SmartMenuItemSelector.tsx
 "use client";
 import { useState, useMemo } from "react";
-import {
-  MenuItemWithVariants,
-  MenuItemVariant,
-  Topping,
-  Modifier,
-  ConfiguredCartItem,
-  getItemCustomizationLevel,
-  shouldShowCustomizer,
-  needsVariantSelection,
-} from "@/lib/types";
+import { MenuItemWithVariants, MenuItemVariant, Topping, Modifier, ConfiguredCartItem, ConfiguredTopping } from "@/lib/types";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
 
 /**
- * 🎯 SMART Menu Item Selector - Routes items by type
+ * 🎯 TYPE-AWARE Smart Menu Item Selector
  *
- * Business Logic:
- * - Pizza items (item_type="pizza") → Full customization modal
- * - Items with variants → Size selection interface
- * - Sides/condiments → Direct add to cart
- * - Everything else → Simple quantity selection
+ * Handles all item types from your database:
+ * - pizza: Full customization (size, crust, toppings, modifiers)
+ * - standard: Simple items, may have variants or be direct-add
+ * - variants: Items with size/portion options
+ * - beverage: Drinks, usually direct-add
+ * - stuffed: Special pizza type with different workflow
  */
+
+// Define all possible item types from your database
+type ItemType = "pizza" | "standard" | "variants" | "beverage" | "stuffed";
+
+// Define customization strategies
+type CustomizationStrategy =
+  | "full_pizza" // Pizza with full customization
+  | "stuffed_pizza" // Stuffed pizza (special handling)
+  | "variant_selection" // Items with size/portion selection
+  | "direct_add" // Simple items, add directly to cart
+  | "simple_quantity"; // Basic items that might need quantity adjustment
 
 interface SmartMenuItemSelectorProps {
   menuItems: MenuItemWithVariants[];
@@ -40,6 +43,82 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
   const [customizerItem, setCustomizerItem] = useState<ConfiguredCartItem | null>(null);
 
   // ==========================================
+  // TYPE-AWARE BUSINESS LOGIC
+  // ==========================================
+
+  /**
+   * Determines the customization strategy based on item properties
+   */
+  const getCustomizationStrategy = (item: MenuItemWithVariants): CustomizationStrategy => {
+    const itemType = item.item_type as ItemType;
+    const hasVariants = item.variants && item.variants.length > 0;
+    const allowsCustomToppings = item.allows_custom_toppings === true;
+
+    // Pizza items always get full customization
+    if (itemType === "pizza") {
+      return "full_pizza";
+    }
+
+    // Stuffed pizza items (special category)
+    if (itemType === "stuffed") {
+      return "stuffed_pizza";
+    }
+
+    // Items explicitly marked as "variants" or have multiple variants
+    if (itemType === "variants" || (hasVariants && item.variants!.length > 1)) {
+      return "variant_selection";
+    }
+
+    // Beverages are typically direct-add
+    if (itemType === "beverage") {
+      return "direct_add";
+    }
+
+    // Standard items with customization enabled
+    if (itemType === "standard" && allowsCustomToppings) {
+      // Special case: condiments and sides shouldn't get pizza customization
+      if (isCondimentOrSide(item)) {
+        return "direct_add";
+      }
+      // Other standard items with customization (sandwiches, etc.)
+      return hasVariants ? "variant_selection" : "simple_quantity";
+    }
+
+    // Default: simple direct add
+    return "direct_add";
+  };
+
+  /**
+   * Identifies condiments and side items that shouldn't have customization
+   */
+  const isCondimentOrSide = (item: MenuItemWithVariants): boolean => {
+    const name = item.name.toLowerCase();
+    const category = item.category?.name?.toLowerCase() || "";
+
+    // Known condiments and sides
+    const condimentKeywords = [
+      "sauce",
+      "dressing",
+      "giardiniera",
+      "peppers",
+      "gravy",
+      "anchovies",
+      "tartar",
+      "cocktail",
+      "hot sauce",
+      "ranch",
+    ];
+
+    const sideCategories = ["sides"];
+
+    return (
+      condimentKeywords.some((keyword) => name.includes(keyword)) ||
+      sideCategories.some((cat) => category.includes(cat)) ||
+      item.base_price < 3.0
+    ); // Low-price items are likely condiments
+  };
+
+  // ==========================================
   // SMART CATEGORIZATION
   // ==========================================
   const categorizedItems = useMemo(() => {
@@ -48,22 +127,42 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
         const categoryName = item.category?.name || "Other";
         if (!acc[categoryName]) {
           acc[categoryName] = {
-            pizza: [],
+            pizzas: [],
+            stuffedPizzas: [],
             customizable: [],
             variants: [],
-            simple: [],
+            beverages: [],
+            sides: [],
+            other: [],
           };
         }
 
-        // Route items based on business logic
-        if (item.item_type === "pizza") {
-          acc[categoryName].pizza.push(item);
-        } else if (shouldShowCustomizer(item)) {
-          acc[categoryName].customizable.push(item);
-        } else if (needsVariantSelection(item)) {
-          acc[categoryName].variants.push(item);
-        } else {
-          acc[categoryName].simple.push(item);
+        const strategy = getCustomizationStrategy(item);
+
+        switch (strategy) {
+          case "full_pizza":
+            acc[categoryName].pizzas.push(item);
+            break;
+          case "stuffed_pizza":
+            acc[categoryName].stuffedPizzas.push(item);
+            break;
+          case "variant_selection":
+            acc[categoryName].variants.push(item);
+            break;
+          case "simple_quantity":
+            acc[categoryName].customizable.push(item);
+            break;
+          case "direct_add":
+            if (item.item_type === "beverage") {
+              acc[categoryName].beverages.push(item);
+            } else if (isCondimentOrSide(item)) {
+              acc[categoryName].sides.push(item);
+            } else {
+              acc[categoryName].other.push(item);
+            }
+            break;
+          default:
+            acc[categoryName].other.push(item);
         }
 
         return acc;
@@ -71,10 +170,13 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
       {} as Record<
         string,
         {
-          pizza: MenuItemWithVariants[];
+          pizzas: MenuItemWithVariants[];
+          stuffedPizzas: MenuItemWithVariants[];
           customizable: MenuItemWithVariants[];
           variants: MenuItemWithVariants[];
-          simple: MenuItemWithVariants[];
+          beverages: MenuItemWithVariants[];
+          sides: MenuItemWithVariants[];
+          other: MenuItemWithVariants[];
         }
       >
     );
@@ -86,43 +188,44 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
   // SMART ITEM SELECTION LOGIC
   // ==========================================
   const handleItemSelect = (item: MenuItemWithVariants) => {
-    console.log(`🎯 Smart routing for: ${item.name} (type: ${item.item_type})`);
+    const strategy = getCustomizationStrategy(item);
+    console.log(`🎯 Item: ${item.name} | Type: ${item.item_type} | Strategy: ${strategy}`);
+
     setSelectedItem(item);
 
-    const customizationLevel = getItemCustomizationLevel(item);
-
-    switch (customizationLevel) {
-      case "full":
-        // Pizza items with full customization
+    switch (strategy) {
+      case "full_pizza":
         console.log("→ Opening full pizza customizer");
         openPizzaCustomizer(item);
         break;
 
-      case "variants":
-        // Items with size selection but limited customization
+      case "stuffed_pizza":
+        console.log("→ Opening stuffed pizza customizer");
+        openPizzaCustomizer(item); // Same modal, different base item
+        break;
+
+      case "variant_selection":
         console.log("→ Showing variant selection");
         if (item.variants && item.variants.length === 1) {
-          // Only one variant, skip selection
+          // Skip selection if only one variant
           handleVariantSelect(item.variants[0]);
         }
-        // Otherwise, show variant selector (handled by render logic)
+        // Otherwise handled by render logic
         break;
 
-      case "simple":
-        // Single variant items
-        console.log("→ Adding as simple item");
-        const variant = item.variants?.[0];
-        addDirectToCart(item, variant);
+      case "simple_quantity":
+        console.log("→ Simple item with possible customization");
+        // Could open a simplified customizer or add directly
+        addDirectToCart(item);
         break;
 
-      case "none":
-        // Direct add items (sides, condiments)
+      case "direct_add":
         console.log("→ Adding directly to cart");
         addDirectToCart(item);
         break;
 
       default:
-        console.warn("Unknown customization level:", customizationLevel);
+        console.warn("Unknown strategy:", strategy);
         addDirectToCart(item);
     }
   };
@@ -163,8 +266,10 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
     console.log(`📏 Variant selected: ${variant.name} for ${selectedItem.name}`);
     setSelectedVariant(variant);
 
-    // Check if this variant needs pizza customization
-    if (selectedItem.item_type === "pizza") {
+    const strategy = getCustomizationStrategy(selectedItem);
+
+    // After variant selection, check if we need further customization
+    if (strategy === "full_pizza" || strategy === "stuffed_pizza") {
       openPizzaCustomizer(selectedItem, variant);
     } else {
       addDirectToCart(selectedItem, variant);
@@ -196,8 +301,8 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
     const basePrice = variant?.price ?? item.base_price;
     const displayName = variant?.name ? `${variant.name} ${item.name}` : item.name;
 
-    // Get default toppings for pizza items
-    const defaultToppings = item.item_type === "pizza" ? getDefaultToppings(item) : [];
+    // Get default toppings for pizza items only
+    const defaultToppings = item.item_type === "pizza" || item.item_type === "stuffed" ? getDefaultToppings(item) : [];
 
     return {
       id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -215,9 +320,8 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
     };
   };
 
-  const getDefaultToppings = (item: MenuItemWithVariants) => {
-    // Extract default toppings from pizza configuration
-    const defaultToppings: { id: any; name: any; amount: any; price: number; isDefault: boolean; category: string }[] = [];
+  const getDefaultToppings = (item: MenuItemWithVariants): ConfiguredTopping[] => {
+    const defaultToppings: ConfiguredTopping[] = [];
 
     try {
       if (item.default_toppings_json && typeof item.default_toppings_json === "object") {
@@ -245,19 +349,33 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
   };
 
   // ==========================================
+  // HELPER FUNCTIONS
+  // ==========================================
+  const needsVariantSelection = (item: MenuItemWithVariants): boolean => {
+    const strategy = getCustomizationStrategy(item);
+    return strategy === "variant_selection" && item.variants && item.variants.length > 1;
+  };
+
+  // ==========================================
   // RENDER LOGIC
   // ==========================================
   return (
     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        {selectedItem && !selectedVariant && !showCustomizerModal ? `Select Size for ${selectedItem.name}` : "Select Menu Item"}
+        {selectedItem && needsVariantSelection(selectedItem) && !selectedVariant && !showCustomizerModal
+          ? `Select Size for ${selectedItem.name}`
+          : "Select Menu Item"}
       </h3>
 
-      {/* Show variant selector if item is selected and has variants */}
+      {/* Show variant selector if needed */}
       {selectedItem && needsVariantSelection(selectedItem) && !selectedVariant && !showCustomizerModal ? (
         <VariantSelector item={selectedItem} onVariantSelect={handleVariantSelect} onBack={() => setSelectedItem(null)} />
       ) : !showCustomizerModal ? (
-        <CategoryGrid categorizedItems={categorizedItems} onItemSelect={handleItemSelect} />
+        <CategoryGrid
+          categorizedItems={categorizedItems}
+          onItemSelect={handleItemSelect}
+          getCustomizationStrategy={getCustomizationStrategy}
+        />
       ) : null}
 
       {/* Pizza Customizer Modal */}
@@ -277,7 +395,7 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
 }
 
 // ==========================================
-// VARIANT SELECTOR COMPONENT
+// VARIANT SELECTOR COMPONENT (Enhanced)
 // ==========================================
 interface VariantSelectorProps {
   item: MenuItemWithVariants;
@@ -286,40 +404,27 @@ interface VariantSelectorProps {
 }
 
 function VariantSelector({ item, onVariantSelect, onBack }: VariantSelectorProps) {
-  // Filter out variants with null crust_type for cleaner display
-  const cleanVariants = useMemo(() => {
+  // Clean and organize variants
+  const organizedVariants = useMemo(() => {
     if (!item.variants) return [];
 
-    // Group variants by size, prioritizing those with crust_type
-    const variantGroups = item.variants.reduce((acc, variant) => {
-      const size = variant.size_code;
-      if (!acc[size]) acc[size] = [];
-      acc[size].push(variant);
-      return acc;
-    }, {} as Record<string, MenuItemVariant[]>);
+    // Remove duplicates and organize by size
+    const uniqueVariants = new Map<string, MenuItemVariant>();
 
-    // For each size, prefer variants with crust_type over null
-    const cleanedVariants: MenuItemVariant[] = [];
-    Object.entries(variantGroups).forEach(([size, variants]) => {
-      if (variants.length === 1) {
-        cleanedVariants.push(variants[0]);
-      } else {
-        // Prefer variants with proper crust_type
-        const withCrust = variants.filter((v) => v.crust_type);
-        const withoutCrust = variants.filter((v) => !v.crust_type);
+    item.variants.forEach((variant) => {
+      const key = `${variant.size_code}-${variant.crust_type || "default"}`;
 
-        if (withCrust.length > 0) {
-          cleanedVariants.push(...withCrust);
-        } else {
-          cleanedVariants.push(withoutCrust[0]); // Take first as fallback
-        }
+      // Prefer variants with proper crust_type and names
+      if (!uniqueVariants.has(key) || (variant.crust_type && variant.name && !variant.name.includes("Inch"))) {
+        uniqueVariants.set(key, variant);
       }
     });
 
-    return cleanedVariants.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    // Sort by price or sort_order
+    return Array.from(uniqueVariants.values()).sort((a, b) => (a.sort_order || a.price || 0) - (b.sort_order || b.price || 0));
   }, [item.variants]);
 
-  if (!cleanVariants.length) {
+  if (!organizedVariants.length) {
     return (
       <div className="text-center py-8">
         <p className="text-gray-500">No size options available for this item.</p>
@@ -340,17 +445,8 @@ function VariantSelector({ item, onVariantSelect, onBack }: VariantSelectorProps
         <h4 className="text-md font-semibold text-gray-900 mb-3">Choose Size for {item.name}</h4>
 
         <div className="grid grid-cols-2 gap-3">
-          {cleanVariants.map((variant) => (
-            <button
-              key={variant.id}
-              onClick={() => onVariantSelect(variant)}
-              className="bg-white border border-gray-300 rounded-lg p-4 text-left hover:border-blue-500 hover:shadow-md transition-all"
-            >
-              <div className="font-semibold text-gray-900">{variant.name || `${variant.size_code} Size`}</div>
-              {variant.serves && <div className="text-sm text-gray-600">{variant.serves}</div>}
-              {variant.crust_type && <div className="text-sm text-gray-600 capitalize">{variant.crust_type.replace("_", " ")} crust</div>}
-              <div className="text-lg font-bold text-green-600 mt-2">${variant.price.toFixed(2)}</div>
-            </button>
+          {organizedVariants.map((variant) => (
+            <VariantCard key={variant.id} variant={variant} onSelect={() => onVariantSelect(variant)} />
           ))}
         </div>
       </div>
@@ -359,22 +455,63 @@ function VariantSelector({ item, onVariantSelect, onBack }: VariantSelectorProps
 }
 
 // ==========================================
-// CATEGORY GRID COMPONENT
+// VARIANT CARD COMPONENT
+// ==========================================
+interface VariantCardProps {
+  variant: MenuItemVariant;
+  onSelect: () => void;
+}
+
+function VariantCard({ variant, onSelect }: VariantCardProps) {
+  const getDisplayName = () => {
+    if (variant.name && !variant.name.includes("Inch")) {
+      return variant.name;
+    }
+
+    // Construct name from size_code and crust_type
+    let name = variant.size_code;
+    if (variant.crust_type && variant.crust_type !== "default") {
+      name += ` ${variant.crust_type.replace("_", " ")}`;
+    }
+    return name;
+  };
+
+  return (
+    <button
+      onClick={onSelect}
+      className="bg-white border border-gray-300 rounded-lg p-4 text-left hover:border-blue-500 hover:shadow-md transition-all"
+    >
+      <div className="font-semibold text-gray-900 capitalize">{getDisplayName()}</div>
+      {variant.serves && <div className="text-sm text-gray-600">{variant.serves}</div>}
+      {variant.crust_type && variant.crust_type !== "default" && (
+        <div className="text-sm text-gray-600 capitalize">{variant.crust_type.replace("_", " ")} crust</div>
+      )}
+      <div className="text-lg font-bold text-green-600 mt-2">${(variant.price || 0).toFixed(2)}</div>
+    </button>
+  );
+}
+
+// ==========================================
+// CATEGORY GRID COMPONENT (Enhanced)
 // ==========================================
 interface CategoryGridProps {
   categorizedItems: Record<
     string,
     {
-      pizza: MenuItemWithVariants[];
+      pizzas: MenuItemWithVariants[];
+      stuffedPizzas: MenuItemWithVariants[];
       customizable: MenuItemWithVariants[];
       variants: MenuItemWithVariants[];
-      simple: MenuItemWithVariants[];
+      beverages: MenuItemWithVariants[];
+      sides: MenuItemWithVariants[];
+      other: MenuItemWithVariants[];
     }
   >;
   onItemSelect: (item: MenuItemWithVariants) => void;
+  getCustomizationStrategy: (item: MenuItemWithVariants) => CustomizationStrategy;
 }
 
-function CategoryGrid({ categorizedItems, onItemSelect }: CategoryGridProps) {
+function CategoryGrid({ categorizedItems, onItemSelect, getCustomizationStrategy }: CategoryGridProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
   const filteredCategories = useMemo(() => {
@@ -383,10 +520,13 @@ function CategoryGrid({ categorizedItems, onItemSelect }: CategoryGridProps) {
     const filtered: typeof categorizedItems = {};
     Object.entries(categorizedItems).forEach(([category, items]) => {
       const categoryFiltered = {
-        pizza: items.pizza.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase())),
+        pizzas: items.pizzas.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase())),
+        stuffedPizzas: items.stuffedPizzas.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase())),
         customizable: items.customizable.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase())),
         variants: items.variants.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase())),
-        simple: items.simple.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase())),
+        beverages: items.beverages.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase())),
+        sides: items.sides.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase())),
+        other: items.other.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase())),
       };
 
       const hasItems = Object.values(categoryFiltered).some((arr) => arr.length > 0);
@@ -412,7 +552,13 @@ function CategoryGrid({ categorizedItems, onItemSelect }: CategoryGridProps) {
 
       <div className="space-y-6 max-h-[500px] overflow-y-auto">
         {Object.entries(filteredCategories).map(([category, items]) => (
-          <CategorySection key={category} categoryName={category} items={items} onItemSelect={onItemSelect} />
+          <CategorySection
+            key={category}
+            categoryName={category}
+            items={items}
+            onItemSelect={onItemSelect}
+            getCustomizationStrategy={getCustomizationStrategy}
+          />
         ))}
       </div>
     </div>
@@ -420,31 +566,45 @@ function CategoryGrid({ categorizedItems, onItemSelect }: CategoryGridProps) {
 }
 
 // ==========================================
-// CATEGORY SECTION COMPONENT
+// CATEGORY SECTION COMPONENT (Enhanced)
 // ==========================================
 interface CategorySectionProps {
   categoryName: string;
   items: {
-    pizza: MenuItemWithVariants[];
+    pizzas: MenuItemWithVariants[];
+    stuffedPizzas: MenuItemWithVariants[];
     customizable: MenuItemWithVariants[];
     variants: MenuItemWithVariants[];
-    simple: MenuItemWithVariants[];
+    beverages: MenuItemWithVariants[];
+    sides: MenuItemWithVariants[];
+    other: MenuItemWithVariants[];
   };
   onItemSelect: (item: MenuItemWithVariants) => void;
+  getCustomizationStrategy: (item: MenuItemWithVariants) => CustomizationStrategy;
 }
 
-function CategorySection({ categoryName, items, onItemSelect }: CategorySectionProps) {
-  const allItems = [...items.pizza, ...items.customizable, ...items.variants, ...items.simple];
+function CategorySection({ categoryName, items, onItemSelect, getCustomizationStrategy }: CategorySectionProps) {
+  const allItems = [
+    ...items.pizzas,
+    ...items.stuffedPizzas,
+    ...items.customizable,
+    ...items.variants,
+    ...items.beverages,
+    ...items.sides,
+    ...items.other,
+  ];
 
   if (allItems.length === 0) return null;
 
   return (
     <div>
-      <h4 className="text-md font-semibold text-gray-900 mb-3 sticky top-0 bg-gray-50 py-1">{categoryName}</h4>
+      <h4 className="text-md font-semibold text-gray-900 mb-3 sticky top-0 bg-gray-50 py-1">
+        {categoryName} <span className="text-sm font-normal text-gray-600">({allItems.length})</span>
+      </h4>
 
       <div className="grid grid-cols-1 gap-3">
         {allItems.map((item) => (
-          <SmartItemCard key={item.id} item={item} onSelect={() => onItemSelect(item)} />
+          <TypeAwareItemCard key={item.id} item={item} strategy={getCustomizationStrategy(item)} onSelect={() => onItemSelect(item)} />
         ))}
       </div>
     </div>
@@ -452,15 +612,15 @@ function CategorySection({ categoryName, items, onItemSelect }: CategorySectionP
 }
 
 // ==========================================
-// SMART ITEM CARD COMPONENT
+// TYPE-AWARE ITEM CARD COMPONENT
 // ==========================================
-interface SmartItemCardProps {
+interface TypeAwareItemCardProps {
   item: MenuItemWithVariants;
+  strategy: CustomizationStrategy;
   onSelect: () => void;
 }
 
-function SmartItemCard({ item, onSelect }: SmartItemCardProps) {
-  const customizationLevel = getItemCustomizationLevel(item);
+function TypeAwareItemCard({ item, strategy, onSelect }: TypeAwareItemCardProps) {
   const hasVariants = item.variants && item.variants.length > 0;
 
   const getPriceDisplay = () => {
@@ -480,32 +640,36 @@ function SmartItemCard({ item, onSelect }: SmartItemCardProps) {
   };
 
   const getActionText = () => {
-    switch (customizationLevel) {
-      case "full":
+    switch (strategy) {
+      case "full_pizza":
         return "Customize Pizza";
-      case "variants":
+      case "stuffed_pizza":
+        return "Customize Stuffed Pizza";
+      case "variant_selection":
         return "Choose Size";
-      case "simple":
-        return "Add to Cart";
-      case "none":
+      case "simple_quantity":
+        return "Customize";
+      case "direct_add":
         return "Add to Cart";
       default:
         return "Select";
     }
   };
 
-  const getItemTypeIndicator = () => {
-    switch (customizationLevel) {
-      case "full":
-        return <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">Pizza</span>;
-      case "variants":
-        return <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">Multiple Sizes</span>;
-      case "simple":
-        return <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Ready to Order</span>;
-      case "none":
-        return <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">Side Item</span>;
+  const getStrategyBadge = () => {
+    switch (strategy) {
+      case "full_pizza":
+        return <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">🍕 Pizza</span>;
+      case "stuffed_pizza":
+        return <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs">🥧 Stuffed</span>;
+      case "variant_selection":
+        return <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">📏 Sizes</span>;
+      case "simple_quantity":
+        return <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">⚙️ Custom</span>;
+      case "direct_add":
+        return <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">➕ Quick Add</span>;
       default:
-        return null;
+        return <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">❓ Standard</span>;
     }
   };
 
@@ -518,10 +682,11 @@ function SmartItemCard({ item, onSelect }: SmartItemCardProps) {
         <div className="flex-1">
           <h5 className="font-semibold text-gray-900 mb-1">{item.name}</h5>
 
-          {item.description && <p className="text-sm text-gray-600 mb-2">{item.description}</p>}
+          {item.description && <p className="text-sm text-gray-600 mb-2 line-clamp-2">{item.description}</p>}
 
           <div className="flex items-center gap-2 text-xs mb-2">
-            {getItemTypeIndicator()}
+            {getStrategyBadge()}
+            <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{item.item_type}</span>
             <span className="text-gray-500">~{item.prep_time_minutes || 15} min</span>
           </div>
         </div>
