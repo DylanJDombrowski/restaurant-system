@@ -11,6 +11,7 @@ import {
   ToppingAmount,
 } from "@/lib/types";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
+import SandwichCustomizer from "./SandwichCustomizer";
 
 /**
  * 🎯 TYPE-AWARE Smart Menu Item Selector
@@ -49,6 +50,8 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
   const [selectedVariant, setSelectedVariant] = useState<MenuItemVariant | null>(null);
   const [showCustomizerModal, setShowCustomizerModal] = useState(false);
   const [customizerItem, setCustomizerItem] = useState<ConfiguredCartItem | null>(null);
+  const [showSandwichCustomizer, setShowSandwichCustomizer] = useState(false);
+  const [customizingItem, setCustomizingItem] = useState<MenuItemWithVariants | null>(null);
 
   // ==========================================
   // TYPE-AWARE BUSINESS LOGIC
@@ -199,6 +202,12 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
   // SMART ITEM SELECTION LOGIC
   // ==========================================
   const handleItemSelect = (item: MenuItemWithVariants) => {
+    // Check if it's a sandwich
+    if (item.category?.name === "Sandwiches") {
+      setCustomizingItem(item);
+      setShowSandwichCustomizer(true);
+      return;
+    }
     const strategy = getCustomizationStrategy(item);
     console.log(`🎯 Item: ${item.name} | Type: ${item.item_type} | Strategy: ${strategy}`);
 
@@ -394,6 +403,22 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
           getCustomizationStrategy={getCustomizationStrategy}
         />
       ) : null}
+
+      {showSandwichCustomizer && customizingItem && (
+        <SandwichCustomizer
+          item={customizingItem}
+          onComplete={(cartItem) => {
+            onAddToCart(cartItem);
+            setShowSandwichCustomizer(false);
+            setCustomizingItem(null);
+          }}
+          onCancel={() => {
+            setShowSandwichCustomizer(false);
+            setCustomizingItem(null);
+          }}
+          isOpen={showSandwichCustomizer}
+        />
+      )}
 
       {/* Pizza Customizer Modal */}
       {showCustomizerModal && customizerItem && (
