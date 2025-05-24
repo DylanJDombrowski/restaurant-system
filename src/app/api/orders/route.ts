@@ -1,22 +1,17 @@
-// src/app/api/orders/enhanced/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { InsertOrder, InsertCustomer, InsertCustomerAddress, OrderWithItems, ApiResponse } from "@/lib/types";
-import { CartItemTransformer } from "@/lib/utils/cart-transformers";
-
-/**
- * Enhanced Order Creation API
- *
- * This endpoint handles the sophisticated order format from our enhanced UI.
- * It processes configured items with variants, toppings, modifiers, and
- * complex pricing logic.
- *
- * Key differences from the basic order API:
- * 1. Handles menu item variants (sizes, crusts)
- * 2. Processes topping and modifier selections
- * 3. Stores customization data in JSON fields
- * 4. Calculates complex pricing with proper validation
- */
+import {
+  InsertOrder,
+  InsertCustomer,
+  OrderWithItems,
+  ApiResponse,
+  Customer,
+  OrderItem,
+  MenuItem,
+  MenuItemVariant,
+  OrderType,
+  OrderStatus,
+} from "@/lib/types";
 
 interface EnhancedOrderItem {
   menuItemId: string;
@@ -36,6 +31,59 @@ interface EnhancedOrderItem {
     priceAdjustment: number;
   }>;
   specialInstructions?: string;
+}
+
+interface OrderFromDB {
+  id: string;
+  restaurant_id: string;
+  customer_id?: string;
+  order_number: string;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  order_type?: string;
+  status: string;
+  customer_address?: string;
+  customer_city?: string;
+  customer_zip?: string;
+  delivery_instructions?: string;
+  subtotal: number;
+  tax_amount: number;
+  tip_amount: number;
+  delivery_fee: number;
+  total: number;
+  special_instructions?: string;
+  created_at: string;
+  updated_at: string;
+  order_items?: Array<{
+    id: string;
+    order_id: string;
+    menu_item_id: string;
+    menu_item_variant_id?: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+    selected_toppings_json?: unknown;
+    selected_modifiers_json?: unknown;
+    special_instructions?: string;
+    created_at: string;
+    menu_items?: {
+      id: string;
+      name: string;
+      description?: string;
+    } | null;
+    menu_item_variants?: {
+      id: string;
+      name: string;
+      price: number;
+    } | null;
+    [key: string]: unknown;
+  }>;
+}
+
+interface OrderRequestBody {
+  orderData: InsertOrder;
+  orderItems: EnhancedOrderItem[];
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<OrderWithItems[]>>> {
@@ -87,23 +135,42 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
       return NextResponse.json({ error: `Failed to fetch orders: ${error.message}` }, { status: 500 });
     }
 
-    // Transform the orders to include properly typed order items
-    const transformedOrders: OrderWithItems[] = (orders || []).map((order) => ({
+    // Transform the orders with proper typing
+    const transformedOrders: OrderWithItems[] = ((orders as OrderFromDB[]) || []).map((order) => ({
       ...order,
+      status: order.status as OrderStatus,
+      order_type: order.order_type as OrderType | undefined,
       order_items:
-        order.order_items?.map(
-          (item: {
-            id: string;
-            menu_items?: { id: string; name: string; description: string };
-            menu_item_variants?: { id: string; name: string; price: number };
-            [key: string]: unknown;
-          }) => ({
-            ...item,
-            // Ensure proper structure for order items
-            menu_item: item.menu_items || null,
-            menu_item_variant: item.menu_item_variants || null,
-          })
-        ) || [],
+        order.order_items?.map((item) => ({
+          ...item,
+          // Cast to proper types and convert null to undefined
+          menu_item: item.menu_items
+            ? ({
+                ...item.menu_items,
+                restaurant_id: order.restaurant_id, // Add missing fields
+                category_id: undefined,
+                base_price: 0,
+                prep_time_minutes: 0,
+                is_available: true,
+                item_type: "standard",
+                allows_custom_toppings: false,
+                created_at: item.created_at,
+                updated_at: item.created_at,
+              } as MenuItem)
+            : undefined,
+          menu_item_variant: item.menu_item_variants
+            ? ({
+                ...item.menu_item_variants,
+                menu_item_id: item.menu_item_id,
+                serves: undefined,
+                crust_type: undefined,
+                sort_order: 0,
+                is_available: true,
+                prep_time_minutes: 0,
+                size_code: "",
+              } as MenuItemVariant)
+            : undefined,
+        })) || [],
     }));
 
     console.log(`Successfully fetched ${transformedOrders.length} orders`);
@@ -128,7 +195,7 @@ export async function POST(request: NextRequest) {
   try {
     console.log("=== Creating Enhanced Order ===");
 
-    const body = await request.json();
+    const body = (await request.json()) as OrderRequestBody;
     const { orderData, orderItems } = body;
 
     // Validate that we have the required data
@@ -142,16 +209,16 @@ export async function POST(request: NextRequest) {
     const orderNumber = generateOrderNumber();
 
     // Handle customer creation/lookup
-    let customerId = null;
+    let customerId: string | null = null;
     if (orderData.customer_phone) {
       customerId = await handleCustomerCreation(orderData);
     }
 
     // Create the order record
-    const orderInsert = {
+    const orderInsert: InsertOrder = {
       ...orderData,
       order_number: orderNumber,
-      customer_id: customerId,
+      customer_id: customerId || undefined,
     };
 
     const { data: order, error: orderError } = await supabaseServer.from("orders").insert(orderInsert).select().single();
@@ -164,7 +231,7 @@ export async function POST(request: NextRequest) {
     console.log("Order created successfully:", order.id);
 
     // Create order items with variant support
-    const orderItemsToInsert = orderItems.map((item: any) => ({
+    const orderItemsToInsert = orderItems.map((item) => ({
       order_id: order.id,
       menu_item_id: item.menuItemId,
       menu_item_variant_id: item.variantId || null,
@@ -214,15 +281,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * Enhanced Customer Handling
- *
- * Similar to the basic version but with enhanced error handling for
- * the more complex order flow.
- */
-async function handleCustomerWithEnhancedErrorHandling(orderData: InsertOrder): Promise<string | null> {
+async function handleCustomerCreation(orderData: InsertOrder): Promise<string | null> {
   try {
-    console.log("🔍 Enhanced customer lookup for:", orderData.customer_phone);
+    console.log("🔍 Customer lookup for:", orderData.customer_phone);
 
     // Clean phone number for matching
     const cleanPhone = (orderData.customer_phone ?? "").replace(/\D/g, "");
@@ -241,30 +302,6 @@ async function handleCustomerWithEnhancedErrorHandling(orderData: InsertOrder): 
 
     if (existingCustomer) {
       console.log("✅ Found existing customer:", existingCustomer.name);
-
-      // Update customer info if we have new information
-      const updates: Partial<InsertCustomer> = {};
-      let hasUpdates = false;
-
-      if (!existingCustomer.name && orderData.customer_name) {
-        updates.name = orderData.customer_name;
-        hasUpdates = true;
-      }
-      if (!existingCustomer.email && orderData.customer_email) {
-        updates.email = orderData.customer_email;
-        hasUpdates = true;
-      }
-
-      if (hasUpdates) {
-        await supabaseServer
-          .from("customers")
-          .update({
-            ...updates,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existingCustomer.id);
-      }
-
       return existingCustomer.id;
     }
 
@@ -301,138 +338,7 @@ async function handleCustomerWithEnhancedErrorHandling(orderData: InsertOrder): 
   }
 }
 
-/**
- * Enhanced Delivery Address Handling
- *
- * Handles saving delivery addresses for future use, with enhanced
- * error handling and validation.
- */
-async function handleDeliveryAddressWithErrorHandling(customerId: string, orderData: InsertOrder): Promise<boolean> {
-  try {
-    // Validate address data
-    if (!orderData.customer_address || !orderData.customer_city || !orderData.customer_zip) {
-      console.log("⚠️ Incomplete address data, skipping save");
-      return false;
-    }
-
-    console.log("💾 Saving delivery address for customer:", customerId);
-
-    // Check if address already exists
-    const { data: existingAddress } = await supabaseServer
-      .from("customer_addresses")
-      .select("*")
-      .eq("customer_id", customerId)
-      .eq("address", orderData.customer_address)
-      .eq("city", orderData.customer_city)
-      .eq("zip", orderData.customer_zip)
-      .maybeSingle();
-
-    if (existingAddress) {
-      console.log("✅ Address already exists, updating instructions if needed");
-
-      if (orderData.delivery_instructions && orderData.delivery_instructions !== existingAddress.delivery_instructions) {
-        await supabaseServer
-          .from("customer_addresses")
-          .update({
-            delivery_instructions: orderData.delivery_instructions,
-          })
-          .eq("id", existingAddress.id);
-      }
-      return true;
-    }
-
-    // Determine if this should be default address
-    const { data: existingAddresses } = await supabaseServer.from("customer_addresses").select("id").eq("customer_id", customerId);
-
-    const isFirstAddress = !existingAddresses || existingAddresses.length === 0;
-
-    // Create new address
-    const newAddress: InsertCustomerAddress = {
-      customer_id: customerId,
-      restaurant_id: orderData.restaurant_id,
-      customer_phone: orderData.customer_phone!,
-      customer_name: orderData.customer_name!,
-      customer_email: orderData.customer_email,
-      address: orderData.customer_address,
-      city: orderData.customer_city,
-      zip: orderData.customer_zip,
-      delivery_instructions: orderData.delivery_instructions,
-      is_default: isFirstAddress,
-    };
-
-    const { error: saveError } = await supabaseServer.from("customer_addresses").insert(newAddress);
-
-    if (saveError) {
-      console.error("❌ Error saving address:", saveError);
-      return false;
-    }
-
-    console.log("✅ Successfully saved new address");
-    return true;
-  } catch (error) {
-    console.error("❌ Unexpected error saving address:", error);
-    return false;
-  }
-}
-
-async function handleCustomerCreation(orderData: any): Promise<string | null> {
-  try {
-    console.log("🔍 Customer lookup for:", orderData.customer_phone);
-
-    // Clean phone number for matching
-    const cleanPhone = (orderData.customer_phone ?? "").replace(/\D/g, "");
-
-    // Try to find existing customer
-    const { data: existingCustomer, error: lookupError } = await supabaseServer
-      .from("customers")
-      .select("*")
-      .eq("restaurant_id", orderData.restaurant_id)
-      .or(`phone.eq.${orderData.customer_phone},phone.eq.${cleanPhone},phone.eq.+1${cleanPhone}`)
-      .maybeSingle();
-
-    if (lookupError) {
-      console.error("❌ Customer lookup error:", lookupError);
-    }
-
-    if (existingCustomer) {
-      console.log("✅ Found existing customer:", existingCustomer.name);
-      return existingCustomer.id;
-    }
-
-    // Create new customer if we have sufficient information
-    if (orderData.customer_name && orderData.customer_phone) {
-      console.log("👤 Creating new customer...");
-
-      const newCustomer = {
-        restaurant_id: orderData.restaurant_id,
-        phone: orderData.customer_phone,
-        name: orderData.customer_name,
-        email: orderData.customer_email,
-        loyalty_points: 0,
-        total_orders: 0,
-        total_spent: 0,
-      };
-
-      const { data: customer, error: createError } = await supabaseServer.from("customers").insert(newCustomer).select().single();
-
-      if (createError) {
-        console.error("❌ Error creating customer:", createError);
-        return null;
-      }
-
-      console.log("✅ Created new customer:", customer.name);
-      return customer.id;
-    }
-
-    console.log("⚠️ Insufficient customer information");
-    return null;
-  } catch (error) {
-    console.error("❌ Unexpected error handling customer:", error);
-    return null;
-  }
-}
-
-async function updateCustomerStats(customerId: string, orderTotal: number) {
+async function updateCustomerStats(customerId: string, orderTotal: number): Promise<void> {
   try {
     console.log("📊 Updating customer stats for:", customerId);
 
@@ -485,48 +391,4 @@ function generateOrderNumber(): string {
     .toString()
     .padStart(2, "0");
   return `ORD-${timestamp}-${random}`;
-}
-
-/**
- * Log Order Analytics
- *
- * Logs order data for business analytics and insights.
- */
-async function logOrderAnalytics(
-  order: {
-    id: string;
-    order_number: string;
-    restaurant_id: string;
-    order_type: string;
-  },
-  items: EnhancedOrderItem[]
-) {
-  try {
-    // Calculate analytics data
-    const analytics = {
-      orderId: order.id,
-      orderNumber: order.order_number,
-      restaurantId: order.restaurant_id,
-      orderType: order.order_type,
-      totalItems: items.length,
-      totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
-      hasCustomizations: items.some(
-        (item) =>
-          (item.selectedToppings && item.selectedToppings.length > 0) || (item.selectedModifiers && item.selectedModifiers.length > 0)
-      ),
-      customizedItems: items.filter(
-        (item) =>
-          (item.selectedToppings && item.selectedToppings.length > 0) || (item.selectedModifiers && item.selectedModifiers.length > 0)
-      ).length,
-      averageItemPrice: items.reduce((sum, item) => sum + item.unitPrice, 0) / items.length,
-      timestamp: new Date().toISOString(),
-    };
-
-    console.log("📈 Order analytics:", analytics);
-
-    // In a production system, you might want to store this in a separate
-    // analytics table or send it to an analytics service
-  } catch (error) {
-    console.error("⚠️ Error logging analytics:", error);
-  }
 }

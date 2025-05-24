@@ -1,7 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
+import { MenuItemWithVariants, MenuItemVariant, Topping, Modifier, ApiResponse } from "@/lib/types";
 
-export async function GET(request: NextRequest) {
+// Define the database response types
+interface MenuItemFromDB {
+  id: string;
+  restaurant_id: string;
+  category_id?: string;
+  name: string;
+  description?: string;
+  base_price: number;
+  prep_time_minutes: number;
+  is_available: boolean;
+  item_type: string;
+  allows_custom_toppings: boolean;
+  default_toppings_json?: unknown;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+  category?: {
+    id: string;
+    name: string;
+    description?: string;
+    sort_order: number;
+    is_active: boolean;
+  } | null;
+  variants?: MenuItemVariant[];
+}
+
+interface FullMenuResponse {
+  menu_items: MenuItemWithVariants[];
+  toppings: Topping[];
+  modifiers: Modifier[];
+}
+
+export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<FullMenuResponse>>> {
   try {
     const searchParams = request.nextUrl.searchParams;
     const restaurantId = searchParams.get("restaurant_id");
@@ -59,21 +92,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: modifiersError.message }, { status: 500 });
     }
 
-    // Transform menu items to include properly ordered variants
-    const transformedMenuItems = (menuItems || []).map((item: any) => ({
+    // Transform menu items with proper typing
+    const transformedMenuItems: MenuItemWithVariants[] = ((menuItems as MenuItemFromDB[]) || []).map((item) => ({
       ...item,
-      variants: (item.variants || []).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0)),
+      category: item.category
+        ? {
+            ...item.category,
+            restaurant_id: item.restaurant_id, // Add the missing restaurant_id
+          }
+        : undefined,
+      variants: (item.variants || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)),
     }));
-
-    console.log(
-      `Fetched menu: ${transformedMenuItems.length} items, ${toppings?.length || 0} toppings, ${modifiers?.length || 0} modifiers`
-    );
 
     return NextResponse.json({
       data: {
         menu_items: transformedMenuItems,
-        toppings: toppings || [],
-        modifiers: modifiers || [],
+        toppings: (toppings as Topping[]) || [],
+        modifiers: (modifiers as Modifier[]) || [],
       },
     });
   } catch (error) {
