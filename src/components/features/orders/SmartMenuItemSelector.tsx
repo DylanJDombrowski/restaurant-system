@@ -1,6 +1,6 @@
 // src/components/features/orders/SmartMenuItemSelector.tsx
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { MenuItemWithVariants, MenuItemVariant, Topping, Modifier, ConfiguredCartItem, ConfiguredTopping } from "@/lib/types";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
 
@@ -49,7 +49,7 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
   /**
    * Determines the customization strategy based on item properties
    */
-  const getCustomizationStrategy = (item: MenuItemWithVariants): CustomizationStrategy => {
+  const getCustomizationStrategy = useCallback((item: MenuItemWithVariants): CustomizationStrategy => {
     const itemType = item.item_type as ItemType;
     const hasVariants = item.variants && item.variants.length > 0;
     const allowsCustomToppings = item.allows_custom_toppings === true;
@@ -86,7 +86,7 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
 
     // Default: simple direct add
     return "direct_add";
-  };
+  }, []);
 
   /**
    * Identifies condiments and side items that shouldn't have customization
