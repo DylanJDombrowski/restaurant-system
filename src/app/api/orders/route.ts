@@ -1,13 +1,7 @@
 // src/app/api/orders/enhanced/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import {
-  InsertOrder,
-  InsertCustomer,
-  InsertCustomerAddress,
-  OrderWithItems,
-  ApiResponse,
-} from "@/lib/types";
+import { InsertOrder, InsertCustomer, InsertCustomerAddress, OrderWithItems, ApiResponse } from "@/lib/types";
 import { CartItemTransformer } from "@/lib/utils/cart-transformers";
 
 /**
@@ -44,9 +38,7 @@ interface EnhancedOrderItem {
   specialInstructions?: string;
 }
 
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse<ApiResponse<OrderWithItems[]>>> {
+export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<OrderWithItems[]>>> {
   try {
     const { searchParams } = new URL(request.url);
     const restaurantId = searchParams.get("restaurant_id");
@@ -55,10 +47,7 @@ export async function GET(
 
     // Validate required parameters
     if (!restaurantId) {
-      return NextResponse.json(
-        { error: "restaurant_id is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "restaurant_id is required" }, { status: 400 });
     }
 
     console.log("Fetching orders for restaurant:", restaurantId);
@@ -95,10 +84,7 @@ export async function GET(
 
     if (error) {
       console.error("Database error fetching orders:", error);
-      return NextResponse.json(
-        { error: `Failed to fetch orders: ${error.message}` },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: `Failed to fetch orders: ${error.message}` }, { status: 500 });
     }
 
     // Transform the orders to include properly typed order items
@@ -147,28 +133,10 @@ export async function POST(request: NextRequest) {
 
     // Validate that we have the required data
     if (!orderData || !orderItems || !Array.isArray(orderItems)) {
-      return NextResponse.json(
-        { error: "Missing orderData or orderItems" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing orderData or orderItems" }, { status: 400 });
     }
 
-    // Validate enhanced order items
-    const enhancedItems = orderItems as EnhancedOrderItem[];
-    for (const item of enhancedItems) {
-      if (!item.menuItemId || item.quantity <= 0 || item.unitPrice < 0) {
-        return NextResponse.json(
-          { error: "Invalid order item data" },
-          { status: 400 }
-        );
-      }
-    }
-
-    console.log(
-      "Processing enhanced order with",
-      enhancedItems.length,
-      "configured items"
-    );
+    console.log("Processing order with", orderItems.length, "items");
 
     // Generate order number
     const orderNumber = generateOrderNumber();
@@ -176,21 +144,17 @@ export async function POST(request: NextRequest) {
     // Handle customer creation/lookup
     let customerId = null;
     if (orderData.customer_phone) {
-      customerId = await handleCustomerWithEnhancedErrorHandling(orderData);
+      customerId = await handleCustomerCreation(orderData);
     }
 
     // Create the order record
-    const orderInsert: InsertOrder = {
+    const orderInsert = {
       ...orderData,
       order_number: orderNumber,
       customer_id: customerId,
     };
 
-    const { data: order, error: orderError } = await supabaseServer
-      .from("orders")
-      .insert(orderInsert)
-      .select()
-      .single();
+    const { data: order, error: orderError } = await supabaseServer.from("orders").insert(orderInsert).select().single();
 
     if (orderError) {
       console.error("Error creating order:", orderError);
@@ -199,44 +163,20 @@ export async function POST(request: NextRequest) {
 
     console.log("Order created successfully:", order.id);
 
-    // Handle delivery address saving
-    if (
-      order.order_type === "delivery" &&
-      customerId &&
-      order.customer_address
-    ) {
-      await handleDeliveryAddressWithErrorHandling(customerId, orderData);
-    }
+    // Create order items with variant support
+    const orderItemsToInsert = orderItems.map((item: any) => ({
+      order_id: order.id,
+      menu_item_id: item.menuItemId,
+      menu_item_variant_id: item.variantId || null,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      total_price: item.unitPrice * item.quantity,
+      selected_toppings_json: item.selectedToppings || [],
+      selected_modifiers_json: item.selectedModifiers || [],
+      special_instructions: item.specialInstructions || null,
+    }));
 
-    // Create enhanced order items with full customization data
-    // Transform the API format to match the database format
-    const orderItemsToInsert = enhancedItems.map((item) => {
-      // Convert API format to ConfiguredCartItem format, then to database format
-      const configuredItem = {
-        id: `temp-${Date.now()}-${Math.random()}`,
-        menuItemId: item.menuItemId,
-        menuItemName: "temp", // This will be populated later
-        variantId: item.variantId,
-        variantName: undefined,
-        quantity: item.quantity,
-        basePrice: item.unitPrice,
-        selectedToppings:
-          item.selectedToppings?.map((t) => ({
-            ...t,
-            category: "api", // Add required field
-          })) || [],
-        selectedModifiers: item.selectedModifiers || [],
-        specialInstructions: item.specialInstructions || "",
-        totalPrice: item.unitPrice,
-        displayName: "temp",
-      };
-
-      return CartItemTransformer.toOrderItem(configuredItem, order.id);
-    });
-
-    const { data: createdOrderItems, error: itemsError } = await supabaseServer
-      .from("order_items")
-      .insert(orderItemsToInsert).select(`
+    const { data: createdOrderItems, error: itemsError } = await supabaseServer.from("order_items").insert(orderItemsToInsert).select(`
         *,
         menu_items(id, name, description),
         menu_item_variants(id, name, price)
@@ -249,37 +189,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: itemsError.message }, { status: 500 });
     }
 
-    console.log(
-      "Enhanced order items created successfully:",
-      createdOrderItems.length
-    );
+    console.log("Order items created successfully:", createdOrderItems.length);
 
     // Update customer statistics if we have a customer
     if (customerId) {
       await updateCustomerStats(customerId, order.total);
     }
 
-    // Log successful order creation for analytics
-    await logOrderAnalytics(order, enhancedItems);
-
-    // Return the complete order with enhanced items
+    // Return the complete order
     const completeOrder = {
       ...order,
       order_items: createdOrderItems,
     };
 
-    console.log("✅ Enhanced order created successfully");
+    console.log("✅ Order created successfully");
 
     return NextResponse.json({
       data: completeOrder,
-      message: "Enhanced order created successfully",
+      message: "Order created successfully",
     });
   } catch (error) {
-    console.error("Error creating enhanced order:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    console.error("Error creating order:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -289,9 +220,7 @@ export async function POST(request: NextRequest) {
  * Similar to the basic version but with enhanced error handling for
  * the more complex order flow.
  */
-async function handleCustomerWithEnhancedErrorHandling(
-  orderData: InsertOrder
-): Promise<string | null> {
+async function handleCustomerWithEnhancedErrorHandling(orderData: InsertOrder): Promise<string | null> {
   try {
     console.log("🔍 Enhanced customer lookup for:", orderData.customer_phone);
 
@@ -303,9 +232,7 @@ async function handleCustomerWithEnhancedErrorHandling(
       .from("customers")
       .select("*")
       .eq("restaurant_id", orderData.restaurant_id)
-      .or(
-        `phone.eq.${orderData.customer_phone},phone.eq.${cleanPhone},phone.eq.+1${cleanPhone}`
-      )
+      .or(`phone.eq.${orderData.customer_phone},phone.eq.${cleanPhone},phone.eq.+1${cleanPhone}`)
       .maybeSingle();
 
     if (lookupError) {
@@ -355,11 +282,7 @@ async function handleCustomerWithEnhancedErrorHandling(
         total_spent: 0,
       };
 
-      const { data: customer, error: createError } = await supabaseServer
-        .from("customers")
-        .insert(newCustomer)
-        .select()
-        .single();
+      const { data: customer, error: createError } = await supabaseServer.from("customers").insert(newCustomer).select().single();
 
       if (createError) {
         console.error("❌ Error creating customer:", createError);
@@ -384,17 +307,10 @@ async function handleCustomerWithEnhancedErrorHandling(
  * Handles saving delivery addresses for future use, with enhanced
  * error handling and validation.
  */
-async function handleDeliveryAddressWithErrorHandling(
-  customerId: string,
-  orderData: InsertOrder
-): Promise<boolean> {
+async function handleDeliveryAddressWithErrorHandling(customerId: string, orderData: InsertOrder): Promise<boolean> {
   try {
     // Validate address data
-    if (
-      !orderData.customer_address ||
-      !orderData.customer_city ||
-      !orderData.customer_zip
-    ) {
+    if (!orderData.customer_address || !orderData.customer_city || !orderData.customer_zip) {
       console.log("⚠️ Incomplete address data, skipping save");
       return false;
     }
@@ -414,11 +330,7 @@ async function handleDeliveryAddressWithErrorHandling(
     if (existingAddress) {
       console.log("✅ Address already exists, updating instructions if needed");
 
-      if (
-        orderData.delivery_instructions &&
-        orderData.delivery_instructions !==
-          existingAddress.delivery_instructions
-      ) {
+      if (orderData.delivery_instructions && orderData.delivery_instructions !== existingAddress.delivery_instructions) {
         await supabaseServer
           .from("customer_addresses")
           .update({
@@ -430,10 +342,7 @@ async function handleDeliveryAddressWithErrorHandling(
     }
 
     // Determine if this should be default address
-    const { data: existingAddresses } = await supabaseServer
-      .from("customer_addresses")
-      .select("id")
-      .eq("customer_id", customerId);
+    const { data: existingAddresses } = await supabaseServer.from("customer_addresses").select("id").eq("customer_id", customerId);
 
     const isFirstAddress = !existingAddresses || existingAddresses.length === 0;
 
@@ -451,9 +360,7 @@ async function handleDeliveryAddressWithErrorHandling(
       is_default: isFirstAddress,
     };
 
-    const { error: saveError } = await supabaseServer
-      .from("customer_addresses")
-      .insert(newAddress);
+    const { error: saveError } = await supabaseServer.from("customer_addresses").insert(newAddress);
 
     if (saveError) {
       console.error("❌ Error saving address:", saveError);
@@ -468,11 +375,63 @@ async function handleDeliveryAddressWithErrorHandling(
   }
 }
 
-/**
- * Update Customer Statistics
- *
- * Updates customer loyalty points and order statistics.
- */
+async function handleCustomerCreation(orderData: any): Promise<string | null> {
+  try {
+    console.log("🔍 Customer lookup for:", orderData.customer_phone);
+
+    // Clean phone number for matching
+    const cleanPhone = (orderData.customer_phone ?? "").replace(/\D/g, "");
+
+    // Try to find existing customer
+    const { data: existingCustomer, error: lookupError } = await supabaseServer
+      .from("customers")
+      .select("*")
+      .eq("restaurant_id", orderData.restaurant_id)
+      .or(`phone.eq.${orderData.customer_phone},phone.eq.${cleanPhone},phone.eq.+1${cleanPhone}`)
+      .maybeSingle();
+
+    if (lookupError) {
+      console.error("❌ Customer lookup error:", lookupError);
+    }
+
+    if (existingCustomer) {
+      console.log("✅ Found existing customer:", existingCustomer.name);
+      return existingCustomer.id;
+    }
+
+    // Create new customer if we have sufficient information
+    if (orderData.customer_name && orderData.customer_phone) {
+      console.log("👤 Creating new customer...");
+
+      const newCustomer = {
+        restaurant_id: orderData.restaurant_id,
+        phone: orderData.customer_phone,
+        name: orderData.customer_name,
+        email: orderData.customer_email,
+        loyalty_points: 0,
+        total_orders: 0,
+        total_spent: 0,
+      };
+
+      const { data: customer, error: createError } = await supabaseServer.from("customers").insert(newCustomer).select().single();
+
+      if (createError) {
+        console.error("❌ Error creating customer:", createError);
+        return null;
+      }
+
+      console.log("✅ Created new customer:", customer.name);
+      return customer.id;
+    }
+
+    console.log("⚠️ Insufficient customer information");
+    return null;
+  } catch (error) {
+    console.error("❌ Unexpected error handling customer:", error);
+    return null;
+  }
+}
+
 async function updateCustomerStats(customerId: string, orderTotal: number) {
   try {
     console.log("📊 Updating customer stats for:", customerId);
@@ -480,7 +439,7 @@ async function updateCustomerStats(customerId: string, orderTotal: number) {
     // Calculate loyalty points (1 point per dollar)
     const pointsEarned = Math.floor(orderTotal);
 
-    // Get current customer stats
+    // Get current customer stats first
     const { data: customer, error: fetchError } = await supabaseServer
       .from("customers")
       .select("total_orders, total_spent, loyalty_points")
@@ -492,13 +451,19 @@ async function updateCustomerStats(customerId: string, orderTotal: number) {
       return;
     }
 
+    // Calculate new values
+    const newTotalOrders = (customer.total_orders || 0) + 1;
+    const newTotalSpent = (customer.total_spent || 0) + orderTotal;
+    const newLoyaltyPoints = (customer.loyalty_points || 0) + pointsEarned;
+
     // Update customer statistics
     const { error: updateError } = await supabaseServer
       .from("customers")
       .update({
-        total_orders: (customer.total_orders ?? 0) + 1,
-        total_spent: (customer.total_spent ?? 0) + orderTotal,
-        loyalty_points: (customer.loyalty_points ?? 0) + pointsEarned,
+        total_orders: newTotalOrders,
+        total_spent: newTotalSpent,
+        loyalty_points: newLoyaltyPoints,
+        last_order_date: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", customerId);
@@ -508,25 +473,18 @@ async function updateCustomerStats(customerId: string, orderTotal: number) {
       return;
     }
 
-    // Log loyalty transaction
-    const { error: loyaltyError } = await supabaseServer
-      .from("loyalty_transactions")
-      .insert({
-        customer_id: customerId,
-        points_earned: pointsEarned,
-        points_redeemed: 0,
-        transaction_type: "earned",
-        description: `Order reward: ${pointsEarned} points`,
-      });
-
-    if (loyaltyError) {
-      console.error("⚠️ Error logging loyalty transaction:", loyaltyError);
-    }
-
     console.log("✅ Customer stats updated successfully");
   } catch (error) {
     console.error("❌ Unexpected error updating customer stats:", error);
   }
+}
+
+function generateOrderNumber(): string {
+  const timestamp = Date.now().toString().slice(-6);
+  const random = Math.floor(Math.random() * 100)
+    .toString()
+    .padStart(2, "0");
+  return `ORD-${timestamp}-${random}`;
 }
 
 /**
@@ -554,16 +512,13 @@ async function logOrderAnalytics(
       totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
       hasCustomizations: items.some(
         (item) =>
-          (item.selectedToppings && item.selectedToppings.length > 0) ||
-          (item.selectedModifiers && item.selectedModifiers.length > 0)
+          (item.selectedToppings && item.selectedToppings.length > 0) || (item.selectedModifiers && item.selectedModifiers.length > 0)
       ),
       customizedItems: items.filter(
         (item) =>
-          (item.selectedToppings && item.selectedToppings.length > 0) ||
-          (item.selectedModifiers && item.selectedModifiers.length > 0)
+          (item.selectedToppings && item.selectedToppings.length > 0) || (item.selectedModifiers && item.selectedModifiers.length > 0)
       ).length,
-      averageItemPrice:
-        items.reduce((sum, item) => sum + item.unitPrice, 0) / items.length,
+      averageItemPrice: items.reduce((sum, item) => sum + item.unitPrice, 0) / items.length,
       timestamp: new Date().toISOString(),
     };
 
@@ -574,15 +529,4 @@ async function logOrderAnalytics(
   } catch (error) {
     console.error("⚠️ Error logging analytics:", error);
   }
-}
-
-/**
- * Generate Order Number
- */
-function generateOrderNumber(): string {
-  const timestamp = Date.now().toString().slice(-6);
-  const random = Math.floor(Math.random() * 100)
-    .toString()
-    .padStart(2, "0");
-  return `ORD-${timestamp}-${random}`;
 }
