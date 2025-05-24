@@ -1,7 +1,15 @@
 // src/components/features/orders/SmartMenuItemSelector.tsx
 "use client";
 import { useState, useMemo, useCallback } from "react";
-import { MenuItemWithVariants, MenuItemVariant, Topping, Modifier, ConfiguredCartItem, ConfiguredTopping } from "@/lib/types";
+import {
+  MenuItemWithVariants,
+  MenuItemVariant,
+  Topping,
+  Modifier,
+  ConfiguredCartItem,
+  ConfiguredTopping,
+  ToppingAmount,
+} from "@/lib/types";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
 
 /**
@@ -91,32 +99,35 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
   /**
    * Identifies condiments and side items that shouldn't have customization
    */
-  const isCondimentOrSide = (item: MenuItemWithVariants): boolean => {
-    const name = item.name.toLowerCase();
-    const category = item.category?.name?.toLowerCase() || "";
+  const isCondimentOrSide = useCallback(
+    (item: MenuItemWithVariants): boolean => {
+      const name = item.name.toLowerCase();
+      const category = item.category?.name?.toLowerCase() || "";
 
-    // Known condiments and sides
-    const condimentKeywords = [
-      "sauce",
-      "dressing",
-      "giardiniera",
-      "peppers",
-      "gravy",
-      "anchovies",
-      "tartar",
-      "cocktail",
-      "hot sauce",
-      "ranch",
-    ];
+      // Known condiments and sides
+      const condimentKeywords = [
+        "sauce",
+        "dressing",
+        "giardiniera",
+        "peppers",
+        "gravy",
+        "anchovies",
+        "tartar",
+        "cocktail",
+        "hot sauce",
+        "ranch",
+      ];
 
-    const sideCategories = ["sides"];
+      const sideCategories = ["sides"];
 
-    return (
-      condimentKeywords.some((keyword) => name.includes(keyword)) ||
-      sideCategories.some((cat) => category.includes(cat)) ||
-      item.base_price < 3.0
-    ); // Low-price items are likely condiments
-  };
+      return (
+        condimentKeywords.some((keyword) => name.includes(keyword)) ||
+        sideCategories.some((cat) => category.includes(cat)) ||
+        item.base_price < 3.0
+      ); // Low-price items are likely condiments
+    },
+    [menuItems]
+  );
 
   // ==========================================
   // SMART CATEGORIZATION
@@ -182,7 +193,7 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
     );
 
     return categories;
-  }, [menuItems]);
+  }, [menuItems, getCustomizationStrategy, isCondimentOrSide]);
 
   // ==========================================
   // SMART ITEM SELECTION LOGIC
@@ -325,14 +336,20 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
 
     try {
       if (item.default_toppings_json && typeof item.default_toppings_json === "object") {
-        const config = item.default_toppings_json as any;
+        const config = item.default_toppings_json as {
+          toppings?: Array<{
+            id: string;
+            name: string;
+            amount?: string;
+          }>;
+        };
         if (config.toppings && Array.isArray(config.toppings)) {
-          config.toppings.forEach((topping: any) => {
+          config.toppings.forEach((topping) => {
             if (topping.id && topping.name) {
               defaultToppings.push({
                 id: topping.id,
                 name: topping.name,
-                amount: topping.amount || "normal",
+                amount: (topping.amount as ToppingAmount) || "normal",
                 price: 0,
                 isDefault: true,
                 category: "default",
