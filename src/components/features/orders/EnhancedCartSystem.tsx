@@ -1,16 +1,10 @@
 // src/components/features/orders/EnhancedCartSystem.tsx
 "use client";
 import { useState, useMemo } from "react";
-import {
-  ConfiguredCartItem,
-  ConfiguredModifier,
-  ConfiguredTopping,
-  Topping,
-  Modifier,
-  Customer,
-} from "@/lib/types";
+import { ConfiguredCartItem, ConfiguredModifier, ConfiguredTopping, Topping, Modifier, Customer } from "@/lib/types";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
 import InlineCustomerInfo from "./InlineCustomerInfo";
+import SandwichCustomizer from "./SandwichCustomizer";
 
 /**
  * 🚀 ENHANCED Cart System with Inline Customer Info Integration
@@ -36,9 +30,7 @@ interface EnhancedCartSystemProps {
   };
   // 🆕 NEW: Customer info integration
   customerInfo: { name: string; phone: string; email: string };
-  setCustomerInfo: React.Dispatch<
-    React.SetStateAction<{ name: string; phone: string; email: string }>
-  >;
+  setCustomerInfo: React.Dispatch<React.SetStateAction<{ name: string; phone: string; email: string }>>;
   foundCustomer: Customer | null;
   onCustomerLookup: (phone: string) => void;
   lookupLoading: boolean;
@@ -71,12 +63,15 @@ export default function EnhancedCartSystem({
   // ==========================================
 
   // Modal states
-  const [customizingItem, setCustomizingItem] =
-    useState<ConfiguredCartItem | null>(null);
+  const [customizingItem, setCustomizingItem] = useState<ConfiguredCartItem | null>(null);
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [availableToppings, setAvailableToppings] = useState<Topping[]>([]);
   const [availableModifiers, setAvailableModifiers] = useState<Modifier[]>([]);
   const [loadingCustomizerData, setLoadingCustomizerData] = useState(false);
+  const [showSandwichCustomizer, setShowSandwichCustomizer] = useState(false);
+  const [customizingSandwichItem, setCustomizingSandwichItem] = useState(null);
+  const [customizingMenuItem, setCustomizingMenuItem] = useState(null);
+  const [showSimpleEditor, setShowSimpleEditor] = useState(false);
 
   // Order notes
   const [orderNotes, setOrderNotes] = useState("");
@@ -85,10 +80,7 @@ export default function EnhancedCartSystem({
   const cartStats = useMemo(() => {
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
     const uniqueItems = items.length;
-    const totalPrice = items.reduce(
-      (sum, item) => sum + item.totalPrice * item.quantity,
-      0
-    );
+    const totalPrice = items.reduce((sum, item) => sum + item.totalPrice * item.quantity, 0);
 
     return { totalItems, uniqueItems, totalPrice };
   }, [items]);
@@ -142,16 +134,95 @@ export default function EnhancedCartSystem({
       return;
     }
 
-    const safeItem = {
-      ...item,
-      specialInstructions: item.specialInstructions || "",
-      selectedToppings: item.selectedToppings || [],
-      selectedModifiers: item.selectedModifiers || [],
-    };
+    // 🆕 NEW: Type-aware customization routing
+    // We need to determine what type of item this is
+    console.log("🔧 Cart customize for item:", item.menuItemName);
 
-    setCustomizingItem(safeItem);
-    await loadCustomizerData();
-    setShowCustomizer(true);
+    // First, get the menu item details to determine routing
+    try {
+      const menuResponse = await fetch(`/api/menu/full?restaurant_id=${restaurantId}`);
+      if (!menuResponse.ok) {
+        console.error("Failed to load menu data for customization");
+        return;
+      }
+
+      const menuData = await menuResponse.json();
+      const fullMenuItem = menuData.data.menu_items.find((mi: any) => mi.id === item.menuItemId);
+
+      if (!fullMenuItem) {
+        console.error("Menu item not found for customization");
+        return;
+      }
+
+      console.log("📋 Menu item details:", {
+        name: fullMenuItem.name,
+        item_type: fullMenuItem.item_type,
+        category: fullMenuItem.category?.name,
+        allows_custom_toppings: fullMenuItem.allows_custom_toppings,
+      });
+
+      // 🎯 ROUTING LOGIC: Same as SmartMenuItemSelector
+
+      // Check if it's a sandwich
+      if (fullMenuItem.category?.name === "Sandwiches") {
+        console.log("🥪 Opening sandwich customizer");
+        // Import and show SandwichCustomizer
+        const { default: SandwichCustomizer } = await import("./SandwichCustomizer");
+
+        // Set up sandwich customizer state
+        setCustomizingSandwichItem(fullMenuItem);
+        setShowSandwichCustomizer(true);
+        return;
+      }
+
+      // Check if it's a pizza or allows toppings
+      if (fullMenuItem.item_type === "pizza" || fullMenuItem.allows_custom_toppings) {
+        console.log("🍕 Opening pizza customizer");
+
+        const safeItem = {
+          ...item,
+          specialInstructions: item.specialInstructions || "",
+          selectedToppings: item.selectedToppings || [],
+          selectedModifiers: item.selectedModifiers || [],
+        };
+
+        setCustomizingItem(safeItem);
+        setCustomizingMenuItem(fullMenuItem); // Store full menu item
+        await loadCustomizerData();
+        setShowCustomizer(true);
+        return;
+      }
+
+      // For other items, show a simple quantity/notes editor
+      console.log("📝 Opening simple editor");
+      setCustomizingItem(item);
+      setShowSimpleEditor(true);
+    } catch (error) {
+      console.error("Error determining customization type:", error);
+
+      // Fallback: assume pizza if allows_custom_toppings was previously set
+      const safeItem = {
+        ...item,
+        specialInstructions: item.specialInstructions || "",
+        selectedToppings: item.selectedToppings || [],
+        selectedModifiers: item.selectedModifiers || [],
+      };
+
+      setCustomizingItem(safeItem);
+      await loadCustomizerData();
+      setShowCustomizer(true);
+    }
+  };
+
+  const handleSandwichCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
+    onUpdateItem(updatedItem.id, updatedItem);
+    setShowSandwichCustomizer(false);
+    setCustomizingSandwichItem(null);
+  };
+
+  const handleSandwichCustomizationCancel = () => {
+    setShowSandwichCustomizer(false);
+    setCustomizingSandwichItem(null);
   };
 
   const handleCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
@@ -234,11 +305,7 @@ export default function EnhancedCartSystem({
           <div className="px-4 py-3 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">
               Current Order
-              {cartStats.totalItems > 0 && (
-                <span className="ml-2 text-sm font-normal text-gray-600">
-                  ({cartStats.totalItems} items)
-                </span>
-              )}
+              {cartStats.totalItems > 0 && <span className="ml-2 text-sm font-normal text-gray-600">({cartStats.totalItems} items)</span>}
             </h3>
           </div>
 
@@ -251,14 +318,10 @@ export default function EnhancedCartSystem({
                   <CartItemCard
                     key={item.id}
                     item={item}
-                    onQuantityChange={(quantity) =>
-                      handleQuantityChange(item.id, quantity)
-                    }
+                    onQuantityChange={(quantity) => handleQuantityChange(item.id, quantity)}
                     onCustomize={() => handleCustomizeItem(item)}
                     onRemove={() => onRemoveItem(item.id)}
-                    customizationLoading={
-                      loadingCustomizerData && customizingItem?.id === item.id
-                    }
+                    customizationLoading={loadingCustomizerData && customizingItem?.id === item.id}
                   />
                 ))}
               </div>
@@ -268,9 +331,7 @@ export default function EnhancedCartSystem({
           {/* Order Notes */}
           {items.length > 0 && (
             <div className="px-4 py-3 border-t border-gray-200">
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Order Notes
-              </label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Order Notes</label>
               <textarea
                 placeholder="Special instructions for this order..."
                 value={orderNotes}
@@ -291,9 +352,7 @@ export default function EnhancedCartSystem({
                 onClick={onCompleteOrder}
                 disabled={!canCompleteOrder()}
                 className={`w-full mt-4 py-3 px-4 rounded-lg font-semibold transition-colors ${
-                  canCompleteOrder()
-                    ? "bg-green-600 text-white hover:bg-green-700"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  canCompleteOrder() ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
               >
                 {getCompletionButtonText()}
@@ -314,6 +373,14 @@ export default function EnhancedCartSystem({
           isOpen={showCustomizer}
         />
       )}
+      {showSandwichCustomizer && customizingSandwichItem && (
+        <SandwichCustomizer
+          item={customizingSandwichItem}
+          onComplete={handleSandwichCustomizationComplete}
+          onCancel={handleSandwichCustomizationCancel}
+          isOpen={showSandwichCustomizer}
+        />
+      )}
     </>
   );
 }
@@ -327,9 +394,7 @@ function CartEmptyState() {
     <div className="p-8 text-center text-gray-500">
       <div className="text-4xl mb-4">🛒</div>
       <h4 className="text-lg font-medium text-gray-900 mb-2">Cart is Empty</h4>
-      <p className="text-sm">
-        Add items from the menu to get started with this order.
-      </p>
+      <p className="text-sm">Add items from the menu to get started with this order.</p>
     </div>
   );
 }
@@ -342,33 +407,18 @@ interface CartItemCardProps {
   customizationLoading?: boolean;
 }
 
-function CartItemCard({
-  item,
-  onQuantityChange,
-  onCustomize,
-  onRemove,
-  customizationLoading = false,
-}: CartItemCardProps) {
-  const canCustomize =
-    item.selectedToppings !== undefined || item.selectedModifiers !== undefined;
+function CartItemCard({ item, onQuantityChange, onCustomize, onRemove, customizationLoading = false }: CartItemCardProps) {
+  const canCustomize = item.selectedToppings !== undefined || item.selectedModifiers !== undefined;
 
   const getItemDescription = (): string => {
     const parts: string[] = [];
 
     if (item.selectedToppings && item.selectedToppings.length > 0) {
-      const addedToppings = item.selectedToppings.filter(
-        (t: ConfiguredTopping) => !t.isDefault || t.amount === "extra"
-      );
-      const removedDefaults = item.selectedToppings.filter(
-        (t: ConfiguredTopping) => t.isDefault && t.amount === "none"
-      );
+      const addedToppings = item.selectedToppings.filter((t: ConfiguredTopping) => !t.isDefault || t.amount === "extra");
+      const removedDefaults = item.selectedToppings.filter((t: ConfiguredTopping) => t.isDefault && t.amount === "none");
 
       if (addedToppings.length > 0) {
-        const toppingNames = addedToppings
-          .map((t: ConfiguredTopping) =>
-            t.amount === "extra" ? `Extra ${t.name}` : t.name
-          )
-          .slice(0, 3);
+        const toppingNames = addedToppings.map((t: ConfiguredTopping) => (t.amount === "extra" ? `Extra ${t.name}` : t.name)).slice(0, 3);
 
         if (addedToppings.length > 3) {
           toppingNames.push(`+${addedToppings.length - 3} more`);
@@ -378,17 +428,13 @@ function CartItemCard({
       }
 
       if (removedDefaults.length > 0) {
-        const removedNames = removedDefaults.map(
-          (t: ConfiguredTopping) => t.name
-        );
+        const removedNames = removedDefaults.map((t: ConfiguredTopping) => t.name);
         parts.push(`No: ${removedNames.join(", ")}`);
       }
     }
 
     if (item.selectedModifiers && item.selectedModifiers.length > 0) {
-      const modifierNames = item.selectedModifiers.map(
-        (m: ConfiguredModifier) => m.name
-      );
+      const modifierNames = item.selectedModifiers.map((m: ConfiguredModifier) => m.name);
       parts.push(modifierNames.join(", "));
     }
 
@@ -402,20 +448,12 @@ function CartItemCard({
     <div className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow">
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-gray-900 text-base">
-            {item.displayName}
-          </div>
+          <div className="font-semibold text-gray-900 text-base">{item.displayName}</div>
 
-          {itemDescription && (
-            <div className="text-sm text-gray-600 mt-1 line-clamp-2">
-              {itemDescription}
-            </div>
-          )}
+          {itemDescription && <div className="text-sm text-gray-600 mt-1 line-clamp-2">{itemDescription}</div>}
 
           {item.specialInstructions && item.specialInstructions.trim() && (
-            <div className="text-sm text-blue-600 mt-1 italic">
-              Note: {item.specialInstructions}
-            </div>
+            <div className="text-sm text-blue-600 mt-1 italic">Note: {item.specialInstructions}</div>
           )}
         </div>
 
@@ -428,9 +466,7 @@ function CartItemCard({
             >
               −
             </button>
-            <span className="px-2 py-1 text-sm font-semibold min-w-[1.5rem] text-center">
-              {item.quantity}
-            </span>
+            <span className="px-2 py-1 text-sm font-semibold min-w-[1.5rem] text-center">{item.quantity}</span>
             <button
               onClick={() => onQuantityChange(item.quantity + 1)}
               className="bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded w-7 h-7 flex items-center justify-center text-sm font-bold transition-colors"
@@ -439,9 +475,7 @@ function CartItemCard({
             </button>
           </div>
 
-          <div className="text-base font-bold text-green-600 min-w-[4rem] text-right">
-            ${itemTotal.toFixed(2)}
-          </div>
+          <div className="text-base font-bold text-green-600 min-w-[4rem] text-right">${itemTotal.toFixed(2)}</div>
         </div>
       </div>
 
@@ -464,9 +498,7 @@ function CartItemCard({
         </button>
       </div>
 
-      <div className="text-xs text-gray-500 mt-1">
-        ${item.totalPrice.toFixed(2)} each
-      </div>
+      <div className="text-xs text-gray-500 mt-1">${item.totalPrice.toFixed(2)} each</div>
     </div>
   );
 }
@@ -485,24 +517,18 @@ function OrderSummaryDisplay({ summary }: OrderSummaryDisplayProps) {
     <div className="space-y-2">
       <div className="flex justify-between text-sm">
         <span className="text-gray-700">Subtotal:</span>
-        <span className="font-semibold text-gray-900">
-          ${summary.subtotal.toFixed(2)}
-        </span>
+        <span className="font-semibold text-gray-900">${summary.subtotal.toFixed(2)}</span>
       </div>
 
       <div className="flex justify-between text-sm">
         <span className="text-gray-700">Tax:</span>
-        <span className="font-semibold text-gray-900">
-          ${summary.tax.toFixed(2)}
-        </span>
+        <span className="font-semibold text-gray-900">${summary.tax.toFixed(2)}</span>
       </div>
 
       {summary.deliveryFee > 0 && (
         <div className="flex justify-between text-sm">
           <span className="text-gray-700">Delivery Fee:</span>
-          <span className="font-semibold text-gray-900">
-            ${summary.deliveryFee.toFixed(2)}
-          </span>
+          <span className="font-semibold text-gray-900">${summary.deliveryFee.toFixed(2)}</span>
         </div>
       )}
 
@@ -519,16 +545,9 @@ function OrderSummaryDisplay({ summary }: OrderSummaryDisplayProps) {
 // Export the cart statistics hook
 export function useCartStatistics(items: ConfiguredCartItem[]) {
   return useMemo(() => {
-    const totalItems = items.reduce(
-      (sum: number, item: ConfiguredCartItem) => sum + item.quantity,
-      0
-    );
+    const totalItems = items.reduce((sum: number, item: ConfiguredCartItem) => sum + item.quantity, 0);
     const uniqueItems = items.length;
-    const subtotal = items.reduce(
-      (sum: number, item: ConfiguredCartItem) =>
-        sum + item.totalPrice * item.quantity,
-      0
-    );
+    const subtotal = items.reduce((sum: number, item: ConfiguredCartItem) => sum + item.totalPrice * item.quantity, 0);
 
     const tax = subtotal * 0.08;
     const deliveryFee = 0; // This will be set by parent component
