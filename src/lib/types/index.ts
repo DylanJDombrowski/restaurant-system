@@ -8,13 +8,7 @@
  * These define the fixed values our system recognizes
  */
 
-export type OrderStatus =
-  | "pending"
-  | "confirmed"
-  | "preparing"
-  | "ready"
-  | "completed"
-  | "cancelled";
+export type OrderStatus = "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled";
 
 export type StaffRole = "staff" | "manager" | "admin";
 export type OrderType = "pickup" | "delivery";
@@ -72,6 +66,7 @@ export interface MenuItem {
   allows_custom_toppings: boolean; // Whether this item can be customized
   default_toppings_json?: unknown; // JSON field for default toppings
   image_url?: string; // Product image
+  variants?: MenuItemVariant[]; // Array of variants for this item
   created_at: string;
   updated_at: string;
 }
@@ -249,6 +244,15 @@ export interface OrderItem {
  * MenuItem with its category information
  * Used throughout the staff interface for simple displays
  */
+export type ItemCategory = "pizza" | "sandwich" | "appetizer" | "side" | "beverage" | "dessert";
+
+// Customization complexity levels
+export type CustomizationLevel =
+  | "full" // Pizza: size, crust, toppings, modifiers
+  | "variants" // Sandwiches: size + limited customization
+  | "simple" // Beverages: size selection only
+  | "none"; // Sides: add directly to cart
+
 export type MenuItemWithCategory = MenuItem & {
   category?: MenuCategory;
 };
@@ -375,16 +379,63 @@ export function isPizzaItem(item: MenuItem): boolean {
 }
 
 // Helper function to safely handle null/undefined strings
-export function safeString(
-  value: SafeString,
-  defaultValue: string = ""
-): string {
+export function safeString(value: SafeString, defaultValue: string = ""): string {
   return value ?? defaultValue;
 }
 
 // Helper function to safely handle null/undefined optional strings
 export function safeOptionalString(value: SafeString): string | undefined {
   return value === null ? undefined : value ?? undefined;
+}
+
+export function getItemCustomizationLevel(item: MenuItem): CustomizationLevel {
+  // Force pizza items to full customization
+  if (item.item_type === "pizza" || item.allows_custom_toppings) {
+    return "full";
+  }
+
+  // Items with multiple variants but no toppings = variants only
+  if (item.variants && item.variants.length > 1) {
+    return "variants";
+  }
+
+  // Single variant items = simple
+  if (item.variants && item.variants.length === 1) {
+    return "simple";
+  }
+
+  // No variants, no customization = direct add
+  return "none";
+}
+
+export function getItemCategory(item: MenuItem): ItemCategory {
+  const itemType = item.item_type?.toLowerCase() || "";
+
+  if (itemType.includes("pizza")) return "pizza";
+  if (itemType.includes("sandwich") || itemType.includes("sub")) return "sandwich";
+  if (itemType.includes("appetizer") || itemType.includes("app")) return "appetizer";
+  if (itemType.includes("side")) return "side";
+  if (itemType.includes("beverage") || itemType.includes("drink")) return "beverage";
+  if (itemType.includes("dessert")) return "dessert";
+
+  // Default categorization by name patterns
+  const name = item.name?.toLowerCase() || "";
+  if (name.includes("pizza")) return "pizza";
+  if (name.includes("wing") || name.includes("bread")) return "appetizer";
+  if (name.includes("soda") || name.includes("water")) return "beverage";
+
+  return "side"; // Default fallback
+}
+
+export function shouldShowCustomizer(item: MenuItem): boolean {
+  const level = getItemCustomizationLevel(item);
+  return level === "full";
+}
+
+// Check if item needs variant selection
+export function needsVariantSelection(item: MenuItem): boolean {
+  const level = getItemCustomizationLevel(item);
+  return level === "variants" || level === "simple";
 }
 
 /**
