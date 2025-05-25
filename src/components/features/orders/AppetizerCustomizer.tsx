@@ -1,7 +1,7 @@
-// src/components/features/orders/AppetizerCustomizer.tsx
+// src/components/features/orders/AppetizerCustomizer.tsx - FIXED VERSION
 "use client";
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { ConfiguredCartItem, MenuItemWithVariants, MenuItemVariant, ConfiguredModifier } from "@/lib/types";
+import { ConfiguredCartItem, MenuItemWithVariants, MenuItemVariant, ConfiguredModifier, Modifier } from "@/lib/types";
 
 /**
  * 🍗 APPETIZER CUSTOMIZER COMPONENT
@@ -70,15 +70,14 @@ export default function AppetizerCustomizer({
       }
 
       const data = await response.json();
-      const modifiers = data.data || [];
+      const modifiers: Modifier[] = data.data || []; // 🔧 FIX: Proper typing instead of any
 
-      // Separate condiments and preparations
-      const condimentModifiers = modifiers.filter((mod: any) => mod.category === condimentCategory);
-
-      const preparationModifiers = modifiers.filter((mod: any) => mod.category === "appetizer_preparation");
+      // Separate condiments and preparations with proper typing
+      const condimentModifiers = modifiers.filter((mod: Modifier) => mod.category === condimentCategory);
+      const preparationModifiers = modifiers.filter((mod: Modifier) => mod.category === "appetizer_preparation");
 
       // Initialize condiments with existing selections
-      const condimentOptions: CondimentOption[] = condimentModifiers.map((mod: any) => ({
+      const condimentOptions: CondimentOption[] = condimentModifiers.map((mod: Modifier) => ({
         id: mod.id,
         name: mod.name,
         price: mod.price_adjustment || 0,
@@ -86,7 +85,7 @@ export default function AppetizerCustomizer({
       }));
 
       // Initialize preparations with existing selections
-      const preparationOptions: PreparationOption[] = preparationModifiers.map((mod: any) => ({
+      const preparationOptions: PreparationOption[] = preparationModifiers.map((mod: Modifier) => ({
         id: mod.id,
         name: mod.name,
         price: mod.price_adjustment || 0,

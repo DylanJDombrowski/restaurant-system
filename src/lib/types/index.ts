@@ -143,6 +143,7 @@ export interface Modifier {
   id: string;
   restaurant_id: string;
   name: string;
+  category: string;
   price_adjustment: number; // How much this modifier adds/subtracts
   is_available: boolean;
 }
