@@ -215,11 +215,13 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
     setShowPizzaCustomizer(true);
   }, []);
 
-  const openSandwichCustomizer = useCallback((_item: MenuItemWithVariants) => {
+  const openSandwichCustomizer = useCallback((item: MenuItemWithVariants) => {
+    setNavState((prev) => ({ ...prev, selectedItem: item }));
     setShowSandwichCustomizer(true);
   }, []);
 
-  const openAppetizerCustomizer = useCallback((_item: MenuItemWithVariants, _variant?: MenuItemVariant) => {
+  const openAppetizerCustomizer = useCallback((item: MenuItemWithVariants, variant?: MenuItemVariant) => {
+    setNavState((prev) => ({ ...prev, selectedItem: item, selectedVariant: variant || null }));
     setShowAppetizerCustomizer(true);
   }, []);
 
