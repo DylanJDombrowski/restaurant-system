@@ -1,7 +1,7 @@
 // src/app/staff/orders/page.tsx - REORGANIZED with Tab Layout
 "use client";
 import CustomerDetails from "@/components/features/orders/CustomerDetails";
-import CategoryFirstNavigator from "@/components/features/orders/MenuNavigator";
+import MenuNavigator from "@/components/features/orders/MenuNavigator";
 import OrderCart, { useCartStatistics } from "@/components/features/orders/OrderCart";
 import OrderSuccessMessage from "@/components/features/orders/OrderSuccessMessage";
 import { ConfiguredCartItem, Customer, MenuItemWithVariants, Modifier, OrderWithItems, Restaurant, Topping } from "@/lib/types";
@@ -446,7 +446,7 @@ export default function StaffOrdersPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
               {/* LEFT: Menu Navigation - Takes more space */}
               <div className="lg:col-span-2">
-                <CategoryFirstNavigator
+                <MenuNavigator
                   menuItems={menuItems}
                   toppings={toppings}
                   modifiers={modifiers}

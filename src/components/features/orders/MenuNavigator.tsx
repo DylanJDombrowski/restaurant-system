@@ -1,4 +1,4 @@
-// src/components/features/orders/CategoryFirstNavigator.tsx - FIXED VERSION
+// src/components/features/orders/MenuNavigator.tsx - FIXED VERSION
 "use client";
 import { ConfiguredCartItem, MenuCategory, MenuItemWithVariants, Modifier, Topping } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
@@ -16,7 +16,7 @@ import SandwichCustomizer from "./SandwichCustomizer";
  * 4. ✅ Added missing customizers for other categories
  */
 
-interface CategoryFirstNavigatorProps {
+interface MenuNavigatorProps {
   menuItems: MenuItemWithVariants[];
   toppings: Topping[];
   modifiers: Modifier[];
@@ -31,7 +31,7 @@ interface NavigationState {
   selectedCategory: MenuCategory | null;
 }
 
-export default function CategoryFirstNavigator({ menuItems, toppings, modifiers, onAddToCart, restaurantId }: CategoryFirstNavigatorProps) {
+export default function MenuNavigator({ menuItems, toppings, modifiers, onAddToCart, restaurantId }: MenuNavigatorProps) {
   // ==========================================
   // SIMPLIFIED NAVIGATION STATE
   // ==========================================
@@ -192,9 +192,21 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
 
   const openPizzaCustomizer = useCallback(
     (item: MenuItemWithVariants) => {
+      console.log("🔧 DEBUG: openPizzaCustomizer called with:", item.name);
+
       const cartItem = createCartItem(item);
+      console.log("🔧 DEBUG: Created cart item:", cartItem);
+
       setCustomizerItem(cartItem);
+      console.log("🔧 DEBUG: Set customizerItem");
+
       setShowPizzaCustomizer(true);
+      console.log("🔧 DEBUG: Set showPizzaCustomizer to true");
+
+      // Add a small delay to check if state actually updates
+      setTimeout(() => {
+        console.log("🔧 DEBUG: After timeout - showPizzaCustomizer should be true");
+      }, 100);
     },
     [createCartItem]
   );

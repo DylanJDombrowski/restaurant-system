@@ -144,13 +144,12 @@ restaurant-system
 │  │  │  ├─ Navigation.tsx
 │  │  │  └─ orders
 │  │  │     ├─ AppetizerCustomizer.tsx
-│  │  │     ├─ CategoryFirstNavigation.tsx
-│  │  │     ├─ EnhancedCartSystem.tsx
-│  │  │     ├─ EnhancedMenuItemSelector.tsx
-│  │  │     ├─ InlineCustomerInfo.tsx
+│  │  │     ├─ CustomerDetails.tsx
+│  │  │     ├─ MenuNavigator.tsx
 │  │  │     ├─ ModalPizzaCustomizer.tsx
-│  │  │     ├─ SandwichCustomizer.tsx
-│  │  │     └─ SmartMenuItemSelector.tsx
+│  │  │     ├─ OrderCart.tsx
+│  │  │     ├─ OrderSuccessMessage.tsx
+│  │  │     └─ SandwichCustomizer.tsx
 │  │  └─ ui
 │  │     ├─ Breadcrumbs.tsx
 │  │     └─ Skeleton.tsx
@@ -168,6 +167,13 @@ restaurant-system
 │     └─ utils
 │        └─ cart-transformers.ts
 ├─ supabase
+│  ├─ .temp
+│  │  ├─ cli-latest
+│  │  ├─ gotrue-version
+│  │  ├─ pooler-url
+│  │  ├─ postgres-version
+│  │  ├─ project-ref
+│  │  └─ rest-version
 │  └─ schema.sql
 └─ tsconfig.json
 
