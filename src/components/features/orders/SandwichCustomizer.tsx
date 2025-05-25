@@ -74,6 +74,7 @@ interface SandwichSelection {
 
 interface SandwichCustomizerProps {
   item: MenuItemWithVariants;
+  existingCartItem?: ConfiguredCartItem; // 🆕 NEW: Pass existing selections
   onComplete: (cartItem: ConfiguredCartItem) => void;
   onCancel: () => void;
   isOpen: boolean;
@@ -220,17 +221,184 @@ const PREPARATION_OPTIONS: PreparationOption[] = [
 // MAIN COMPONENT
 // ==========================================
 
-export default function SandwichCustomizer({ item, onComplete, onCancel, isOpen }: SandwichCustomizerProps) {
-  // ==========================================
-  // STATE MANAGEMENT
-  // ==========================================
+// COMPLETE FIXES for SandwichCustomizer.tsx
 
+// 1. Fix the interface to include existingCartItem
+interface SandwichCustomizerProps {
+  item: MenuItemWithVariants;
+  existingCartItem?: ConfiguredCartItem; // ✅ Already added
+  onComplete: (cartItem: ConfiguredCartItem) => void;
+  onCancel: () => void;
+  isOpen: boolean;
+}
+
+// 2. Add missing helper functions for parsing
+function getTierIdFromLabel(tierLabel: string): string | null {
+  const tierMap: Record<string, string> = {
+    Standard: "standard",
+    Extra: "extra",
+    "XXL Extra": "xxl_extra",
+    "On the Side": "on_side",
+  };
+  return tierMap[tierLabel] || null;
+}
+
+function getIngredientIdFromName(ingredientName: string): string | null {
+  const nameMap: Record<string, string> = {
+    Mozzarella: "mozzarella",
+    "Sweet Peppers": "sweet_peppers",
+    "Hot Giardiniera": "hot_giardiniera",
+    "Juicy (Extra Juice)": "juicy",
+    Juicy: "juicy",
+    Onions: "onions",
+    Mushrooms: "mushrooms",
+  };
+  return nameMap[ingredientName.trim()] || null;
+}
+
+function getSideSauceIdFromName(sauceName: string): string | null {
+  const nameMap: Record<string, string> = {
+    "Side of Natural Gravy": "side_natural_gravy",
+    "Side of Red Sauce": "side_red_sauce",
+    "Side of Wing Sauce": "side_wing_sauce",
+    "Side of BBQ Sauce": "side_bbq_sauce",
+  };
+  return nameMap[sauceName.trim()] || null;
+}
+
+function getPreparationIdFromName(prepName: string): string | null {
+  const nameMap: Record<string, string> = {
+    "Cut in Half": "cut_in_half",
+    "Well Done": "well_done",
+    Toasted: "toasted",
+    Cold: "cold",
+    "Do Not Cut": "do_not_cut",
+    "Cut in Thirds": "cut_in_thirds",
+  };
+  return nameMap[prepName.trim()] || null;
+}
+
+// 3. COMPLETE parseExistingModifiers function
+function parseExistingModifiers(modifiers: ConfiguredModifier[]): Partial<SandwichSelection> {
+  const parsed: Partial<SandwichSelection> = {
+    ingredients: [],
+    sideSauces: [],
+    preparations: [],
+    bread: "plain", // Default
+    makeItDeluxe: false,
+  };
+
+  console.log("🔧 Parsing existing modifiers:", modifiers);
+
+  modifiers.forEach((modifier) => {
+    console.log("🔧 Processing modifier:", modifier.name);
+
+    // Parse style selection
+    if (modifier.name.includes("Prepared with")) {
+      if (modifier.name.includes("Red Sauce")) {
+        parsed.style = "red_sauce";
+      } else if (modifier.name.includes("Natural Gravy")) {
+        parsed.style = "natural_gravy";
+      } else if (modifier.name.includes("Dry")) {
+        parsed.style = "dry";
+      }
+    }
+
+    // Parse bread selection
+    else if (modifier.name === "Garlic Bread") {
+      parsed.bread = "garlic";
+    }
+
+    // Parse deluxe option
+    else if (modifier.name.includes("Make it Deluxe")) {
+      parsed.makeItDeluxe = true;
+    }
+
+    // Parse ingredients with tiers (e.g., "Mozzarella (Extra)")
+    else if (modifier.name.includes("(") && modifier.name.includes(")")) {
+      const match = modifier.name.match(/^(.*?)\s*\((.*?)\)$/);
+      if (match) {
+        const [, ingredientName, tierLabel] = match;
+        const tierId = getTierIdFromLabel(tierLabel);
+        const ingredientId = getIngredientIdFromName(ingredientName);
+
+        if (ingredientId && tierId) {
+          parsed.ingredients = parsed.ingredients || [];
+          parsed.ingredients.push({ id: ingredientId, tier: tierId });
+          console.log("🔧 Added ingredient:", ingredientId, "tier:", tierId);
+        }
+      }
+    }
+
+    // Parse side sauces (e.g., "Side of Natural Gravy (Standard)")
+    else if (modifier.name.includes("Side of")) {
+      const match = modifier.name.match(/^(.*?)\s*\((.*?)\)$/);
+      if (match) {
+        const [, sauceName, tierLabel] = match;
+        const tierId = getTierIdFromLabel(tierLabel);
+        const sauceId = getSideSauceIdFromName(sauceName);
+
+        if (sauceId && tierId) {
+          parsed.sideSauces = parsed.sideSauces || [];
+          parsed.sideSauces.push({ id: sauceId, tier: tierId });
+          console.log("🔧 Added side sauce:", sauceId, "tier:", tierId);
+        }
+      }
+    }
+
+    // Parse preparations (direct match)
+    else {
+      const prepId = getPreparationIdFromName(modifier.name);
+      if (prepId) {
+        parsed.preparations = parsed.preparations || [];
+        parsed.preparations.push(prepId);
+        console.log("🔧 Added preparation:", prepId);
+      }
+    }
+  });
+
+  console.log("🔧 Final parsed state:", parsed);
+  return parsed;
+}
+
+// 4. Fix the initial state to use existingCartItem
+// REPLACE the useState initialization in the main component:
+
+export default function SandwichCustomizer({
+  item,
+  existingCartItem, // ✅ Now properly typed
+  onComplete,
+  onCancel,
+  isOpen,
+}: SandwichCustomizerProps) {
   const [selection, setSelection] = useState<SandwichSelection>(() => {
     const requiresStyle = SANDWICHES_WITH_STYLE.includes(item.name);
     const defaultsToGarlic = GARLIC_BREAD_DEFAULTS.includes(item.name);
 
+    // 🆕 FIXED: Parse existing cart item state if provided
+    if (existingCartItem?.selectedModifiers && existingCartItem.selectedModifiers.length > 0) {
+      try {
+        console.log("🔧 Parsing existing sandwich selections for:", item.name);
+        const existingSelection = parseExistingModifiers(existingCartItem.selectedModifiers);
+
+        return {
+          style: existingSelection.style || (requiresStyle ? undefined : "not_required"),
+          bread: existingSelection.bread || (defaultsToGarlic ? "garlic" : "plain"),
+          makeItDeluxe: existingSelection.makeItDeluxe || false,
+          ingredients: existingSelection.ingredients || [],
+          sideSauces: existingSelection.sideSauces || [],
+          preparations: existingSelection.preparations || [],
+          specialInstructions: existingCartItem.specialInstructions || "",
+        };
+      } catch (error) {
+        console.error("Error parsing existing sandwich state:", error);
+      }
+    }
+
+    // Default state (when no existing selections)
+    console.log("🔧 Using default sandwich state for:", item.name);
     return {
-      style: requiresStyle ? undefined : "not_required", // Track if style is required
+      style: requiresStyle ? undefined : "not_required",
       bread: defaultsToGarlic ? "garlic" : "plain",
       makeItDeluxe: false,
       ingredients: [],
@@ -426,14 +594,14 @@ export default function SandwichCustomizer({ item, onComplete, onCancel, isOpen 
       }
     });
 
-    // Create cart item
+    // 🆕 FIXED: Create cart item preserving existing ID and quantity
     const cartItem: ConfiguredCartItem = {
-      id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: existingCartItem?.id || `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       menuItemId: item.id,
       menuItemName: item.name,
       variantId: null,
       variantName: null,
-      quantity: 1,
+      quantity: existingCartItem?.quantity || 1, // ✅ Preserve existing quantity
       basePrice: item.base_price,
       selectedToppings: [], // Sandwiches don't use toppings system
       selectedModifiers: configuredModifiers,
@@ -442,8 +610,9 @@ export default function SandwichCustomizer({ item, onComplete, onCancel, isOpen 
       displayName: item.name,
     };
 
+    console.log("🔧 Completed sandwich customization:", cartItem);
     onComplete(cartItem);
-  }, [canComplete, selection, item, calculatedPrice, onComplete]);
+  }, [canComplete, selection, item, calculatedPrice, onComplete, existingCartItem]);
 
   // ==========================================
   // RENDER

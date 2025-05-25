@@ -418,7 +418,13 @@ export default function ExpressStaffOrdersPage() {
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* LEFT: MENU - 🔄 CHANGE: Use SmartMenuItemSelector */}
         <div className="xl:col-span-2">
-          <SmartMenuItemSelector menuItems={menuItems} toppings={toppings} modifiers={modifiers} onAddToCart={handleAddToCart} />
+          <SmartMenuItemSelector
+            menuItems={menuItems}
+            toppings={toppings}
+            modifiers={modifiers}
+            onAddToCart={handleAddToCart}
+            restaurantId={restaurant?.id || ""}
+          />
         </div>
 
         {/* CENTER: CART */}

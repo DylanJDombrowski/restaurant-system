@@ -1,4 +1,4 @@
-// src/components/features/orders/SmartMenuItemSelector.tsx
+// src/components/features/orders/SmartMenuItemSelector.tsx - FIXED VERSION
 "use client";
 import { useState, useMemo, useCallback } from "react";
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/lib/types";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
 import SandwichCustomizer from "./SandwichCustomizer";
+import AppetizerCustomizer from "./AppetizerCustomizer";
 
 /**
  * 🎯 TYPE-AWARE Smart Menu Item Selector
@@ -40,9 +41,16 @@ interface SmartMenuItemSelectorProps {
   toppings: Topping[];
   modifiers: Modifier[];
   onAddToCart: (configuredItem: ConfiguredCartItem) => void;
+  restaurantId: string; // 🔧 FIX 4: Added required prop
 }
 
-export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, onAddToCart }: SmartMenuItemSelectorProps) {
+export default function SmartMenuItemSelector({
+  menuItems,
+  toppings,
+  modifiers,
+  onAddToCart,
+  restaurantId, // 🔧 FIX 4: Added restaurantId prop
+}: SmartMenuItemSelectorProps) {
   // ==========================================
   // STATE MANAGEMENT
   // ==========================================
@@ -52,6 +60,9 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
   const [customizerItem, setCustomizerItem] = useState<ConfiguredCartItem | null>(null);
   const [showSandwichCustomizer, setShowSandwichCustomizer] = useState(false);
   const [customizingItem, setCustomizingItem] = useState<MenuItemWithVariants | null>(null);
+  const [showAppetizerCustomizer, setShowAppetizerCustomizer] = useState(false);
+  const [customizingAppetizerItem, setCustomizingAppetizerItem] = useState<MenuItemWithVariants | null>(null);
+  const [selectedAppetizerVariant, setSelectedAppetizerVariant] = useState<MenuItemVariant | null>(null);
 
   // ==========================================
   // TYPE-AWARE BUSINESS LOGIC
@@ -202,6 +213,26 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
   // SMART ITEM SELECTION LOGIC
   // ==========================================
   const handleItemSelect = (item: MenuItemWithVariants) => {
+    console.log("Item selected:", item.name, "Category:", item.category?.name, "Type:", item.item_type);
+
+    setSelectedItem(item);
+
+    // 🆕 NEW: Appetizer routing
+    if (item.category?.name === "Appetizers") {
+      console.log("🍗 Routing to appetizer customization");
+
+      // Check if item has variants (size selection needed)
+      if (item.variants && item.variants.length > 1) {
+        console.log("📏 Appetizer has variants, showing size selection first");
+        // Let the UI show variant selector, then route to appetizer customizer
+        return;
+      } else {
+        // No variants, go directly to appetizer customizer
+        console.log("🍗 Opening appetizer customizer directly");
+        openAppetizerCustomizer(item);
+        return;
+      }
+    }
     // Check if it's a sandwich
     if (item.category?.name === "Sandwiches") {
       setCustomizingItem(item);
@@ -281,19 +312,57 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
   // VARIANT SELECTION LOGIC
   // ==========================================
   const handleVariantSelect = (variant: MenuItemVariant) => {
-    if (!selectedItem) return;
+    if (!selectedItem) {
+      console.error("No selected item for variant selection");
+      return;
+    }
 
-    console.log(`📏 Variant selected: ${variant.name} for ${selectedItem.name}`);
+    console.log("Variant selected:", variant.name, "for item:", selectedItem.name);
     setSelectedVariant(variant);
 
-    const strategy = getCustomizationStrategy(selectedItem);
+    // 🆕 NEW: After variant selection, check if it's an appetizer
+    if (selectedItem.category?.name === "Appetizers") {
+      console.log("🍗 Opening appetizer customizer with variant");
+      openAppetizerCustomizer(selectedItem, variant);
+      return;
+    }
 
-    // After variant selection, check if we need further customization
+    const strategy = getCustomizationStrategy(selectedItem);
     if (strategy === "full_pizza" || strategy === "stuffed_pizza") {
+      // 🔧 FIX 5: Fixed function name
       openPizzaCustomizer(selectedItem, variant);
     } else {
+      // 🔧 FIX 6: Fixed function name
       addDirectToCart(selectedItem, variant);
     }
+  };
+
+  // ==========================================
+  // APPETIZER CUSTOMIZER LOGIC
+  // ==========================================
+  const openAppetizerCustomizer = (item: MenuItemWithVariants, variant?: MenuItemVariant) => {
+    console.log("Opening appetizer customizer for:", item.name);
+    setCustomizingAppetizerItem(item);
+    setSelectedAppetizerVariant(variant || null);
+    setShowAppetizerCustomizer(true);
+  };
+
+  const handleAppetizerCustomizationComplete = (configuredItem: ConfiguredCartItem) => {
+    console.log("✅ Appetizer customization completed");
+    onAddToCart(configuredItem);
+    closeAppetizerCustomizer();
+  };
+
+  const handleAppetizerCustomizationCancel = () => {
+    console.log("❌ Appetizer customization cancelled");
+    closeAppetizerCustomizer();
+  };
+
+  const closeAppetizerCustomizer = () => {
+    setShowAppetizerCustomizer(false);
+    setCustomizingAppetizerItem(null);
+    setSelectedAppetizerVariant(null);
+    setSelectedItem(null);
   };
 
   // ==========================================
@@ -302,7 +371,7 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
   const addDirectToCart = (item: MenuItemWithVariants, variant?: MenuItemVariant) => {
     try {
       const cartItem = createCartItem(item, variant);
-      console.log(`➕ Adding to cart: ${cartItem.displayName} - $${cartItem.totalPrice}`);
+      console.log(`➕ Adding to cart: ${cartItem.displayName} - ${cartItem.totalPrice}`);
       onAddToCart(cartItem);
 
       // Clear selection
@@ -430,6 +499,17 @@ export default function SmartMenuItemSelector({ menuItems, toppings, modifiers, 
           onComplete={handleCustomizerComplete}
           onCancel={handleCustomizerCancel}
           isOpen={showCustomizerModal}
+        />
+      )}
+
+      {showAppetizerCustomizer && customizingAppetizerItem && (
+        <AppetizerCustomizer
+          item={customizingAppetizerItem}
+          selectedVariant={selectedAppetizerVariant || undefined}
+          onComplete={handleAppetizerCustomizationComplete}
+          onCancel={handleAppetizerCustomizationCancel}
+          isOpen={showAppetizerCustomizer}
+          restaurantId={restaurantId}
         />
       )}
     </div>
@@ -672,12 +752,12 @@ function TypeAwareItemCard({ item, strategy, onSelect }: TypeAwareItemCardProps)
       const maxPrice = Math.max(...prices);
 
       if (minPrice === maxPrice) {
-        return `$${minPrice.toFixed(2)}`;
+        return `${minPrice.toFixed(2)}`;
       } else {
-        return `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
+        return `${minPrice.toFixed(2)} - ${maxPrice.toFixed(2)}`;
       }
     } else {
-      return `$${(item.base_price || 0).toFixed(2)}`;
+      return `${(item.base_price || 0).toFixed(2)}`;
     }
   };
 

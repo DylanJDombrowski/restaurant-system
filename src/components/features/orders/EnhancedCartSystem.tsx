@@ -1,10 +1,20 @@
-// src/components/features/orders/EnhancedCartSystem.tsx - CLEANED VERSION
+// src/components/features/orders/EnhancedCartSystem.tsx - FIXED VERSION
 "use client";
 import { useState, useMemo } from "react";
-import { ConfiguredCartItem, ConfiguredModifier, ConfiguredTopping, Topping, Modifier, Customer, MenuItemWithVariants } from "@/lib/types";
+import {
+  ConfiguredCartItem,
+  ConfiguredModifier,
+  ConfiguredTopping,
+  Topping,
+  Modifier,
+  Customer,
+  MenuItemWithVariants,
+  MenuItemVariant, // 🔧 FIX 1: Added missing import
+} from "@/lib/types";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
 import InlineCustomerInfo from "./InlineCustomerInfo";
 import SandwichCustomizer from "./SandwichCustomizer";
+import AppetizerCustomizer from "./AppetizerCustomizer";
 
 interface EnhancedCartSystemProps {
   items: ConfiguredCartItem[];
@@ -58,6 +68,11 @@ export default function EnhancedCartSystem({
   // Sandwich customizer states
   const [showSandwichCustomizer, setShowSandwichCustomizer] = useState(false);
   const [customizingSandwichItem, setCustomizingSandwichItem] = useState<MenuItemWithVariants | null>(null);
+
+  // Appetizer customizer states
+  const [showAppetizerCustomizer, setShowAppetizerCustomizer] = useState(false);
+  const [customizingAppetizerItem, setCustomizingAppetizerItem] = useState<MenuItemWithVariants | null>(null);
+  const [customizingAppetizerVariant, setCustomizingAppetizerVariant] = useState<MenuItemVariant | null>(null);
 
   // Order notes
   const [orderNotes, setOrderNotes] = useState("");
@@ -130,7 +145,6 @@ export default function EnhancedCartSystem({
       }
 
       const menuData = await menuResponse.json();
-      // FIXED: Proper typing instead of 'any'
       const fullMenuItem = menuData.data.menu_items.find((mi: MenuItemWithVariants) => mi.id === item.menuItemId);
 
       if (!fullMenuItem) {
@@ -145,24 +159,47 @@ export default function EnhancedCartSystem({
         allows_custom_toppings: fullMenuItem.allows_custom_toppings,
       });
 
-      // ROUTING LOGIC: Same as SmartMenuItemSelector
-      if (fullMenuItem.category?.name === "Sandwiches") {
-        console.log("🥪 Opening sandwich customizer");
-        setCustomizingSandwichItem(fullMenuItem);
-        setShowSandwichCustomizer(true);
+      // 🎯 ROUTING LOGIC WITH APPETIZER SUPPORT
+
+      // 🆕 NEW: Check if it's an appetizer
+      if (fullMenuItem.category?.name === "Appetizers") {
+        console.log("🍗 Opening appetizer customizer from cart");
+
+        // Find the variant if this cart item has one
+        let selectedVariant = null;
+        if (item.variantId && fullMenuItem.variants) {
+          // 🔧 FIX 2: Added proper typing for find method
+          selectedVariant = fullMenuItem.variants.find((v: MenuItemVariant) => v.id === item.variantId) || null;
+        }
+
+        setCustomizingAppetizerItem(fullMenuItem);
+        setCustomizingAppetizerVariant(selectedVariant);
+        setCustomizingItem(item); // Store existing cart item for state preservation
+        setShowAppetizerCustomizer(true);
         return;
       }
 
-      // Check if it's a pizza or allows toppings
       if (fullMenuItem.item_type === "pizza" || fullMenuItem.allows_custom_toppings) {
-        console.log("🍕 Opening pizza customizer");
+        console.log("🍕 Opening pizza customizer with existing state");
 
-        const safeItem = {
+        // 🆕 FIXED: Preserve ALL existing state
+        const safeItem: ConfiguredCartItem = {
           ...item,
-          specialInstructions: item.specialInstructions || "",
+          // Keep existing selections (don't reset to empty arrays)
           selectedToppings: item.selectedToppings || [],
           selectedModifiers: item.selectedModifiers || [],
+          specialInstructions: item.specialInstructions || "",
+          // Preserve pricing information
+          basePrice: item.basePrice,
+          totalPrice: item.totalPrice,
+          quantity: item.quantity,
         };
+
+        console.log("🔧 Passing to pizza customizer:", {
+          toppings: safeItem.selectedToppings.length,
+          modifiers: safeItem.selectedModifiers.length,
+          instructions: safeItem.specialInstructions,
+        });
 
         setCustomizingItem(safeItem);
         await loadCustomizerData();
@@ -170,18 +207,17 @@ export default function EnhancedCartSystem({
         return;
       }
 
-      // For other items, just show a simple alert for now
       console.log("📝 Item doesn't need customization");
       alert("This item doesn't have customization options.");
     } catch (error) {
       console.error("Error determining customization type:", error);
 
-      // Fallback: assume pizza if allows_custom_toppings was previously set
-      const safeItem = {
+      // 🆕 FIXED: Fallback also preserves state
+      const safeItem: ConfiguredCartItem = {
         ...item,
-        specialInstructions: item.specialInstructions || "",
         selectedToppings: item.selectedToppings || [],
         selectedModifiers: item.selectedModifiers || [],
+        specialInstructions: item.specialInstructions || "",
       };
 
       setCustomizingItem(safeItem);
@@ -192,9 +228,19 @@ export default function EnhancedCartSystem({
 
   // SANDWICH CUSTOMIZATION HANDLERS
   const handleSandwichCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
-    onUpdateItem(updatedItem.id, updatedItem);
+    console.log("🥪 Sandwich customization completed:", updatedItem);
+
+    // 🆕 FIXED: Update the SAME cart item (preserve ID and other properties)
+    const finalItem: ConfiguredCartItem = {
+      ...updatedItem,
+      id: customizingItem?.id || updatedItem.id, // Keep original cart item ID
+      quantity: customizingItem?.quantity || updatedItem.quantity, // Keep original quantity
+    };
+
+    onUpdateItem(finalItem.id, finalItem);
     setShowSandwichCustomizer(false);
     setCustomizingSandwichItem(null);
+    setCustomizingItem(null); // Clear the stored state
   };
 
   const handleSandwichCustomizationCancel = () => {
@@ -204,6 +250,9 @@ export default function EnhancedCartSystem({
 
   // PIZZA CUSTOMIZATION HANDLERS
   const handleCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
+    console.log("🍕 Pizza customization completed:", updatedItem);
+
+    // The pizza customizer already preserves the item ID correctly
     onUpdateItem(updatedItem.id, updatedItem);
     setShowCustomizer(false);
     setCustomizingItem(null);
@@ -211,6 +260,25 @@ export default function EnhancedCartSystem({
 
   const handleCustomizationCancel = () => {
     setShowCustomizer(false);
+    setCustomizingItem(null);
+  };
+
+  // ===========================================
+  // APPETIZER CUSTOMIZATION HANDLERS
+  // ===========================================
+  const handleAppetizerCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
+    console.log("🍗 Appetizer customization completed:", updatedItem);
+    onUpdateItem(updatedItem.id, updatedItem);
+    setShowAppetizerCustomizer(false);
+    setCustomizingAppetizerItem(null);
+    setCustomizingAppetizerVariant(null);
+    setCustomizingItem(null);
+  };
+
+  const handleAppetizerCustomizationCancel = () => {
+    setShowAppetizerCustomizer(false);
+    setCustomizingAppetizerItem(null);
+    setCustomizingAppetizerVariant(null);
     setCustomizingItem(null);
   };
 
@@ -358,6 +426,19 @@ export default function EnhancedCartSystem({
           onComplete={handleSandwichCustomizationComplete}
           onCancel={handleSandwichCustomizationCancel}
           isOpen={showSandwichCustomizer}
+        />
+      )}
+
+      {/* APPETIZER MODAL CUSTOMIZER */}
+      {showAppetizerCustomizer && customizingAppetizerItem && (
+        <AppetizerCustomizer
+          item={customizingAppetizerItem}
+          selectedVariant={customizingAppetizerVariant || undefined}
+          existingCartItem={customizingItem || undefined} // 🔧 FIX 3: Changed null to undefined
+          onComplete={handleAppetizerCustomizationComplete}
+          onCancel={handleAppetizerCustomizationCancel}
+          isOpen={showAppetizerCustomizer}
+          restaurantId={restaurantId}
         />
       )}
     </>
