@@ -503,19 +503,6 @@ export default function StaffOrdersPage() {
                   </div>
                 )}
 
-                {/* Cart */}
-                <CustomerDetails
-                  customerInfo={customerInfo}
-                  setCustomerInfo={setCustomerInfo}
-                  foundCustomer={foundCustomer}
-                  onCustomerLookup={lookupCustomer}
-                  lookupLoading={lookupLoading}
-                  customerLookupStatus={customerLookupStatus}
-                  restaurantId={restaurant?.id || ""}
-                  orderType={orderType}
-                  deliveryAddress={deliveryAddress}
-                  setDeliveryAddress={setDeliveryAddress}
-                />
                 <OrderCart
                   items={cartItems}
                   onUpdateItem={handleUpdateCartItem}
