@@ -1,13 +1,14 @@
-// src/app/staff/orders/page.tsx - UPDATED to use SmartMenuItemSelector
+// src/app/staff/orders/page.tsx - UPDATED to use CategoryFirstNavigator
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { MenuItemWithVariants, Restaurant, OrderWithItems, Customer, Topping, Modifier, ConfiguredCartItem } from "@/lib/types";
-// 🔄 CHANGE: Switch to SmartMenuItemSelector
-import SmartMenuItemSelector from "@/components/features/orders/SmartMenuItemSelector";
+// 🔄 CHANGE: Switch to CategoryFirstNavigator
+import CategoryFirstNavigator from "@/components/features/orders/CategoryFirstNavigation";
 import EnhancedCartSystem, { useCartStatistics } from "@/components/features/orders/EnhancedCartSystem";
 
 /**
- * 🔧 UPDATED: Switch to SmartMenuItemSelector for sandwich support
+ * 🆕 UPDATED: Now uses category-first navigation for better staff experience
+ * Staff workflow: Categories → Items → Customization → Cart
  */
 
 export default function ExpressStaffOrdersPage() {
@@ -213,6 +214,8 @@ export default function ExpressStaffOrdersPage() {
   // ==========================================
 
   const handleAddToCart = (configuredItem: ConfiguredCartItem) => {
+    console.log("🛒 Adding to cart:", configuredItem.displayName);
+
     setCartItems((prev) => {
       const existingIndex = prev.findIndex(
         (item) =>
@@ -229,8 +232,10 @@ export default function ExpressStaffOrdersPage() {
           ...updated[existingIndex],
           quantity: updated[existingIndex].quantity + 1,
         };
+        console.log("📦 Updated existing cart item quantity");
         return updated;
       } else {
+        console.log("➕ Added new item to cart");
         return [...prev, configuredItem];
       }
     });
@@ -336,13 +341,13 @@ export default function ExpressStaffOrdersPage() {
   };
 
   // ==========================================
-  // RENDER LOGIC (unchanged except selector)
+  // RENDER LOGIC - UPDATED HEADER WITH CATEGORY INFO
   // ==========================================
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
-        <div className="text-lg font-semibold text-gray-900">Loading enhanced ordering system...</div>
+        <div className="text-lg font-semibold text-gray-900">Loading category-first ordering system...</div>
       </div>
     );
   }
@@ -373,16 +378,25 @@ export default function ExpressStaffOrdersPage() {
 
   const readyOrders = orders.filter((order) => order.status === "ready");
 
+  // Get category count for header
+  const categoryCount = new Set(menuItems.map((item) => item.category?.name).filter(Boolean)).size;
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      {/* ENHANCED HEADER */}
+      {/* 🆕 ENHANCED HEADER WITH CATEGORY INFO */}
       <div className="mb-6">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Express Order Taking</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Category-First Ordering</h1>
             <div className="mt-2 flex items-center gap-4 text-sm">
               <span className="text-gray-600">
                 <span className="font-semibold">{restaurant?.name}</span>
+              </span>
+              <span className="text-purple-600">
+                📂 <span className="font-semibold">{categoryCount} categories</span>
+              </span>
+              <span className="text-gray-600">
+                🍽️ <span className="font-semibold">{menuItems.length} menu items</span>
               </span>
               <span className="text-blue-600">
                 Cart: <span className="font-semibold">{cartStats.totalItems} items</span>
@@ -416,9 +430,9 @@ export default function ExpressStaffOrdersPage() {
 
       {/* MAIN LAYOUT */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-        {/* LEFT: MENU - 🔄 CHANGE: Use SmartMenuItemSelector */}
+        {/* LEFT: CATEGORY-FIRST NAVIGATION - 🆕 UPDATED */}
         <div className="xl:col-span-2">
-          <SmartMenuItemSelector
+          <CategoryFirstNavigator
             menuItems={menuItems}
             toppings={toppings}
             modifiers={modifiers}
