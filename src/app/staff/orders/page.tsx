@@ -575,7 +575,7 @@ function PickupOrdersView({ orders, onOrderComplete, completingOrderIds }: Picku
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900">Orders Ready for Pickup ({orders.length})</h2>
-        <div className="text-sm text-gray-600">Click "Mark as Picked Up" when customer collects their order</div>
+        <div className="text-sm text-gray-600">Click Mark as Picked Up when customer collects their order</div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

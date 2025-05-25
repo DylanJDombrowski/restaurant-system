@@ -1,6 +1,6 @@
 // src/components/features/orders/CustomerDetails.tsx
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Customer } from "@/lib/types";
 
 /**
@@ -15,6 +15,15 @@ interface DeliveryAddress {
   city: string;
   zip: string;
   instructions: string;
+}
+
+interface CustomerAddress {
+  id: string;
+  address: string;
+  city: string;
+  zip: string;
+  delivery_instructions?: string;
+  is_default: boolean;
 }
 
 interface CustomerDetailsProps {
@@ -45,7 +54,7 @@ export default function CustomerDetails({
 }: CustomerDetailsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSuggestion, setShowSuggestion] = useState(false);
-  const [previousAddresses, setPreviousAddresses] = useState<any[]>([]);
+  const [previousAddresses, setPreviousAddresses] = useState<CustomerAddress[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
 
@@ -75,52 +84,58 @@ export default function CustomerDetails({
     }
   }, [foundCustomer, customerInfo.phone, orderType, restaurantId]);
 
-  const loadPreviousAddresses = async (customerId: string) => {
-    try {
-      setLoadingAddresses(true);
-      const response = await fetch(`/api/customers/${customerId}/addresses`);
-      if (response.ok) {
-        const data = await response.json();
-        setPreviousAddresses(data.data || []);
+  const loadPreviousAddresses = useCallback(
+    async (customerId: string) => {
+      try {
+        setLoadingAddresses(true);
+        const response = await fetch(`/api/customers/${customerId}/addresses`);
+        if (response.ok) {
+          const data = await response.json();
+          setPreviousAddresses(data.data || []);
 
-        // Auto-fill with default address if available and no address entered yet
-        const defaultAddress = data.data?.find((addr: any) => addr.is_default);
-        if (defaultAddress && !deliveryAddress.address) {
-          setDeliveryAddress({
-            address: defaultAddress.address,
-            city: defaultAddress.city,
-            zip: defaultAddress.zip,
-            instructions: defaultAddress.delivery_instructions || "",
-          });
+          // Auto-fill with default address if available and no address entered yet
+          const defaultAddress = data.data?.find((addr: any) => addr.is_default);
+          if (defaultAddress && !deliveryAddress.address) {
+            setDeliveryAddress({
+              address: defaultAddress.address,
+              city: defaultAddress.city,
+              zip: defaultAddress.zip,
+              instructions: defaultAddress.delivery_instructions || "",
+            });
+          }
         }
+      } catch (error) {
+        console.error("Error loading previous addresses:", error);
+      } finally {
+        setLoadingAddresses(false);
       }
-    } catch (error) {
-      console.error("Error loading previous addresses:", error);
-    } finally {
-      setLoadingAddresses(false);
-    }
-  };
+    },
+    [setDeliveryAddress]
+  );
 
-  const loadAddressesByPhone = async (phone: string) => {
-    try {
-      setLoadingAddresses(true);
-      const response = await fetch(
-        `/api/customers/lookup?phone=${encodeURIComponent(phone)}&restaurant_id=${restaurantId}&include_addresses=true`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data?.addresses) {
-          setPreviousAddresses(data.data.addresses);
+  const loadAddressesByPhone = useCallback(
+    async (phone: string) => {
+      try {
+        setLoadingAddresses(true);
+        const response = await fetch(
+          `/api/customers/lookup?phone=${encodeURIComponent(phone)}&restaurant_id=${restaurantId}&include_addresses=true`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          if (data.data?.addresses) {
+            setPreviousAddresses(data.data.addresses);
+          }
         }
+      } catch (error) {
+        console.error("Error loading addresses by phone:", error);
+      } finally {
+        setLoadingAddresses(false);
       }
-    } catch (error) {
-      console.error("Error loading addresses by phone:", error);
-    } finally {
-      setLoadingAddresses(false);
-    }
-  };
+    },
+    [restaurantId, setDeliveryAddress]
+  );
 
-  const handleAddressSelect = (address: any) => {
+  const handleAddressSelect = (address: CustomerAddress) => {
     setDeliveryAddress({
       address: address.address,
       city: address.city,
@@ -288,7 +303,7 @@ export default function CustomerDetails({
 
                   {showAddressSuggestions && (
                     <div className="space-y-2 mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      {previousAddresses.map((addr, index) => (
+                      {previousAddresses.map((addr: CustomerAddress, index) => (
                         <button
                           key={index}
                           onClick={() => handleAddressSelect(addr)}

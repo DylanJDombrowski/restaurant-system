@@ -1,7 +1,7 @@
 // src/components/features/orders/CategoryFirstNavigator.tsx - FIXED VERSION
 "use client";
 import { useState, useMemo, useCallback } from "react";
-import { MenuItemWithVariants, MenuItemVariant, MenuCategory, Topping, Modifier, ConfiguredCartItem } from "@/lib/types";
+import { MenuItemWithVariants, MenuCategory, Topping, Modifier, ConfiguredCartItem } from "@/lib/types";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
 import SandwichCustomizer from "./SandwichCustomizer";
 import AppetizerCustomizer from "./AppetizerCustomizer";
@@ -46,8 +46,6 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
   const [showPizzaCustomizer, setShowPizzaCustomizer] = useState(false);
   const [showSandwichCustomizer, setShowSandwichCustomizer] = useState(false);
   const [showAppetizerCustomizer, setShowAppetizerCustomizer] = useState(false);
-  const [showChickenCustomizer, setShowChickenCustomizer] = useState(false);
-  const [showPastaCustomizer, setShowPastaCustomizer] = useState(false);
 
   const [selectedItem, setSelectedItem] = useState<MenuItemWithVariants | null>(null);
   const [customizerItem, setCustomizerItem] = useState<ConfiguredCartItem | null>(null);
@@ -114,56 +112,16 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
     });
   }, []);
 
-  const handleBackToCategoryItems = useCallback(() => {
-    console.log("← Back to category items");
-    closeAllCustomizers();
-  }, []);
-
-  // ==========================================
-  // 🆕 SIMPLIFIED ITEM SELECTION (NO DOUBLE VARIANTS)
-  // ==========================================
-
-  const handleItemSelect = useCallback((item: MenuItemWithVariants) => {
-    console.log("🍕 Selected item:", item.name, "Category:", item.category?.name);
-
-    setSelectedItem(item);
-
-    // 🆕 FIXED: Route directly to customizers - they handle variants internally
-    const categoryName = item.category?.name;
-
-    if (categoryName === "Pizzas") {
-      console.log("🍕 Opening pizza customizer directly");
-      openPizzaCustomizer(item);
-    } else if (categoryName === "Sandwiches") {
-      console.log("🥪 Opening sandwich customizer directly");
-      openSandwichCustomizer(item);
-    } else if (categoryName === "Appetizers") {
-      console.log("🍗 Opening appetizer customizer directly");
-      openAppetizerCustomizer(item);
-    } else if (categoryName === "Chicken") {
-      console.log("🍗 Opening chicken customizer directly");
-      openChickenCustomizer(item);
-    } else if (categoryName === "Pasta") {
-      console.log("🍝 Opening pasta customizer directly");
-      openPastaCustomizer(item);
-    } else if (categoryName === "Beverages" || categoryName === "Sides") {
-      console.log("🥤 Adding simple item directly to cart");
-      addDirectToCart(item);
-    } else {
-      // Default: try to add directly or show error
-      console.log("❓ Unknown category, adding directly to cart");
-      addDirectToCart(item);
-    }
-  }, []);
-
   // ==========================================
   // CUSTOMIZER OPERATIONS
   // ==========================================
 
-  const openPizzaCustomizer = useCallback((item: MenuItemWithVariants) => {
-    const cartItem = createCartItem(item);
-    setCustomizerItem(cartItem);
-    setShowPizzaCustomizer(true);
+  const closeAllCustomizers = useCallback(() => {
+    setShowPizzaCustomizer(false);
+    setShowSandwichCustomizer(false);
+    setShowAppetizerCustomizer(false);
+    setSelectedItem(null);
+    setCustomizerItem(null);
   }, []);
 
   const openSandwichCustomizer = useCallback((item: MenuItemWithVariants) => {
@@ -224,6 +182,51 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
     };
   }, []);
 
+  const openPizzaCustomizer = useCallback(
+    (item: MenuItemWithVariants) => {
+      const cartItem = createCartItem(item);
+      setCustomizerItem(cartItem);
+      setShowPizzaCustomizer(true);
+    },
+    [createCartItem]
+  );
+
+  const handleItemSelect = useCallback(
+    (item: MenuItemWithVariants) => {
+      console.log("🍕 Selected item:", item.name, "Category:", item.category?.name);
+
+      setSelectedItem(item);
+
+      // 🆕 FIXED: Route directly to customizers - they handle variants internally
+      const categoryName = item.category?.name;
+
+      if (categoryName === "Pizzas") {
+        console.log("🍕 Opening pizza customizer directly");
+        openPizzaCustomizer(item);
+      } else if (categoryName === "Sandwiches") {
+        console.log("🥪 Opening sandwich customizer directly");
+        openSandwichCustomizer(item);
+      } else if (categoryName === "Appetizers") {
+        console.log("🍗 Opening appetizer customizer directly");
+        openAppetizerCustomizer(item);
+      } else if (categoryName === "Chicken") {
+        console.log("🍗 Opening chicken customizer directly");
+        openChickenCustomizer(item);
+      } else if (categoryName === "Pasta") {
+        console.log("🍝 Opening pasta customizer directly");
+        openPastaCustomizer(item);
+      } else if (categoryName === "Beverages" || categoryName === "Sides") {
+        console.log("🥤 Adding simple item directly to cart");
+        addDirectToCart(item);
+      } else {
+        // Default: try to add directly or show error
+        console.log("❓ Unknown category, adding directly to cart");
+        addDirectToCart(item);
+      }
+    },
+    [openPizzaCustomizer, openSandwichCustomizer, openAppetizerCustomizer, openChickenCustomizer, openPastaCustomizer, addDirectToCart]
+  );
+
   // ==========================================
   // CUSTOMIZER COMPLETION HANDLERS
   // ==========================================
@@ -258,16 +261,6 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
   const handleCustomizerCancel = useCallback(() => {
     console.log("❌ Customization cancelled");
     closeAllCustomizers();
-  }, []);
-
-  const closeAllCustomizers = useCallback(() => {
-    setShowPizzaCustomizer(false);
-    setShowSandwichCustomizer(false);
-    setShowAppetizerCustomizer(false);
-    setShowChickenCustomizer(false);
-    setShowPastaCustomizer(false);
-    setSelectedItem(null);
-    setCustomizerItem(null);
   }, []);
 
   // ==========================================
