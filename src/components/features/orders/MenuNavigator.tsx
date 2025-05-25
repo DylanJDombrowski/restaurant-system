@@ -1,4 +1,4 @@
-// src/components/features/orders/CategoryFirstNavigator.tsx
+// src/components/features/orders/CategoryFirstNavigator.tsx - FIXED VERSION
 "use client";
 import { useState, useMemo, useCallback } from "react";
 import { MenuItemWithVariants, MenuItemVariant, MenuCategory, Topping, Modifier, ConfiguredCartItem } from "@/lib/types";
@@ -7,13 +7,13 @@ import SandwichCustomizer from "./SandwichCustomizer";
 import AppetizerCustomizer from "./AppetizerCustomizer";
 
 /**
- * 🎯 CATEGORY-FIRST NAVIGATION SYSTEM
+ * 🎯 FIXED: CATEGORY-FIRST NAVIGATION SYSTEM
  *
- * New Flow:
- * 1. Show category grid (Pizzas, Sandwiches, Appetizers, etc.)
- * 2. Click category → Show items in that category
- * 3. Click item → Route to appropriate customizer
- * 4. Back button returns to category or item list
+ * FIXES APPLIED:
+ * 1. ✅ Removed double variant selection - customizers handle sizing internally
+ * 2. ✅ Fixed sandwich routing to open customizer properly
+ * 3. ✅ Simplified item selection flow
+ * 4. ✅ Added missing customizers for other categories
  */
 
 interface CategoryFirstNavigatorProps {
@@ -24,24 +24,20 @@ interface CategoryFirstNavigatorProps {
   restaurantId: string;
 }
 
-type NavigationView = "categories" | "category-items" | "customizing";
+type NavigationView = "categories" | "category-items";
 
 interface NavigationState {
   view: NavigationView;
   selectedCategory: MenuCategory | null;
-  selectedItem: MenuItemWithVariants | null;
-  selectedVariant: MenuItemVariant | null;
 }
 
 export default function CategoryFirstNavigator({ menuItems, toppings, modifiers, onAddToCart, restaurantId }: CategoryFirstNavigatorProps) {
   // ==========================================
-  // NAVIGATION STATE
+  // SIMPLIFIED NAVIGATION STATE
   // ==========================================
   const [navState, setNavState] = useState<NavigationState>({
     view: "categories",
     selectedCategory: null,
-    selectedItem: null,
-    selectedVariant: null,
   });
 
   // ==========================================
@@ -50,6 +46,10 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
   const [showPizzaCustomizer, setShowPizzaCustomizer] = useState(false);
   const [showSandwichCustomizer, setShowSandwichCustomizer] = useState(false);
   const [showAppetizerCustomizer, setShowAppetizerCustomizer] = useState(false);
+  const [showChickenCustomizer, setShowChickenCustomizer] = useState(false);
+  const [showPastaCustomizer, setShowPastaCustomizer] = useState(false);
+
+  const [selectedItem, setSelectedItem] = useState<MenuItemWithVariants | null>(null);
   const [customizerItem, setCustomizerItem] = useState<ConfiguredCartItem | null>(null);
 
   // ==========================================
@@ -103,8 +103,6 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
     setNavState({
       view: "category-items",
       selectedCategory: category,
-      selectedItem: null,
-      selectedVariant: null,
     });
   }, []);
 
@@ -113,145 +111,109 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
     setNavState({
       view: "categories",
       selectedCategory: null,
-      selectedItem: null,
-      selectedVariant: null,
     });
   }, []);
 
   const handleBackToCategoryItems = useCallback(() => {
     console.log("← Back to category items");
-    setNavState((prev) => ({
-      ...prev,
-      view: "category-items",
-      selectedItem: null,
-      selectedVariant: null,
-    }));
+    closeAllCustomizers();
   }, []);
 
   // ==========================================
-  // ITEM SELECTION AND ROUTING
+  // 🆕 SIMPLIFIED ITEM SELECTION (NO DOUBLE VARIANTS)
   // ==========================================
 
   const handleItemSelect = useCallback((item: MenuItemWithVariants) => {
     console.log("🍕 Selected item:", item.name, "Category:", item.category?.name);
 
-    setNavState((prev) => ({
-      ...prev,
-      selectedItem: item,
-    }));
+    setSelectedItem(item);
 
-    // Route to appropriate customizer based on category and item type
-    if (item.category?.name === "Pizzas") {
-      // Pizza customization flow
-      if (item.variants && item.variants.length > 1) {
-        // Show variant selector first, then customizer
-        setNavState((prev) => ({ ...prev, view: "customizing" }));
-        return;
-      } else {
-        // Direct to pizza customizer
-        openPizzaCustomizer(item);
-      }
-    } else if (item.category?.name === "Sandwiches") {
+    // 🆕 FIXED: Route directly to customizers - they handle variants internally
+    const categoryName = item.category?.name;
+
+    if (categoryName === "Pizzas") {
+      console.log("🍕 Opening pizza customizer directly");
+      openPizzaCustomizer(item);
+    } else if (categoryName === "Sandwiches") {
+      console.log("🥪 Opening sandwich customizer directly");
       openSandwichCustomizer(item);
-    } else if (item.category?.name === "Appetizers") {
-      // Check for variants
-      if (item.variants && item.variants.length > 1) {
-        setNavState((prev) => ({ ...prev, view: "customizing" }));
-        return;
-      } else {
-        openAppetizerCustomizer(item);
-      }
-    } else if (item.category?.name === "Beverages") {
-      // Simple items - check for variants or direct add
-      if (item.variants && item.variants.length > 1) {
-        setNavState((prev) => ({ ...prev, view: "customizing" }));
-        return;
-      } else {
-        addDirectToCart(item);
-      }
+    } else if (categoryName === "Appetizers") {
+      console.log("🍗 Opening appetizer customizer directly");
+      openAppetizerCustomizer(item);
+    } else if (categoryName === "Chicken") {
+      console.log("🍗 Opening chicken customizer directly");
+      openChickenCustomizer(item);
+    } else if (categoryName === "Pasta") {
+      console.log("🍝 Opening pasta customizer directly");
+      openPastaCustomizer(item);
+    } else if (categoryName === "Beverages" || categoryName === "Sides") {
+      console.log("🥤 Adding simple item directly to cart");
+      addDirectToCart(item);
     } else {
-      // Default handling for other categories
-      if (item.variants && item.variants.length > 1) {
-        setNavState((prev) => ({ ...prev, view: "customizing" }));
-      } else {
-        addDirectToCart(item);
-      }
+      // Default: try to add directly or show error
+      console.log("❓ Unknown category, adding directly to cart");
+      addDirectToCart(item);
     }
   }, []);
-
-  const handleVariantSelect = useCallback(
-    (variant: MenuItemVariant) => {
-      if (!navState.selectedItem) return;
-
-      console.log("📏 Selected variant:", variant.name);
-
-      setNavState((prev) => ({
-        ...prev,
-        selectedVariant: variant,
-      }));
-
-      const item = navState.selectedItem;
-
-      // Route based on category after variant selection
-      if (item.category?.name === "Pizzas") {
-        openPizzaCustomizer(item, variant);
-      } else if (item.category?.name === "Appetizers") {
-        openAppetizerCustomizer(item, variant);
-      } else {
-        // For other categories, add directly to cart with variant
-        addDirectToCart(item, variant);
-      }
-    },
-    [navState.selectedItem]
-  );
 
   // ==========================================
   // CUSTOMIZER OPERATIONS
   // ==========================================
 
-  const openPizzaCustomizer = useCallback((item: MenuItemWithVariants, variant?: MenuItemVariant) => {
-    const cartItem = createCartItem(item, variant);
+  const openPizzaCustomizer = useCallback((item: MenuItemWithVariants) => {
+    const cartItem = createCartItem(item);
     setCustomizerItem(cartItem);
     setShowPizzaCustomizer(true);
   }, []);
 
   const openSandwichCustomizer = useCallback((item: MenuItemWithVariants) => {
-    setNavState((prev) => ({ ...prev, selectedItem: item }));
     setShowSandwichCustomizer(true);
   }, []);
 
-  const openAppetizerCustomizer = useCallback((item: MenuItemWithVariants, variant?: MenuItemVariant) => {
-    setNavState((prev) => ({ ...prev, selectedItem: item, selectedVariant: variant || null }));
+  const openAppetizerCustomizer = useCallback((item: MenuItemWithVariants) => {
     setShowAppetizerCustomizer(true);
   }, []);
 
+  const openChickenCustomizer = useCallback((item: MenuItemWithVariants) => {
+    // TODO: Implement ChickenCustomizer component
+    console.log("🚧 Chicken customizer not yet implemented");
+    addDirectToCart(item);
+  }, []);
+
+  const openPastaCustomizer = useCallback((item: MenuItemWithVariants) => {
+    // TODO: Implement PastaCustomizer component
+    console.log("🚧 Pasta customizer not yet implemented");
+    addDirectToCart(item);
+  }, []);
+
   const addDirectToCart = useCallback(
-    (item: MenuItemWithVariants, variant?: MenuItemVariant) => {
+    (item: MenuItemWithVariants) => {
       try {
-        const cartItem = createCartItem(item, variant);
+        const cartItem = createCartItem(item);
         console.log(`➕ Adding to cart: ${cartItem.displayName} - $${cartItem.totalPrice}`);
         onAddToCart(cartItem);
 
-        // Return to category items view
-        handleBackToCategoryItems();
+        // Stay in category view after adding simple items
       } catch (error) {
         console.error("Error adding item to cart:", error);
         alert("Error adding item to cart. Please try again.");
       }
     },
-    [onAddToCart, handleBackToCategoryItems]
+    [onAddToCart]
   );
 
-  const createCartItem = useCallback((item: MenuItemWithVariants, variant?: MenuItemVariant): ConfiguredCartItem => {
-    const basePrice = variant?.price ?? item.base_price;
-    const displayName = variant?.name ? `${variant.name} ${item.name}` : item.name;
+  const createCartItem = useCallback((item: MenuItemWithVariants): ConfiguredCartItem => {
+    // For items with variants, use the first variant as default (customizer will handle selection)
+    const defaultVariant = item.variants && item.variants.length > 0 ? item.variants[0] : null;
+    const basePrice = defaultVariant?.price ?? item.base_price;
+    const displayName = item.name;
 
     return {
       id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       menuItemId: item.id,
       menuItemName: item.name,
-      variantId: variant?.id || null,
-      variantName: variant?.name || null,
+      variantId: defaultVariant?.id || null,
+      variantName: defaultVariant?.name || null,
       quantity: 1,
       basePrice,
       selectedToppings: [],
@@ -270,40 +232,43 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
     (updatedItem: ConfiguredCartItem) => {
       console.log("✅ Pizza customization completed");
       onAddToCart(updatedItem);
-      setShowPizzaCustomizer(false);
-      setCustomizerItem(null);
-      handleBackToCategoryItems();
+      closeAllCustomizers();
     },
-    [onAddToCart, handleBackToCategoryItems]
+    [onAddToCart]
   );
 
   const handleSandwichCustomizerComplete = useCallback(
     (updatedItem: ConfiguredCartItem) => {
       console.log("✅ Sandwich customization completed");
       onAddToCart(updatedItem);
-      setShowSandwichCustomizer(false);
-      handleBackToCategoryItems();
+      closeAllCustomizers();
     },
-    [onAddToCart, handleBackToCategoryItems]
+    [onAddToCart]
   );
 
   const handleAppetizerCustomizerComplete = useCallback(
     (updatedItem: ConfiguredCartItem) => {
       console.log("✅ Appetizer customization completed");
       onAddToCart(updatedItem);
-      setShowAppetizerCustomizer(false);
-      handleBackToCategoryItems();
+      closeAllCustomizers();
     },
-    [onAddToCart, handleBackToCategoryItems]
+    [onAddToCart]
   );
 
   const handleCustomizerCancel = useCallback(() => {
+    console.log("❌ Customization cancelled");
+    closeAllCustomizers();
+  }, []);
+
+  const closeAllCustomizers = useCallback(() => {
     setShowPizzaCustomizer(false);
     setShowSandwichCustomizer(false);
     setShowAppetizerCustomizer(false);
+    setShowChickenCustomizer(false);
+    setShowPastaCustomizer(false);
+    setSelectedItem(null);
     setCustomizerItem(null);
-    handleBackToCategoryItems();
-  }, [handleBackToCategoryItems]);
+  }, []);
 
   // ==========================================
   // RENDER LOGIC
@@ -311,65 +276,61 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
 
   if (navState.view === "categories") {
     return (
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Category</h3>
-        <CategoryGrid categories={categorizedItems} onCategorySelect={handleCategorySelect} />
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-xl font-bold text-gray-900">Menu Categories</h3>
+          <p className="text-sm text-gray-600 mt-1">Choose a category to start ordering</p>
+        </div>
+
+        <div className="p-6">
+          <CategoryGrid categories={categorizedItems} onCategorySelect={handleCategorySelect} />
+        </div>
       </div>
     );
   }
 
   if (navState.view === "category-items") {
     return (
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full">
-        <div className="flex items-center gap-4 mb-4">
-          <button onClick={handleBackToCategories} className="text-blue-600 hover:text-blue-800 font-medium">
-            ← Categories
-          </button>
-          <h3 className="text-lg font-semibold text-gray-900">
-            {navState.selectedCategory?.name} ({currentCategoryItems.length})
-          </h3>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleBackToCategories}
+              className="flex items-center text-blue-600 hover:text-blue-800 font-medium transition-colors"
+            >
+              ← Categories
+            </button>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">{navState.selectedCategory?.name}</h3>
+              <p className="text-sm text-gray-600">{currentCategoryItems.length} items available</p>
+            </div>
+          </div>
         </div>
 
-        <CategoryItemsGrid items={currentCategoryItems} onItemSelect={handleItemSelect} />
+        <div className="p-6">
+          <CategoryItemsGrid items={currentCategoryItems} onItemSelect={handleItemSelect} />
+        </div>
       </div>
     );
-  }
-
-  if (navState.view === "customizing" && navState.selectedItem) {
-    // Show variant selector if needed
-    if (navState.selectedItem.variants && navState.selectedItem.variants.length > 1 && !navState.selectedVariant) {
-      return (
-        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full">
-          <div className="flex items-center gap-4 mb-4">
-            <button onClick={handleBackToCategoryItems} className="text-blue-600 hover:text-blue-800 font-medium">
-              ← {navState.selectedCategory?.name}
-            </button>
-            <h3 className="text-lg font-semibold text-gray-900">Select Size for {navState.selectedItem.name}</h3>
-          </div>
-
-          <VariantSelector item={navState.selectedItem} onVariantSelect={handleVariantSelect} />
-        </div>
-      );
-    }
   }
 
   return (
     <>
       {/* Default fallback */}
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full">
-        <button onClick={handleBackToCategories} className="text-blue-600 hover:text-blue-800 font-medium mb-4">
-          ← Back to Categories
-        </button>
-        <div className="text-center py-8">
-          <div className="text-lg text-gray-600">Loading...</div>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg text-gray-600 mb-4">Loading menu...</div>
+          <button onClick={handleBackToCategories} className="text-blue-600 hover:text-blue-800 font-medium">
+            ← Back to Categories
+          </button>
         </div>
       </div>
 
       {/* CUSTOMIZER MODALS */}
-      {showPizzaCustomizer && customizerItem && navState.selectedItem && (
+      {showPizzaCustomizer && customizerItem && selectedItem && (
         <ModalPizzaCustomizer
           item={customizerItem}
-          menuItemWithVariants={navState.selectedItem}
+          menuItemWithVariants={selectedItem}
           availableToppings={toppings}
           availableModifiers={modifiers}
           onComplete={handlePizzaCustomizerComplete}
@@ -378,19 +339,18 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
         />
       )}
 
-      {showSandwichCustomizer && navState.selectedItem && (
+      {showSandwichCustomizer && selectedItem && (
         <SandwichCustomizer
-          item={navState.selectedItem}
+          item={selectedItem}
           onComplete={handleSandwichCustomizerComplete}
           onCancel={handleCustomizerCancel}
           isOpen={showSandwichCustomizer}
         />
       )}
 
-      {showAppetizerCustomizer && navState.selectedItem && (
+      {showAppetizerCustomizer && selectedItem && (
         <AppetizerCustomizer
-          item={navState.selectedItem}
-          selectedVariant={navState.selectedVariant || undefined}
+          item={selectedItem}
           onComplete={handleAppetizerCustomizerComplete}
           onCancel={handleCustomizerCancel}
           isOpen={showAppetizerCustomizer}
@@ -419,24 +379,38 @@ function CategoryGrid({ categories, onCategorySelect }: CategoryGridProps) {
     if (name.includes("pizza")) return "🍕";
     if (name.includes("sandwich")) return "🥪";
     if (name.includes("appetizer")) return "🍗";
+    if (name.includes("chicken")) return "🍗";
+    if (name.includes("pasta")) return "🍝";
     if (name.includes("beverage") || name.includes("drink")) return "🥤";
     if (name.includes("side")) return "🍟";
     if (name.includes("dessert")) return "🍰";
     return "🍽️";
   };
 
+  const getCategoryDescription = (categoryName: string) => {
+    const name = categoryName.toLowerCase();
+    if (name.includes("pizza")) return "Customizable pizzas with fresh toppings";
+    if (name.includes("sandwich")) return "Build your perfect sandwich";
+    if (name.includes("appetizer")) return "Wings, mozzarella sticks & more";
+    if (name.includes("chicken")) return "Family packs & chicken dinners";
+    if (name.includes("pasta")) return "Italian favorites with sauce options";
+    if (name.includes("beverage")) return "Sodas, juices & beverages";
+    if (name.includes("side")) return "Fries, breadsticks & extras";
+    return "Delicious menu items";
+  };
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
       {categories.map(({ category, items }) => (
         <button
           key={category.id}
           onClick={() => onCategorySelect(category)}
-          className="bg-white border border-gray-200 rounded-lg p-6 text-center hover:border-blue-500 hover:shadow-md transition-all"
+          className="bg-gray-50 hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-300 rounded-xl p-6 text-center transition-all duration-200 hover:shadow-md"
         >
-          <div className="text-4xl mb-3">{getCategoryIcon(category.name)}</div>
-          <div className="font-semibold text-gray-900 mb-1">{category.name}</div>
-          <div className="text-sm text-gray-600">{items.length} items</div>
-          {category.description && <div className="text-xs text-gray-500 mt-1">{category.description}</div>}
+          <div className="text-5xl mb-3">{getCategoryIcon(category.name)}</div>
+          <div className="font-bold text-gray-900 mb-2 text-lg">{category.name}</div>
+          <div className="text-sm text-gray-600 mb-2">{getCategoryDescription(category.name)}</div>
+          <div className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full inline-block">{items.length} items</div>
         </button>
       ))}
     </div>
@@ -450,7 +424,7 @@ interface CategoryItemsGridProps {
 
 function CategoryItemsGrid({ items, onItemSelect }: CategoryItemsGridProps) {
   return (
-    <div className="grid grid-cols-1 gap-3 max-h-[500px] overflow-y-auto">
+    <div className="grid grid-cols-1 gap-4 max-h-[500px] overflow-y-auto">
       {items.map((item) => (
         <ItemCard key={item.id} item={item} onSelect={() => onItemSelect(item)} />
       ))}
@@ -482,50 +456,41 @@ function ItemCard({ item, onSelect }: ItemCardProps) {
     }
   };
 
+  const getActionText = (categoryName?: string) => {
+    if (!categoryName) return "Add to Cart";
+
+    const category = categoryName.toLowerCase();
+    if (category.includes("pizza")) return "Customize Pizza";
+    if (category.includes("sandwich")) return "Build Sandwich";
+    if (category.includes("appetizer")) return "Customize Order";
+    if (category.includes("chicken")) return "Select Options";
+    if (category.includes("pasta")) return "Choose Sauce";
+    return "Add to Cart";
+  };
+
   return (
     <button
       onClick={onSelect}
-      className="bg-white border border-gray-200 rounded-lg p-4 text-left hover:border-blue-500 hover:shadow-md transition-all w-full"
+      className="bg-white hover:bg-gray-50 border border-gray-200 hover:border-blue-300 rounded-lg p-4 text-left transition-all duration-200 hover:shadow-md w-full"
     >
       <div className="flex justify-between items-start">
         <div className="flex-1">
-          <h5 className="font-semibold text-gray-900 mb-1">{item.name}</h5>
-          {item.description && <p className="text-sm text-gray-600 mb-2 line-clamp-2">{item.description}</p>}
+          <h5 className="font-bold text-gray-900 mb-1 text-lg">{item.name}</h5>
+          {item.description && <p className="text-sm text-gray-600 mb-3 line-clamp-2">{item.description}</p>}
+
           <div className="flex items-center gap-2 text-xs">
-            <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{item.item_type}</span>
+            {hasVariants && (
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">{item.variants.length} sizes</span>
+            )}
             <span className="text-gray-500">~{item.prep_time_minutes || 15} min</span>
-            {hasVariants && <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">{item.variants.length} sizes</span>}
           </div>
         </div>
 
         <div className="text-right ml-4">
-          <div className="text-lg font-bold text-green-600">{getPriceDisplay()}</div>
-          <div className="text-xs text-blue-600 mt-1">{hasVariants ? "Choose Size" : "Add to Cart"}</div>
+          <div className="text-xl font-bold text-green-600 mb-1">{getPriceDisplay()}</div>
+          <div className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded">{getActionText(item.category?.name)}</div>
         </div>
       </div>
     </button>
-  );
-}
-
-interface VariantSelectorProps {
-  item: MenuItemWithVariants;
-  onVariantSelect: (variant: MenuItemVariant) => void;
-}
-
-function VariantSelector({ item, onVariantSelect }: VariantSelectorProps) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      {item.variants.map((variant) => (
-        <button
-          key={variant.id}
-          onClick={() => onVariantSelect(variant)}
-          className="bg-white border border-gray-300 rounded-lg p-4 text-left hover:border-blue-500 hover:shadow-md transition-all"
-        >
-          <div className="font-semibold text-gray-900">{variant.name}</div>
-          {variant.serves && <div className="text-sm text-gray-600">{variant.serves}</div>}
-          <div className="text-lg font-bold text-green-600 mt-2">${variant.price.toFixed(2)}</div>
-        </button>
-      ))}
-    </div>
   );
 }

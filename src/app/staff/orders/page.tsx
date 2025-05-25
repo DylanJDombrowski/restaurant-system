@@ -1,19 +1,22 @@
-// src/app/staff/orders/page.tsx - UPDATED to use CategoryFirstNavigator
+// src/app/staff/orders/page.tsx - REORGANIZED with Tab Layout
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { MenuItemWithVariants, Restaurant, OrderWithItems, Customer, Topping, Modifier, ConfiguredCartItem } from "@/lib/types";
-// 🔄 CHANGE: Switch to CategoryFirstNavigator
-import CategoryFirstNavigator from "@/components/features/orders/CategoryFirstNavigation";
-import EnhancedCartSystem, { useCartStatistics } from "@/components/features/orders/EnhancedCartSystem";
+import CategoryFirstNavigator from "@/components/features/orders/MenuNavigator";
+import OrderCart, { useCartStatistics } from "@/components/features/orders/OrderCart";
+import CustomerDetails from "@/components/features/orders/CustomerDetails";
+import OrderSuccessMessage from "@/components/features/orders/OrderSuccessMessage";
 
-/**
- * 🆕 UPDATED: Now uses category-first navigation for better staff experience
- * Staff workflow: Categories → Items → Customization → Cart
- */
+type ActiveTab = "new-order" | "pickup";
 
-export default function ExpressStaffOrdersPage() {
+export default function StaffOrdersPage() {
   // ==========================================
-  // CORE DATA STATES (unchanged)
+  // UI STATE - NEW TAB SYSTEM
+  // ==========================================
+  const [activeTab, setActiveTab] = useState<ActiveTab>("new-order");
+
+  // ==========================================
+  // CORE DATA STATES
   // ==========================================
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItemWithVariants[]>([]);
@@ -42,6 +45,7 @@ export default function ExpressStaffOrdersPage() {
 
   const [orderType, setOrderType] = useState<"pickup" | "delivery">("pickup");
 
+  // Delivery address state
   const [deliveryAddress, setDeliveryAddress] = useState({
     address: "",
     city: "",
@@ -49,9 +53,15 @@ export default function ExpressStaffOrdersPage() {
     instructions: "",
   });
 
-  const [orderCompletionStep, setOrderCompletionStep] = useState<"building" | "customer_info" | "finalizing" | "completed">("building");
-
+  // Order completion states
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showOrderSuccess, setShowOrderSuccess] = useState(false);
+  const [completedOrder, setCompletedOrder] = useState<{
+    orderNumber: string;
+    total: number;
+    orderType: "pickup" | "delivery";
+    estimatedTime: number;
+  } | null>(null);
 
   // Cart statistics
   const cartStats = useCartStatistics(cartItems);
@@ -63,7 +73,7 @@ export default function ExpressStaffOrdersPage() {
   };
 
   // ==========================================
-  // DATA LOADING (unchanged)
+  // DATA LOADING
   // ==========================================
 
   const loadOrders = useCallback(async (restaurantId: string) => {
@@ -109,12 +119,11 @@ export default function ExpressStaffOrdersPage() {
   }, [loadInitialData]);
 
   // ==========================================
-  // PICKUP FUNCTIONALITY (unchanged)
+  // PICKUP FUNCTIONALITY
   // ==========================================
 
   const handleOrderPickupComplete = async (orderId: string) => {
     if (!restaurant) return;
-
     if (completingOrderIds.has(orderId)) return;
 
     try {
@@ -136,11 +145,6 @@ export default function ExpressStaffOrdersPage() {
 
       setOrders((prevOrders) => prevOrders.filter((order) => order.id !== orderId));
 
-      const order = orders.find((o) => o.id === orderId);
-      if (order) {
-        console.log(`Order #${order.order_number} marked as picked up`);
-      }
-
       setTimeout(() => {
         loadOrders(restaurant.id);
       }, 1000);
@@ -157,7 +161,7 @@ export default function ExpressStaffOrdersPage() {
   };
 
   // ==========================================
-  // CUSTOMER LOOKUP (unchanged)
+  // CUSTOMER LOOKUP
   // ==========================================
 
   const lookupCustomer = useCallback(
@@ -210,7 +214,7 @@ export default function ExpressStaffOrdersPage() {
   }, [customerInfo.phone, lookupCustomer, restaurant]);
 
   // ==========================================
-  // CART MANAGEMENT (unchanged)
+  // CART MANAGEMENT
   // ==========================================
 
   const handleAddToCart = (configuredItem: ConfiguredCartItem) => {
@@ -232,10 +236,8 @@ export default function ExpressStaffOrdersPage() {
           ...updated[existingIndex],
           quantity: updated[existingIndex].quantity + 1,
         };
-        console.log("📦 Updated existing cart item quantity");
         return updated;
       } else {
-        console.log("➕ Added new item to cart");
         return [...prev, configuredItem];
       }
     });
@@ -250,7 +252,7 @@ export default function ExpressStaffOrdersPage() {
   };
 
   // ==========================================
-  // ORDER COMPLETION WORKFLOW (unchanged)
+  // ORDER COMPLETION WORKFLOW
   // ==========================================
 
   const handleCompleteOrder = () => {
@@ -314,20 +316,14 @@ export default function ExpressStaffOrdersPage() {
       const responseData = await response.json();
       if (!response.ok) throw new Error(responseData.error || "Failed to create order");
 
-      // Reset everything for next order
-      setCartItems([]);
-      setCustomerInfo({ name: "", phone: "", email: "" });
-      setOrderType("pickup");
-      setDeliveryAddress({ address: "", city: "", zip: "", instructions: "" });
-      setFoundCustomer(null);
-      setCustomerLookupStatus("idle");
-      setOrderCompletionStep("completed");
-
-      alert("Order created successfully! Order Number: " + responseData.data.order_number);
-
-      setTimeout(() => {
-        setOrderCompletionStep("building");
-      }, 2000);
+      // Show success message instead of alert
+      setCompletedOrder({
+        orderNumber: responseData.data.order_number,
+        total: orderSummary.total,
+        orderType: orderType,
+        estimatedTime: orderType === "pickup" ? 25 : 45,
+      });
+      setShowOrderSuccess(true);
 
       if (restaurant) {
         loadOrders(restaurant.id);
@@ -340,14 +336,27 @@ export default function ExpressStaffOrdersPage() {
     }
   };
 
+  // Handle order success completion
+  const handleOrderSuccessComplete = () => {
+    // Reset everything for next order
+    setCartItems([]);
+    setCustomerInfo({ name: "", phone: "", email: "" });
+    setOrderType("pickup");
+    setDeliveryAddress({ address: "", city: "", zip: "", instructions: "" });
+    setFoundCustomer(null);
+    setCustomerLookupStatus("idle");
+    setShowOrderSuccess(false);
+    setCompletedOrder(null);
+  };
+
   // ==========================================
-  // RENDER LOGIC - UPDATED HEADER WITH CATEGORY INFO
+  // RENDER LOGIC
   // ==========================================
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
-        <div className="text-lg font-semibold text-gray-900">Loading category-first ordering system...</div>
+        <div className="text-lg font-semibold text-gray-900">Loading ordering system...</div>
       </div>
     );
   }
@@ -364,224 +373,276 @@ export default function ExpressStaffOrdersPage() {
     );
   }
 
-  if (orderCompletionStep === "completed") {
-    return (
-      <div className="flex justify-center items-center h-96">
-        <div className="text-center">
-          <div className="text-6xl mb-4">✅</div>
-          <div className="text-2xl font-bold text-green-600 mb-2">Order Created Successfully!</div>
-          <div className="text-gray-600">Starting new order...</div>
-        </div>
-      </div>
-    );
-  }
-
   const readyOrders = orders.filter((order) => order.status === "ready");
-
-  // Get category count for header
   const categoryCount = new Set(menuItems.map((item) => item.category?.name).filter(Boolean)).size;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      {/* 🆕 ENHANCED HEADER WITH CATEGORY INFO */}
-      <div className="mb-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Category-First Ordering</h1>
-            <div className="mt-2 flex items-center gap-4 text-sm">
-              <span className="text-gray-600">
-                <span className="font-semibold">{restaurant?.name}</span>
-              </span>
-              <span className="text-purple-600">
-                📂 <span className="font-semibold">{categoryCount} categories</span>
-              </span>
-              <span className="text-gray-600">
-                🍽️ <span className="font-semibold">{menuItems.length} menu items</span>
-              </span>
-              <span className="text-blue-600">
-                Cart: <span className="font-semibold">{cartStats.totalItems} items</span>
-              </span>
-              <span className="text-green-600">
-                Total: <span className="font-semibold">${orderSummary.total.toFixed(2)}</span>
-              </span>
-              {readyOrders.length > 0 && (
-                <span className="text-orange-600">
-                  <span className="font-semibold">{readyOrders.length}</span> ready for pickup
-                </span>
+    <>
+      <div className="min-h-screen bg-gray-50">
+        {/* 🆕 NEW: TAB-BASED HEADER */}
+        <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+          <div className="px-4 md:px-6 py-4">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Pizza Mia Orders</h1>
+                <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                  <span>{restaurant?.name}</span>
+                  <span>📂 {categoryCount} categories</span>
+                  <span>🍽️ {menuItems.length} items</span>
+                  {activeTab === "new-order" && (
+                    <>
+                      <span className="text-blue-600">Cart: {cartStats.totalItems} items</span>
+                      <span className="text-green-600 font-medium">${orderSummary.total.toFixed(2)}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Complete Order Button - Only show on New Order tab */}
+              {activeTab === "new-order" && cartItems.length > 0 && (
+                <button
+                  onClick={handleCompleteOrder}
+                  disabled={isSubmitting}
+                  className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+                >
+                  {isSubmitting ? "Processing..." : `Complete Order - ${orderSummary.total.toFixed(2)}`}
+                </button>
               )}
             </div>
-          </div>
 
-          <div className="flex items-center gap-4">
-            <CustomerStatusBadge customerInfo={customerInfo} foundCustomer={foundCustomer} customerLookupStatus={customerLookupStatus} />
-
-            {cartItems.length > 0 && (
+            {/* Tab Navigation */}
+            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
               <button
-                onClick={handleCompleteOrder}
-                disabled={isSubmitting}
-                className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+                onClick={() => setActiveTab("new-order")}
+                className={`px-6 py-2 rounded-md font-medium transition-all ${
+                  activeTab === "new-order" ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-white"
+                }`}
               >
-                {isSubmitting ? "Processing..." : "Complete Order"}
+                📝 New Order
+                {cartItems.length > 0 && (
+                  <span className="ml-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full">{cartStats.totalItems}</span>
+                )}
               </button>
-            )}
+
+              <button
+                onClick={() => setActiveTab("pickup")}
+                className={`px-6 py-2 rounded-md font-medium transition-all ${
+                  activeTab === "pickup" ? "bg-orange-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-white"
+                }`}
+              >
+                🍕 Ready for Pickup
+                {readyOrders.length > 0 && (
+                  <span className="ml-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">{readyOrders.length}</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* 🆕 NEW: TAB CONTENT */}
+        <div className="p-4 md:p-6">
+          {activeTab === "new-order" ? (
+            // NEW ORDER TAB - Clean Two-Column Layout
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+              {/* LEFT: Menu Navigation - Takes more space */}
+              <div className="lg:col-span-2">
+                <CategoryFirstNavigator
+                  menuItems={menuItems}
+                  toppings={toppings}
+                  modifiers={modifiers}
+                  onAddToCart={handleAddToCart}
+                  restaurantId={restaurant?.id || ""}
+                />
+              </div>
+
+              {/* RIGHT: Cart & Customer Info - Compact */}
+              <div className="space-y-4">
+                {/* Customer Details */}
+                <CustomerDetails
+                  customerInfo={customerInfo}
+                  setCustomerInfo={setCustomerInfo}
+                  foundCustomer={foundCustomer}
+                  onCustomerLookup={lookupCustomer}
+                  lookupLoading={lookupLoading}
+                  customerLookupStatus={customerLookupStatus}
+                  restaurantId={restaurant?.id || ""}
+                  orderType={orderType}
+                  deliveryAddress={deliveryAddress}
+                  setDeliveryAddress={setDeliveryAddress}
+                />
+
+                {/* Order Type Selection */}
+                {cartItems.length > 0 && (
+                  <div className="bg-white border border-gray-300 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-900 mb-3">Order Type</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setOrderType("pickup")}
+                        className={`p-3 rounded-lg border-2 transition-all text-center ${
+                          orderType === "pickup"
+                            ? "border-blue-600 bg-blue-50 text-blue-900"
+                            : "border-gray-300 text-gray-700 hover:border-gray-400"
+                        }`}
+                      >
+                        <div className="font-semibold">🏃 Pickup</div>
+                        <div className="text-sm">~25 minutes</div>
+                      </button>
+
+                      <button
+                        onClick={() => setOrderType("delivery")}
+                        className={`p-3 rounded-lg border-2 transition-all text-center ${
+                          orderType === "delivery"
+                            ? "border-blue-600 bg-blue-50 text-blue-900"
+                            : "border-gray-300 text-gray-700 hover:border-gray-400"
+                        }`}
+                      >
+                        <div className="font-semibold">🚚 Delivery</div>
+                        <div className="text-sm">+$3.99 • ~45 min</div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cart */}
+                <CustomerDetails
+                  customerInfo={customerInfo}
+                  setCustomerInfo={setCustomerInfo}
+                  foundCustomer={foundCustomer}
+                  onCustomerLookup={lookupCustomer}
+                  lookupLoading={lookupLoading}
+                  customerLookupStatus={customerLookupStatus}
+                  restaurantId={restaurant?.id || ""}
+                  orderType={orderType}
+                  deliveryAddress={deliveryAddress}
+                  setDeliveryAddress={setDeliveryAddress}
+                />
+                <OrderCart
+                  items={cartItems}
+                  onUpdateItem={handleUpdateCartItem}
+                  onRemoveItem={handleRemoveCartItem}
+                  restaurantId={restaurant?.id || ""}
+                  orderSummary={orderSummary}
+                  onCompleteOrder={handleCompleteOrder}
+                />
+              </div>
+            </div>
+          ) : (
+            // PICKUP TAB - Full Width for Better Order Management
+            <div className="max-w-6xl mx-auto">
+              <PickupOrdersView orders={readyOrders} onOrderComplete={handleOrderPickupComplete} completingOrderIds={completingOrderIds} />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* MAIN LAYOUT */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-        {/* LEFT: CATEGORY-FIRST NAVIGATION - 🆕 UPDATED */}
-        <div className="xl:col-span-2">
-          <CategoryFirstNavigator
-            menuItems={menuItems}
-            toppings={toppings}
-            modifiers={modifiers}
-            onAddToCart={handleAddToCart}
-            restaurantId={restaurant?.id || ""}
-          />
-        </div>
-
-        {/* CENTER: CART */}
-        <div className="xl:col-span-1">
-          <EnhancedCartSystem
-            items={cartItems}
-            onUpdateItem={handleUpdateCartItem}
-            onRemoveItem={handleRemoveCartItem}
-            restaurantId={restaurant?.id || ""}
-            orderSummary={orderSummary}
-            customerInfo={customerInfo}
-            setCustomerInfo={setCustomerInfo}
-            foundCustomer={foundCustomer}
-            onCustomerLookup={lookupCustomer}
-            lookupLoading={lookupLoading}
-            customerLookupStatus={customerLookupStatus}
-            orderType={orderType}
-            setOrderType={setOrderType}
-            onCompleteOrder={handleCompleteOrder}
-          />
-        </div>
-
-        {/* RIGHT: PICKUP ORDERS */}
-        <div className="xl:col-span-1">
-          <ReadyForPickupPanel orders={readyOrders} onOrderComplete={handleOrderPickupComplete} completingOrderIds={completingOrderIds} />
-        </div>
-      </div>
-    </div>
+      {/* Order Success Modal */}
+      {showOrderSuccess && completedOrder && (
+        <OrderSuccessMessage
+          orderNumber={completedOrder.orderNumber}
+          orderTotal={completedOrder.total}
+          orderType={completedOrder.orderType}
+          estimatedTime={completedOrder.estimatedTime}
+          onComplete={handleOrderSuccessComplete}
+        />
+      )}
+    </>
   );
 }
 
 // ==========================================
-// HELPER COMPONENTS (unchanged)
+// 🆕 ENHANCED PICKUP ORDERS VIEW
 // ==========================================
 
-interface ReadyForPickupPanelProps {
+interface PickupOrdersViewProps {
   orders: OrderWithItems[];
   onOrderComplete: (orderId: string) => void;
   completingOrderIds: Set<string>;
 }
 
-function ReadyForPickupPanel({ orders, onOrderComplete, completingOrderIds }: ReadyForPickupPanelProps) {
+function PickupOrdersView({ orders, onOrderComplete, completingOrderIds }: PickupOrdersViewProps) {
+  if (orders.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <div className="text-6xl mb-4">🎉</div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">All Caught Up!</h3>
+        <p className="text-gray-600 mb-6">No orders are currently ready for pickup.</p>
+        <div className="text-sm text-gray-500">Orders will appear here when the kitchen marks them as ready.</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white border border-gray-300 rounded-lg h-fit">
-      <div className="px-4 py-3 border-b border-gray-200 bg-orange-50">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-          <span className="mr-2">🍕</span>
-          Ready for Pickup
-          {orders.length > 0 && <span className="ml-2 bg-orange-200 text-orange-800 px-2 py-1 rounded-full text-sm">{orders.length}</span>}
-        </h3>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-900">Orders Ready for Pickup ({orders.length})</h2>
+        <div className="text-sm text-gray-600">Click "Mark as Picked Up" when customer collects their order</div>
       </div>
 
-      <div className="max-h-96 overflow-y-auto">
-        {orders.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
-            <div className="text-4xl mb-2">📋</div>
-            <div className="font-medium text-gray-900 mb-1">All caught up!</div>
-            <div className="text-sm">No orders ready for pickup</div>
-          </div>
-        ) : (
-          <div className="p-4 space-y-3">
-            {orders.map((order) => {
-              const isCompleting = completingOrderIds.has(order.id);
-              const orderAge = new Date().getTime() - new Date(order.created_at).getTime();
-              const minutesWaiting = Math.floor(orderAge / (1000 * 60));
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {orders.map((order) => {
+          const isCompleting = completingOrderIds.has(order.id);
+          const orderAge = new Date().getTime() - new Date(order.created_at).getTime();
+          const minutesWaiting = Math.floor(orderAge / (1000 * 60));
 
-              return (
+          return (
+            <div
+              key={order.id}
+              className={`bg-white rounded-lg shadow-sm border-2 p-6 transition-all ${
+                isCompleting
+                  ? "border-green-300 bg-green-50"
+                  : minutesWaiting > 15
+                  ? "border-red-300 bg-red-50"
+                  : minutesWaiting > 10
+                  ? "border-yellow-300 bg-yellow-50"
+                  : "border-gray-200 hover:shadow-md"
+              }`}
+            >
+              {/* Order Header */}
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">#{order.order_number}</div>
+                  <div className="text-lg font-medium text-gray-800">{order.customer_name}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xl font-bold text-green-600">${order.total.toFixed(2)}</div>
+                  <div className="text-sm text-gray-500 capitalize">{order.order_type}</div>
+                </div>
+              </div>
+
+              {/* Customer Info */}
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <div className="text-sm text-gray-700">📞 {order.customer_phone}</div>
+                {order.customer_email && <div className="text-sm text-gray-700">✉️ {order.customer_email}</div>}
+              </div>
+
+              {/* Wait Time Status */}
+              <div className="mb-4">
                 <div
-                  key={order.id}
-                  className={`border rounded-lg p-3 transition-all ${
-                    isCompleting
-                      ? "border-green-300 bg-green-50"
-                      : minutesWaiting > 10
-                      ? "border-red-300 bg-red-50"
-                      : "border-gray-200 bg-white hover:shadow-md"
+                  className={`text-sm font-medium ${
+                    minutesWaiting > 15 ? "text-red-600" : minutesWaiting > 10 ? "text-yellow-600" : "text-green-600"
                   }`}
                 >
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <div className="font-semibold text-gray-900">#{order.order_number}</div>
-                      <div className="text-sm text-gray-900 font-medium">{order.customer_name}</div>
-                      <div className="text-sm text-gray-600">{order.customer_phone}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Waiting {minutesWaiting} min
-                        {minutesWaiting > 10 && <span className="text-red-600 font-medium"> • Long wait!</span>}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-green-600">${order.total.toFixed(2)}</div>
-                      <div className="text-xs text-gray-500 capitalize">{order.order_type}</div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => onOrderComplete(order.id)}
-                    disabled={isCompleting}
-                    className={`w-full py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                      isCompleting ? "bg-green-200 text-green-800 cursor-not-allowed" : "bg-green-600 text-white hover:bg-green-700"
-                    }`}
-                  >
-                    {isCompleting ? "Completing..." : "Mark as Picked Up"}
-                  </button>
+                  ⏱️ Waiting: {minutesWaiting} minutes
+                  {minutesWaiting > 15 && " • PRIORITY"}
+                  {minutesWaiting > 10 && minutesWaiting <= 15 && " • Getting Long"}
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <div className="text-xs text-gray-500 mt-1">Ordered at {new Date(order.created_at).toLocaleTimeString()}</div>
+              </div>
+
+              {/* Action Button */}
+              <button
+                onClick={() => onOrderComplete(order.id)}
+                disabled={isCompleting}
+                className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors ${
+                  isCompleting ? "bg-green-200 text-green-800 cursor-not-allowed" : "bg-green-600 text-white hover:bg-green-700"
+                }`}
+              >
+                {isCompleting ? "Completing..." : "✅ Mark as Picked Up"}
+              </button>
+            </div>
+          );
+        })}
       </div>
-    </div>
-  );
-}
-
-interface CustomerStatusBadgeProps {
-  customerInfo: { name: string; phone: string; email: string };
-  foundCustomer: Customer | null;
-  customerLookupStatus: "idle" | "searching" | "found" | "not-found";
-}
-
-function CustomerStatusBadge({ customerInfo, foundCustomer, customerLookupStatus }: CustomerStatusBadgeProps) {
-  if (foundCustomer) {
-    return (
-      <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-        <div className="text-sm font-medium text-green-800">Customer: {foundCustomer.name}</div>
-        <div className="text-xs text-green-600">
-          {foundCustomer.total_orders} orders • {foundCustomer.loyalty_points} points
-        </div>
-      </div>
-    );
-  }
-
-  if (customerInfo.phone && customerLookupStatus === "not-found") {
-    return (
-      <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-        <div className="text-sm font-medium text-blue-800">New Customer</div>
-        <div className="text-xs text-blue-600">{customerInfo.phone}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
-      <div className="text-sm font-medium text-gray-600">No Customer Info</div>
-      <div className="text-xs text-gray-500">Add customer info in cart section</div>
     </div>
   );
 }

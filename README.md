@@ -144,6 +144,7 @@ restaurant-system
 │  │  │  ├─ Navigation.tsx
 │  │  │  └─ orders
 │  │  │     ├─ AppetizerCustomizer.tsx
+│  │  │     ├─ CategoryFirstNavigation.tsx
 │  │  │     ├─ EnhancedCartSystem.tsx
 │  │  │     ├─ EnhancedMenuItemSelector.tsx
 │  │  │     ├─ InlineCustomerInfo.tsx

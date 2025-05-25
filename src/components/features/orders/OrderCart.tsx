@@ -1,4 +1,4 @@
-// src/components/features/orders/EnhancedCartSystem.tsx - FIXED VERSION
+// src/components/features/orders/OrderCart.tsx - FIXED VERSION
 "use client";
 import { useState, useMemo } from "react";
 import {
@@ -7,16 +7,21 @@ import {
   ConfiguredTopping,
   Topping,
   Modifier,
-  Customer,
   MenuItemWithVariants,
-  MenuItemVariant, // 🔧 FIX 1: Added missing import
+  MenuItemVariant,
 } from "@/lib/types";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
-import InlineCustomerInfo from "./InlineCustomerInfo";
 import SandwichCustomizer from "./SandwichCustomizer";
 import AppetizerCustomizer from "./AppetizerCustomizer";
 
-interface EnhancedCartSystemProps {
+/**
+ * 🔄 RENAMED: OrderCart (formerly EnhancedCartSystem)
+ *
+ * SIMPLIFIED: Customer details and order type moved to main page
+ * FOCUSED: This component now only handles cart items and customization
+ */
+
+interface OrderCartProps {
   items: ConfiguredCartItem[];
   onUpdateItem: (itemId: string, updates: Partial<ConfiguredCartItem>) => void;
   onRemoveItem: (itemId: string) => void;
@@ -27,35 +32,12 @@ interface EnhancedCartSystemProps {
     deliveryFee: number;
     total: number;
   };
-  customerInfo: { name: string; phone: string; email: string };
-  setCustomerInfo: React.Dispatch<React.SetStateAction<{ name: string; phone: string; email: string }>>;
-  foundCustomer: Customer | null;
-  onCustomerLookup: (phone: string) => void;
-  lookupLoading: boolean;
-  customerLookupStatus: "idle" | "searching" | "found" | "not-found";
-  orderType: "pickup" | "delivery";
-  setOrderType: (type: "pickup" | "delivery") => void;
   onCompleteOrder: () => void;
 }
 
-export default function EnhancedCartSystem({
-  items,
-  onUpdateItem,
-  onRemoveItem,
-  restaurantId,
-  orderSummary,
-  customerInfo,
-  setCustomerInfo,
-  foundCustomer,
-  onCustomerLookup,
-  lookupLoading,
-  customerLookupStatus,
-  orderType,
-  setOrderType,
-  onCompleteOrder,
-}: EnhancedCartSystemProps) {
+export default function OrderCart({ items, onUpdateItem, onRemoveItem, restaurantId, orderSummary, onCompleteOrder }: OrderCartProps) {
   // ==========================================
-  // STATE MANAGEMENT - CLEANED
+  // STATE MANAGEMENT - SIMPLIFIED
   // ==========================================
 
   // Pizza customizer states
@@ -118,7 +100,7 @@ export default function EnhancedCartSystem({
   };
 
   // ==========================================
-  // CART ITEM MANAGEMENT - FIXED TYPES
+  // CART ITEM MANAGEMENT
   // ==========================================
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
@@ -161,14 +143,13 @@ export default function EnhancedCartSystem({
 
       // 🎯 ROUTING LOGIC WITH APPETIZER SUPPORT
 
-      // 🆕 NEW: Check if it's an appetizer
+      // Check if it's an appetizer
       if (fullMenuItem.category?.name === "Appetizers") {
         console.log("🍗 Opening appetizer customizer from cart");
 
         // Find the variant if this cart item has one
         let selectedVariant = null;
         if (item.variantId && fullMenuItem.variants) {
-          // 🔧 FIX 2: Added proper typing for find method
           selectedVariant = fullMenuItem.variants.find((v: MenuItemVariant) => v.id === item.variantId) || null;
         }
 
@@ -179,10 +160,20 @@ export default function EnhancedCartSystem({
         return;
       }
 
+      // Check if it's a sandwich
+      if (fullMenuItem.category?.name === "Sandwiches") {
+        console.log("🥪 Opening sandwich customizer from cart");
+        setCustomizingSandwichItem(fullMenuItem);
+        setCustomizingItem(item);
+        setShowSandwichCustomizer(true);
+        return;
+      }
+
+      // Pizza or customizable items
       if (fullMenuItem.item_type === "pizza" || fullMenuItem.allows_custom_toppings) {
         console.log("🍕 Opening pizza customizer with existing state");
 
-        // 🆕 FIXED: Preserve ALL existing state
+        // Preserve ALL existing state
         const safeItem: ConfiguredCartItem = {
           ...item,
           // Keep existing selections (don't reset to empty arrays)
@@ -212,7 +203,7 @@ export default function EnhancedCartSystem({
     } catch (error) {
       console.error("Error determining customization type:", error);
 
-      // 🆕 FIXED: Fallback also preserves state
+      // Fallback also preserves state
       const safeItem: ConfiguredCartItem = {
         ...item,
         selectedToppings: item.selectedToppings || [],
@@ -226,11 +217,15 @@ export default function EnhancedCartSystem({
     }
   };
 
-  // SANDWICH CUSTOMIZATION HANDLERS
+  // ==========================================
+  // CUSTOMIZATION HANDLERS
+  // ==========================================
+
+  // Sandwich customization handlers
   const handleSandwichCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
     console.log("🥪 Sandwich customization completed:", updatedItem);
 
-    // 🆕 FIXED: Update the SAME cart item (preserve ID and other properties)
+    // Update the SAME cart item (preserve ID and other properties)
     const finalItem: ConfiguredCartItem = {
       ...updatedItem,
       id: customizingItem?.id || updatedItem.id, // Keep original cart item ID
@@ -246,9 +241,10 @@ export default function EnhancedCartSystem({
   const handleSandwichCustomizationCancel = () => {
     setShowSandwichCustomizer(false);
     setCustomizingSandwichItem(null);
+    setCustomizingItem(null);
   };
 
-  // PIZZA CUSTOMIZATION HANDLERS
+  // Pizza customization handlers
   const handleCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
     console.log("🍕 Pizza customization completed:", updatedItem);
 
@@ -263,9 +259,7 @@ export default function EnhancedCartSystem({
     setCustomizingItem(null);
   };
 
-  // ===========================================
-  // APPETIZER CUSTOMIZATION HANDLERS
-  // ===========================================
+  // Appetizer customization handlers
   const handleAppetizerCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
     console.log("🍗 Appetizer customization completed:", updatedItem);
     onUpdateItem(updatedItem.id, updatedItem);
@@ -287,12 +281,11 @@ export default function EnhancedCartSystem({
   // ==========================================
 
   const canCompleteOrder = () => {
-    return items.length > 0 && customerInfo.name && customerInfo.phone;
+    return items.length > 0;
   };
 
   const getCompletionButtonText = () => {
     if (items.length === 0) return "Add Items First";
-    if (!customerInfo.name || !customerInfo.phone) return "Add Customer Info";
     return `Complete Order - $${orderSummary.total.toFixed(2)}`;
   };
 
@@ -302,109 +295,63 @@ export default function EnhancedCartSystem({
 
   return (
     <>
-      <div className="space-y-4">
-        {/* INLINE CUSTOMER INFO */}
-        <InlineCustomerInfo
-          customerInfo={customerInfo}
-          setCustomerInfo={setCustomerInfo}
-          foundCustomer={foundCustomer}
-          onCustomerLookup={onCustomerLookup}
-          lookupLoading={lookupLoading}
-          customerLookupStatus={customerLookupStatus}
-          restaurantId={restaurantId}
-        />
+      <div className="bg-white border border-gray-300 rounded-lg">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Current Order
+            {cartStats.totalItems > 0 && <span className="ml-2 text-sm font-normal text-gray-600">({cartStats.totalItems} items)</span>}
+          </h3>
+        </div>
 
-        {/* ORDER TYPE SELECTION */}
-        {items.length > 0 && (
-          <div className="bg-white border border-gray-300 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-3">Order Type</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setOrderType("pickup")}
-                className={`p-3 rounded-lg border-2 transition-all text-center ${
-                  orderType === "pickup"
-                    ? "border-blue-600 bg-blue-50 text-blue-900"
-                    : "border-gray-300 text-gray-700 hover:border-gray-400"
-                }`}
-              >
-                <div className="font-semibold">🏃 Pickup</div>
-                <div className="text-sm">~25 minutes</div>
-              </button>
-
-              <button
-                onClick={() => setOrderType("delivery")}
-                className={`p-3 rounded-lg border-2 transition-all text-center ${
-                  orderType === "delivery"
-                    ? "border-blue-600 bg-blue-50 text-blue-900"
-                    : "border-gray-300 text-gray-700 hover:border-gray-400"
-                }`}
-              >
-                <div className="font-semibold">🚚 Delivery</div>
-                <div className="text-sm">+$3.99 • ~45 min</div>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* CART ITEMS */}
-        <div className="bg-white border border-gray-300 rounded-lg">
-          <div className="px-4 py-3 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Current Order
-              {cartStats.totalItems > 0 && <span className="ml-2 text-sm font-normal text-gray-600">({cartStats.totalItems} items)</span>}
-            </h3>
-          </div>
-
-          <div className="max-h-96 overflow-y-auto">
-            {items.length === 0 ? (
-              <CartEmptyState />
-            ) : (
-              <div className="p-4 space-y-3">
-                {items.map((item) => (
-                  <CartItemCard
-                    key={item.id}
-                    item={item}
-                    onQuantityChange={(quantity) => handleQuantityChange(item.id, quantity)}
-                    onCustomize={() => handleCustomizeItem(item)}
-                    onRemove={() => onRemoveItem(item.id)}
-                    customizationLoading={loadingCustomizerData && customizingItem?.id === item.id}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Order Notes */}
-          {items.length > 0 && (
-            <div className="px-4 py-3 border-t border-gray-200">
-              <label className="block text-sm font-medium text-gray-900 mb-1">Order Notes</label>
-              <textarea
-                placeholder="Special instructions for this order..."
-                value={orderNotes}
-                onChange={(e) => setOrderNotes(e.target.value)}
-                rows={2}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          )}
-
-          {/* CART SUMMARY */}
-          {items.length > 0 && (
-            <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
-              <OrderSummaryDisplay summary={orderSummary} />
-
-              <button
-                onClick={onCompleteOrder}
-                disabled={!canCompleteOrder()}
-                className={`w-full mt-4 py-3 px-4 rounded-lg font-semibold transition-colors ${
-                  canCompleteOrder() ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                {getCompletionButtonText()}
-              </button>
+        <div className="max-h-96 overflow-y-auto">
+          {items.length === 0 ? (
+            <CartEmptyState />
+          ) : (
+            <div className="p-4 space-y-3">
+              {items.map((item) => (
+                <CartItemCard
+                  key={item.id}
+                  item={item}
+                  onQuantityChange={(quantity) => handleQuantityChange(item.id, quantity)}
+                  onCustomize={() => handleCustomizeItem(item)}
+                  onRemove={() => onRemoveItem(item.id)}
+                  customizationLoading={loadingCustomizerData && customizingItem?.id === item.id}
+                />
+              ))}
             </div>
           )}
         </div>
+
+        {/* Order Notes */}
+        {items.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-200">
+            <label className="block text-sm font-medium text-gray-900 mb-1">Order Notes</label>
+            <textarea
+              placeholder="Special instructions for this order..."
+              value={orderNotes}
+              onChange={(e) => setOrderNotes(e.target.value)}
+              rows={2}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        )}
+
+        {/* CART SUMMARY */}
+        {items.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <OrderSummaryDisplay summary={orderSummary} />
+
+            <button
+              onClick={onCompleteOrder}
+              disabled={!canCompleteOrder()}
+              className={`w-full mt-4 py-3 px-4 rounded-lg font-semibold transition-colors ${
+                canCompleteOrder() ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              {getCompletionButtonText()}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* PIZZA MODAL CUSTOMIZER */}
@@ -423,6 +370,7 @@ export default function EnhancedCartSystem({
       {showSandwichCustomizer && customizingSandwichItem && (
         <SandwichCustomizer
           item={customizingSandwichItem}
+          existingCartItem={customizingItem || undefined}
           onComplete={handleSandwichCustomizationComplete}
           onCancel={handleSandwichCustomizationCancel}
           isOpen={showSandwichCustomizer}
@@ -434,7 +382,7 @@ export default function EnhancedCartSystem({
         <AppetizerCustomizer
           item={customizingAppetizerItem}
           selectedVariant={customizingAppetizerVariant || undefined}
-          existingCartItem={customizingItem || undefined} // 🔧 FIX 3: Changed null to undefined
+          existingCartItem={customizingItem || undefined}
           onComplete={handleAppetizerCustomizationComplete}
           onCancel={handleAppetizerCustomizationCancel}
           isOpen={showAppetizerCustomizer}
