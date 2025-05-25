@@ -215,11 +215,11 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
     setShowPizzaCustomizer(true);
   }, []);
 
-  const openSandwichCustomizer = useCallback((item: MenuItemWithVariants) => {
+  const openSandwichCustomizer = useCallback((_item: MenuItemWithVariants) => {
     setShowSandwichCustomizer(true);
   }, []);
 
-  const openAppetizerCustomizer = useCallback((item: MenuItemWithVariants, variant?: MenuItemVariant) => {
+  const openAppetizerCustomizer = useCallback((_item: MenuItemWithVariants, _variant?: MenuItemVariant) => {
     setShowAppetizerCustomizer(true);
   }, []);
 
