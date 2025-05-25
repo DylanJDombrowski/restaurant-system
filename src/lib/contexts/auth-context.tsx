@@ -1,8 +1,8 @@
 "use client";
-import { createContext, useContext, useEffect, useState, useRef } from "react";
-import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
-import { Staff, Restaurant } from "@/lib/types";
+import { Restaurant, Staff } from "@/lib/types";
+import { Session, User } from "@supabase/supabase-js";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 interface AuthContextType {
   user: User | null;
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * the employee entrance instead of the customer entrance - it's a direct
    * path to the data without security checkpoints that might slow things down.
    */
-  const loadStaffData = async (session: Session, retryCount = 0) => {
+  const loadStaffData = useCallback(async (session: Session, retryCount = 0) => {
     // Prevent concurrent loading attempts
     if (loadingStaffData.current) {
       console.log("Staff data already loading, skipping...");
@@ -132,7 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loadingStaffData.current = false;
       setLoading(false);
     }
-  };
+  }, []);
 
   // Update the refs whenever staff or restaurant change
   useEffect(() => {
@@ -195,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadStaffData]);
 
   /**
    * Auth State Change Listener
@@ -249,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Cleaning up auth listener...");
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadStaffData]);
 
   /**
    * Manual Retry Function

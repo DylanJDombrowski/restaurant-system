@@ -1,11 +1,11 @@
 // src/app/staff/orders/page.tsx - REORGANIZED with Tab Layout
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { MenuItemWithVariants, Restaurant, OrderWithItems, Customer, Topping, Modifier, ConfiguredCartItem } from "@/lib/types";
+import CustomerDetails from "@/components/features/orders/CustomerDetails";
 import CategoryFirstNavigator from "@/components/features/orders/MenuNavigator";
 import OrderCart, { useCartStatistics } from "@/components/features/orders/OrderCart";
-import CustomerDetails from "@/components/features/orders/CustomerDetails";
 import OrderSuccessMessage from "@/components/features/orders/OrderSuccessMessage";
+import { ConfiguredCartItem, Customer, MenuItemWithVariants, Modifier, OrderWithItems, Restaurant, Topping } from "@/lib/types";
+import { useCallback, useEffect, useState } from "react";
 
 type ActiveTab = "new-order" | "pickup";
 

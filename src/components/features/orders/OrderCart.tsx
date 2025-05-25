@@ -1,18 +1,18 @@
 // src/components/features/orders/OrderCart.tsx - FIXED VERSION
 "use client";
-import { useState, useMemo } from "react";
 import {
   ConfiguredCartItem,
   ConfiguredModifier,
   ConfiguredTopping,
-  Topping,
-  Modifier,
-  MenuItemWithVariants,
   MenuItemVariant,
+  MenuItemWithVariants,
+  Modifier,
+  Topping,
 } from "@/lib/types";
+import { useMemo, useState } from "react";
+import AppetizerCustomizer from "./AppetizerCustomizer";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
 import SandwichCustomizer from "./SandwichCustomizer";
-import AppetizerCustomizer from "./AppetizerCustomizer";
 
 /**
  * 🔄 RENAMED: OrderCart (formerly EnhancedCartSystem)

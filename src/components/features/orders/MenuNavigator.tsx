@@ -1,10 +1,10 @@
 // src/components/features/orders/CategoryFirstNavigator.tsx - FIXED VERSION
 "use client";
-import { useState, useMemo, useCallback } from "react";
-import { MenuItemWithVariants, MenuCategory, Topping, Modifier, ConfiguredCartItem } from "@/lib/types";
+import { ConfiguredCartItem, MenuCategory, MenuItemWithVariants, Modifier, Topping } from "@/lib/types";
+import { useCallback, useMemo, useState } from "react";
+import AppetizerCustomizer from "./AppetizerCustomizer";
 import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
 import SandwichCustomizer from "./SandwichCustomizer";
-import AppetizerCustomizer from "./AppetizerCustomizer";
 
 /**
  * 🎯 FIXED: CATEGORY-FIRST NAVIGATION SYSTEM
@@ -112,54 +112,6 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
     });
   }, []);
 
-  // ==========================================
-  // CUSTOMIZER OPERATIONS
-  // ==========================================
-
-  const closeAllCustomizers = useCallback(() => {
-    setShowPizzaCustomizer(false);
-    setShowSandwichCustomizer(false);
-    setShowAppetizerCustomizer(false);
-    setSelectedItem(null);
-    setCustomizerItem(null);
-  }, []);
-
-  const openSandwichCustomizer = useCallback((item: MenuItemWithVariants) => {
-    setShowSandwichCustomizer(true);
-  }, []);
-
-  const openAppetizerCustomizer = useCallback((item: MenuItemWithVariants) => {
-    setShowAppetizerCustomizer(true);
-  }, []);
-
-  const openChickenCustomizer = useCallback((item: MenuItemWithVariants) => {
-    // TODO: Implement ChickenCustomizer component
-    console.log("🚧 Chicken customizer not yet implemented");
-    addDirectToCart(item);
-  }, []);
-
-  const openPastaCustomizer = useCallback((item: MenuItemWithVariants) => {
-    // TODO: Implement PastaCustomizer component
-    console.log("🚧 Pasta customizer not yet implemented");
-    addDirectToCart(item);
-  }, []);
-
-  const addDirectToCart = useCallback(
-    (item: MenuItemWithVariants) => {
-      try {
-        const cartItem = createCartItem(item);
-        console.log(`➕ Adding to cart: ${cartItem.displayName} - $${cartItem.totalPrice}`);
-        onAddToCart(cartItem);
-
-        // Stay in category view after adding simple items
-      } catch (error) {
-        console.error("Error adding item to cart:", error);
-        alert("Error adding item to cart. Please try again.");
-      }
-    },
-    [onAddToCart]
-  );
-
   const createCartItem = useCallback((item: MenuItemWithVariants): ConfiguredCartItem => {
     // For items with variants, use the first variant as default (customizer will handle selection)
     const defaultVariant = item.variants && item.variants.length > 0 ? item.variants[0] : null;
@@ -181,6 +133,62 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
       displayName,
     };
   }, []);
+
+  const addDirectToCart = useCallback(
+    (item: MenuItemWithVariants) => {
+      try {
+        const cartItem = createCartItem(item);
+        console.log(`➕ Adding to cart: ${cartItem.displayName} - $${cartItem.totalPrice}`);
+        onAddToCart(cartItem);
+
+        // Stay in category view after adding simple items
+      } catch (error) {
+        console.error("Error adding item to cart:", error);
+        alert("Error adding item to cart. Please try again.");
+      }
+    },
+    [createCartItem, onAddToCart]
+  );
+
+  // ==========================================
+  // CUSTOMIZER OPERATIONS
+  // ==========================================
+
+  const closeAllCustomizers = useCallback(() => {
+    setShowPizzaCustomizer(false);
+    setShowSandwichCustomizer(false);
+    setShowAppetizerCustomizer(false);
+    setSelectedItem(null);
+    setCustomizerItem(null);
+  }, []);
+
+  const openSandwichCustomizer = useCallback((item: MenuItemWithVariants) => {
+    setSelectedItem(item);
+    setShowSandwichCustomizer(true);
+  }, []);
+
+  const openAppetizerCustomizer = useCallback((item: MenuItemWithVariants) => {
+    setSelectedItem(item);
+    setShowAppetizerCustomizer(true);
+  }, []);
+
+  const openChickenCustomizer = useCallback(
+    (item: MenuItemWithVariants) => {
+      // TODO: Implement ChickenCustomizer component
+      console.log("🚧 Chicken customizer not yet implemented");
+      addDirectToCart(item);
+    },
+    [addDirectToCart]
+  );
+
+  const openPastaCustomizer = useCallback(
+    (item: MenuItemWithVariants) => {
+      // TODO: Implement PastaCustomizer component
+      console.log("🚧 Pasta customizer not yet implemented");
+      addDirectToCart(item);
+    },
+    [addDirectToCart]
+  );
 
   const openPizzaCustomizer = useCallback(
     (item: MenuItemWithVariants) => {
@@ -237,7 +245,7 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
       onAddToCart(updatedItem);
       closeAllCustomizers();
     },
-    [onAddToCart]
+    [closeAllCustomizers, onAddToCart]
   );
 
   const handleSandwichCustomizerComplete = useCallback(
@@ -246,7 +254,7 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
       onAddToCart(updatedItem);
       closeAllCustomizers();
     },
-    [onAddToCart]
+    [closeAllCustomizers, onAddToCart]
   );
 
   const handleAppetizerCustomizerComplete = useCallback(
@@ -255,13 +263,13 @@ export default function CategoryFirstNavigator({ menuItems, toppings, modifiers,
       onAddToCart(updatedItem);
       closeAllCustomizers();
     },
-    [onAddToCart]
+    [closeAllCustomizers, onAddToCart]
   );
 
   const handleCustomizerCancel = useCallback(() => {
     console.log("❌ Customization cancelled");
     closeAllCustomizers();
-  }, []);
+  }, [closeAllCustomizers]);
 
   // ==========================================
   // RENDER LOGIC

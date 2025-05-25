@@ -1,7 +1,7 @@
 // src/components/features/orders/CustomerDetails.tsx
 "use client";
-import { useState, useEffect, useCallback } from "react";
 import { Customer } from "@/lib/types";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * 🆕 ENHANCED CUSTOMER DETAILS COMPONENT
@@ -75,15 +75,6 @@ export default function CustomerDetails({
     }
   }, [customerInfo.phone, onCustomerLookup]);
 
-  // Load customer addresses when customer found and delivery is selected
-  useEffect(() => {
-    if (orderType === "delivery" && foundCustomer?.id) {
-      loadPreviousAddresses(foundCustomer.id);
-    } else if (orderType === "delivery" && customerInfo.phone.length === 10) {
-      loadAddressesByPhone(customerInfo.phone);
-    }
-  }, [foundCustomer, customerInfo.phone, orderType, restaurantId]);
-
   const loadPreviousAddresses = useCallback(
     async (customerId: string) => {
       try {
@@ -94,7 +85,7 @@ export default function CustomerDetails({
           setPreviousAddresses(data.data || []);
 
           // Auto-fill with default address if available and no address entered yet
-          const defaultAddress = data.data?.find((addr: any) => addr.is_default);
+          const defaultAddress = data.data?.find((addr: CustomerAddress) => addr.is_default);
           if (defaultAddress && !deliveryAddress.address) {
             setDeliveryAddress({
               address: defaultAddress.address,
@@ -110,7 +101,7 @@ export default function CustomerDetails({
         setLoadingAddresses(false);
       }
     },
-    [setDeliveryAddress]
+    [deliveryAddress.address, setDeliveryAddress]
   );
 
   const loadAddressesByPhone = useCallback(
@@ -132,8 +123,17 @@ export default function CustomerDetails({
         setLoadingAddresses(false);
       }
     },
-    [restaurantId, setDeliveryAddress]
+    [restaurantId]
   );
+
+  // Load customer addresses when customer found and delivery is selected
+  useEffect(() => {
+    if (orderType === "delivery" && foundCustomer?.id) {
+      loadPreviousAddresses(foundCustomer.id);
+    } else if (orderType === "delivery" && customerInfo.phone.length === 10) {
+      loadAddressesByPhone(customerInfo.phone);
+    }
+  }, [foundCustomer, customerInfo.phone, orderType, restaurantId, loadPreviousAddresses, loadAddressesByPhone]);
 
   const handleAddressSelect = (address: CustomerAddress) => {
     setDeliveryAddress({

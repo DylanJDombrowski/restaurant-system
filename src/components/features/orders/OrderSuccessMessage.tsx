@@ -93,7 +93,7 @@ export default function OrderSuccessMessage({ orderNumber, orderTotal, orderType
                 <ul className="text-sm text-blue-800 space-y-1">
                   {orderType === "pickup" ? (
                     <>
-                      <li>• You'll receive a notification when ready</li>
+                      <li>• You&apos;ll receive a notification when ready</li>
                       <li>• Please bring your order number</li>
                       <li>• Check the pickup counter display</li>
                     </>
