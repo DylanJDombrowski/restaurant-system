@@ -1,14 +1,7 @@
-// src/components/features/orders/ModalPizzaCustomizer.tsx
+// src/components/features/orders/PizzaCustomizer.tsx
 "use client";
-import { useState, useMemo, useCallback, useEffect } from "react";
-import {
-  ConfiguredCartItem,
-  Topping,
-  Modifier,
-  ToppingAmount,
-  MenuItemWithVariants,
-  MenuItemVariant,
-} from "@/lib/types";
+import { ConfiguredCartItem, MenuItemVariant, MenuItemWithVariants, Modifier, Topping, ToppingAmount } from "@/lib/types";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 /**
  * ENHANCED Modal Pizza Customizer with Dynamic Crust Loading
@@ -39,7 +32,7 @@ interface ModifierConfiguration {
   selected: boolean;
 }
 
-interface ModalPizzaCustomizerProps {
+interface PizzaCustomizerProps {
   item: ConfiguredCartItem;
   menuItemWithVariants?: MenuItemWithVariants;
   availableToppings: Topping[];
@@ -49,7 +42,7 @@ interface ModalPizzaCustomizerProps {
   isOpen: boolean;
 }
 
-export default function ModalPizzaCustomizer({
+export default function PizzaCustomizer({
   item,
   menuItemWithVariants,
   availableToppings,
@@ -57,25 +50,20 @@ export default function ModalPizzaCustomizer({
   onComplete,
   onCancel,
   isOpen,
-}: ModalPizzaCustomizerProps) {
+}: PizzaCustomizerProps) {
   // ==========================================
   // ENHANCED STATE MANAGEMENT
   // ==========================================
 
   const [toppings, setToppings] = useState<ToppingConfiguration[]>([]);
   const [modifiers, setModifiers] = useState<ModifierConfiguration[]>([]);
-  const [specialInstructions, setSpecialInstructions] = useState(
-    item.specialInstructions || ""
-  );
+  const [specialInstructions, setSpecialInstructions] = useState(item.specialInstructions || "");
 
   // 🆕 NEW: Dynamic size and crust selection
-  const [selectedVariant, setSelectedVariant] =
-    useState<MenuItemVariant | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<MenuItemVariant | null>(null);
   const [availableSizes, setAvailableSizes] = useState<string[]>([]);
   const [selectedSize, setSelectedSize] = useState<string>("");
-  const [availableCrusts, setAvailableCrusts] = useState<
-    { value: string; label: string; variant: MenuItemVariant }[]
-  >([]);
+  const [availableCrusts, setAvailableCrusts] = useState<{ value: string; label: string; variant: MenuItemVariant }[]>([]);
   const [selectedCrust, setSelectedCrust] = useState<string>("");
 
   // ==========================================
@@ -91,21 +79,15 @@ export default function ModalPizzaCustomizer({
 
     // Get unique sizes in logical order
     const sizeOrder = { small: 1, medium: 2, large: 3, xlarge: 4 };
-    const uniqueSizes = [
-      ...new Set(menuItemWithVariants.variants.map((v) => v.size_code)),
-    ].sort(
-      (a, b) =>
-        (sizeOrder[a as keyof typeof sizeOrder] || 999) -
-        (sizeOrder[b as keyof typeof sizeOrder] || 999)
+    const uniqueSizes = [...new Set(menuItemWithVariants.variants.map((v) => v.size_code))].sort(
+      (a, b) => (sizeOrder[a as keyof typeof sizeOrder] || 999) - (sizeOrder[b as keyof typeof sizeOrder] || 999)
     );
 
     setAvailableSizes(uniqueSizes);
 
     // If item already has a variant selected, set it as default
     if (item.variantId) {
-      const currentVariant = menuItemWithVariants.variants.find(
-        (v) => v.id === item.variantId
-      );
+      const currentVariant = menuItemWithVariants.variants.find((v) => v.id === item.variantId);
       if (currentVariant) {
         setSelectedVariant(currentVariant);
         setSelectedSize(currentVariant.size_code);
@@ -113,9 +95,7 @@ export default function ModalPizzaCustomizer({
       }
     } else if (uniqueSizes.length > 0) {
       // Default to medium if available, otherwise first size
-      const defaultSize = uniqueSizes.includes("medium")
-        ? "medium"
-        : uniqueSizes[0];
+      const defaultSize = uniqueSizes.includes("medium") ? "medium" : uniqueSizes[0];
       setSelectedSize(defaultSize);
     }
   }, [menuItemWithVariants, item.variantId]);
@@ -138,16 +118,12 @@ export default function ModalPizzaCustomizer({
 
     // Auto-select first crust if none selected
     if (crustsForSize.length > 0 && !selectedCrust) {
-      const defaultCrust =
-        crustsForSize.find((c) => c.value === "thin")?.value ||
-        crustsForSize[0].value;
+      const defaultCrust = crustsForSize.find((c) => c.value === "thin")?.value || crustsForSize[0].value;
       setSelectedCrust(defaultCrust);
     }
 
     // Update selected variant when size/crust combination changes
-    const matchingVariant = crustsForSize.find(
-      (c) => c.value === selectedCrust
-    )?.variant;
+    const matchingVariant = crustsForSize.find((c) => c.value === selectedCrust)?.variant;
     if (matchingVariant) {
       setSelectedVariant(matchingVariant);
     }
@@ -196,9 +172,7 @@ export default function ModalPizzaCustomizer({
 
     if (item.selectedToppings) {
       item.selectedToppings.forEach((selectedTopping) => {
-        const availableTopping = availableToppings.find(
-          (t) => t.id === selectedTopping.id
-        );
+        const availableTopping = availableToppings.find((t) => t.id === selectedTopping.id);
         if (availableTopping) {
           toppingConfigs.push({
             id: selectedTopping.id,
@@ -234,14 +208,12 @@ export default function ModalPizzaCustomizer({
   }, [availableToppings, item.selectedToppings]);
 
   const initializeModifiers = useCallback(() => {
-    const modifierConfigs: ModifierConfiguration[] = availableModifiers.map(
-      (mod) => ({
-        id: mod.id,
-        name: mod.name,
-        priceAdjustment: mod.price_adjustment,
-        selected: item.selectedModifiers?.some((m) => m.id === mod.id) || false,
-      })
-    );
+    const modifierConfigs: ModifierConfiguration[] = availableModifiers.map((mod) => ({
+      id: mod.id,
+      name: mod.name,
+      priceAdjustment: mod.price_adjustment,
+      selected: item.selectedModifiers?.some((m) => m.id === mod.id) || false,
+    }));
     setModifiers(modifierConfigs);
   }, [availableModifiers, item.selectedModifiers]);
 
@@ -261,11 +233,7 @@ export default function ModalPizzaCustomizer({
   // 🆕 ENHANCED PRICING CALCULATION
   // ==========================================
 
-  const calculateToppingPrice = (
-    topping: ToppingConfiguration,
-    amount: ToppingAmount,
-    isDefault: boolean
-  ): number => {
+  const calculateToppingPrice = (topping: ToppingConfiguration, amount: ToppingAmount, isDefault: boolean): number => {
     if (amount === "none") return 0;
 
     // Apply size multipliers for toppings
@@ -302,11 +270,7 @@ export default function ModalPizzaCustomizer({
     setToppings((prev) =>
       prev.map((topping) => {
         if (topping.id === toppingId) {
-          const newPrice = calculateToppingPrice(
-            topping,
-            newAmount,
-            topping.isDefault
-          );
+          const newPrice = calculateToppingPrice(topping, newAmount, topping.isDefault);
           return { ...topping, amount: newAmount, price: newPrice };
         }
         return topping;
@@ -315,11 +279,7 @@ export default function ModalPizzaCustomizer({
   };
 
   const handleModifierChange = (modifierId: string, selected: boolean) => {
-    setModifiers((prev) =>
-      prev.map((modifier) =>
-        modifier.id === modifierId ? { ...modifier, selected } : modifier
-      )
-    );
+    setModifiers((prev) => prev.map((modifier) => (modifier.id === modifierId ? { ...modifier, selected } : modifier)));
   };
 
   // ==========================================
@@ -406,15 +366,11 @@ export default function ModalPizzaCustomizer({
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Customize {item.menuItemName}
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-900">Customize {item.menuItemName}</h2>
             <p className="text-sm text-gray-600 mt-1">
               {selectedVariant ? (
                 <>
-                  Selected:{" "}
-                  <span className="font-medium">{selectedVariant.name}</span> -
-                  ${selectedVariant.price.toFixed(2)}
+                  Selected: <span className="font-medium">{selectedVariant.name}</span> - ${selectedVariant.price.toFixed(2)}
                 </>
               ) : (
                 <>Base price: ${item.basePrice.toFixed(2)}</>
@@ -422,9 +378,7 @@ export default function ModalPizzaCustomizer({
             </p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-green-600">
-              ${calculatedPrice.toFixed(2)}
-            </div>
+            <div className="text-2xl font-bold text-green-600">${calculatedPrice.toFixed(2)}</div>
             <div className="text-sm text-gray-500">Current total</div>
           </div>
         </div>
@@ -435,18 +389,11 @@ export default function ModalPizzaCustomizer({
             {/* 🆕 SIZE SELECTION SECTION */}
             {availableSizes.length > 1 && (
               <section>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                  Choose Size
-                </h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Choose Size</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {availableSizes.map((size) => {
-                    const sizeVariant = menuItemWithVariants?.variants?.find(
-                      (v) => v.size_code === size && v.crust_type === "thin"
-                    );
-                    const sizeLabel =
-                      sizeVariant?.name?.split(" ")[0] +
-                        " " +
-                        sizeVariant?.name?.split(" ")[1] || size;
+                    const sizeVariant = menuItemWithVariants?.variants?.find((v) => v.size_code === size && v.crust_type === "thin");
+                    const sizeLabel = sizeVariant?.name?.split(" ")[0] + " " + sizeVariant?.name?.split(" ")[1] || size;
 
                     return (
                       <button
@@ -456,22 +403,12 @@ export default function ModalPizzaCustomizer({
                           setSelectedCrust(""); // Reset crust selection
                         }}
                         className={`p-3 rounded-lg border-2 transition-all text-left hover:shadow-md ${
-                          selectedSize === size
-                            ? "border-blue-600 bg-blue-50 shadow-md"
-                            : "border-gray-200 hover:border-gray-300"
+                          selectedSize === size ? "border-blue-600 bg-blue-50 shadow-md" : "border-gray-200 hover:border-gray-300"
                         }`}
                       >
-                        <div className="font-semibold text-gray-900">
-                          {sizeLabel}
-                        </div>
-                        {sizeVariant?.serves && (
-                          <div className="text-sm text-gray-600">
-                            {sizeVariant.serves}
-                          </div>
-                        )}
-                        <div className="text-sm font-medium text-green-600 mt-1">
-                          From ${sizeVariant?.price?.toFixed(2)}
-                        </div>
+                        <div className="font-semibold text-gray-900">{sizeLabel}</div>
+                        {sizeVariant?.serves && <div className="text-sm text-gray-600">{sizeVariant.serves}</div>}
+                        <div className="text-sm font-medium text-green-600 mt-1">From ${sizeVariant?.price?.toFixed(2)}</div>
                       </button>
                     );
                   })}
@@ -483,18 +420,14 @@ export default function ModalPizzaCustomizer({
             {selectedSize && availableCrusts.length > 0 && (
               <section>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                  Choose Crust (
-                  {selectedSize.charAt(0).toUpperCase() + selectedSize.slice(1)}
-                  )
+                  Choose Crust ({selectedSize.charAt(0).toUpperCase() + selectedSize.slice(1)})
                 </h3>
                 <div className="space-y-3">
                   {availableCrusts.map((crust) => (
                     <label
                       key={crust.value}
                       className={`flex items-center justify-between p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
-                        selectedCrust === crust.value
-                          ? "border-blue-600 bg-blue-50 shadow-md"
-                          : "border-gray-200 hover:border-gray-300"
+                        selectedCrust === crust.value ? "border-blue-600 bg-blue-50 shadow-md" : "border-gray-200 hover:border-gray-300"
                       }`}
                     >
                       <div className="flex items-center">
@@ -507,24 +440,12 @@ export default function ModalPizzaCustomizer({
                           className="mr-3 text-blue-600 focus:ring-blue-500"
                         />
                         <div>
-                          <div className="font-semibold text-gray-900">
-                            {crust.label}
-                          </div>
-                          {crust.value === "double_dough" && (
-                            <div className="text-sm text-gray-600">
-                              Thick and hearty
-                            </div>
-                          )}
-                          {crust.value === "gluten_free" && (
-                            <div className="text-sm text-blue-600">
-                              Special dietary option
-                            </div>
-                          )}
+                          <div className="font-semibold text-gray-900">{crust.label}</div>
+                          {crust.value === "double_dough" && <div className="text-sm text-gray-600">Thick and hearty</div>}
+                          {crust.value === "gluten_free" && <div className="text-sm text-blue-600">Special dietary option</div>}
                         </div>
                       </div>
-                      <div className="text-lg font-bold text-green-600">
-                        ${crust.variant.price.toFixed(2)}
-                      </div>
+                      <div className="text-lg font-bold text-green-600">${crust.variant.price.toFixed(2)}</div>
                     </label>
                   ))}
                 </div>
@@ -537,57 +458,41 @@ export default function ModalPizzaCustomizer({
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">
                   Toppings
                   {selectedSize && (
-                    <span className="text-sm font-normal text-gray-600 ml-2">
-                      (Prices adjusted for {selectedSize} size)
-                    </span>
+                    <span className="text-sm font-normal text-gray-600 ml-2">(Prices adjusted for {selectedSize} size)</span>
                   )}
                 </h3>
-                {Object.entries(toppingsByCategory).map(
-                  ([category, categoryToppings]) => (
-                    <div key={category} className="mb-4">
-                      <h4 className="text-base font-medium text-gray-800 mb-2 capitalize flex items-center">
-                        <span className="mr-2">
-                          {category === "meats"
-                            ? "🥓"
-                            : category === "vegetables"
-                            ? "🥬"
-                            : category === "cheese"
-                            ? "🧀"
-                            : "🍅"}
-                        </span>
-                        {category}
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {categoryToppings.map((topping) => (
-                          <ToppingSelector
-                            key={topping.id}
-                            topping={topping}
-                            onChange={(amount) =>
-                              handleToppingChange(topping.id, amount)
-                            }
-                          />
-                        ))}
-                      </div>
+                {Object.entries(toppingsByCategory).map(([category, categoryToppings]) => (
+                  <div key={category} className="mb-4">
+                    <h4 className="text-base font-medium text-gray-800 mb-2 capitalize flex items-center">
+                      <span className="mr-2">
+                        {category === "meats" ? "🥓" : category === "vegetables" ? "🥬" : category === "cheese" ? "🧀" : "🍅"}
+                      </span>
+                      {category}
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {categoryToppings.map((topping) => (
+                        <ToppingSelector
+                          key={topping.id}
+                          topping={topping}
+                          onChange={(amount) => handleToppingChange(topping.id, amount)}
+                        />
+                      ))}
                     </div>
-                  )
-                )}
+                  </div>
+                ))}
               </section>
             )}
 
             {/* EXISTING: Modifiers */}
             {modifiers.length > 0 && (
               <section>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                  Special Preparations
-                </h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Special Preparations</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {modifiers.map((modifier) => (
                     <ModifierSelector
                       key={modifier.id}
                       modifier={modifier}
-                      onChange={(selected) =>
-                        handleModifierChange(modifier.id, selected)
-                      }
+                      onChange={(selected) => handleModifierChange(modifier.id, selected)}
                     />
                   ))}
                 </div>
@@ -596,9 +501,7 @@ export default function ModalPizzaCustomizer({
 
             {/* EXISTING: Special Instructions */}
             <section>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                Special Instructions
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Special Instructions</h3>
               <textarea
                 placeholder="Any special requests for this pizza..."
                 value={specialInstructions}
@@ -622,9 +525,7 @@ export default function ModalPizzaCustomizer({
           <div className="flex items-center gap-4">
             <div className="text-right">
               <div className="text-sm text-gray-600">Updated total:</div>
-              <div className="text-xl font-bold text-green-600">
-                ${calculatedPrice.toFixed(2)}
-              </div>
+              <div className="text-xl font-bold text-green-600">${calculatedPrice.toFixed(2)}</div>
             </div>
             <button
               onClick={handleSave}
@@ -661,32 +562,14 @@ function ToppingSelector({ topping, onChange }: ToppingSelectorProps) {
   ];
 
   return (
-    <div
-      className={`border rounded-lg p-3 transition-all ${
-        topping.amount !== "none"
-          ? "border-blue-500 bg-blue-50"
-          : "border-gray-200"
-      }`}
-    >
+    <div className={`border rounded-lg p-3 transition-all ${topping.amount !== "none" ? "border-blue-500 bg-blue-50" : "border-gray-200"}`}>
       <div className="flex justify-between items-center mb-2">
         <div>
           <span className="font-medium text-gray-900">{topping.name}</span>
-          {topping.isDefault && (
-            <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-              Default
-            </span>
-          )}
-          {topping.isPremium && (
-            <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
-              Premium
-            </span>
-          )}
+          {topping.isDefault && <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Default</span>}
+          {topping.isPremium && <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Premium</span>}
         </div>
-        {topping.price > 0 && (
-          <span className="text-sm font-semibold text-green-600">
-            +${topping.price.toFixed(2)}
-          </span>
-        )}
+        {topping.price > 0 && <span className="text-sm font-semibold text-green-600">+${topping.price.toFixed(2)}</span>}
       </div>
 
       <div className="grid grid-cols-4 gap-1">
@@ -695,9 +578,7 @@ function ToppingSelector({ topping, onChange }: ToppingSelectorProps) {
             key={option.value}
             onClick={() => onChange(option.value)}
             className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-              topping.amount === option.value
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              topping.amount === option.value ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
             {option.label}
@@ -717,9 +598,7 @@ function ModifierSelector({ modifier, onChange }: ModifierSelectorProps) {
   return (
     <label
       className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-        modifier.selected
-          ? "border-blue-500 bg-blue-50"
-          : "border-gray-200 hover:border-gray-300"
+        modifier.selected ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
       }`}
     >
       <div className="flex items-center">
@@ -732,13 +611,8 @@ function ModifierSelector({ modifier, onChange }: ModifierSelectorProps) {
         <span className="font-medium text-gray-900">{modifier.name}</span>
       </div>
       {modifier.priceAdjustment !== 0 && (
-        <span
-          className={`text-sm font-semibold ${
-            modifier.priceAdjustment > 0 ? "text-green-600" : "text-red-600"
-          }`}
-        >
-          {modifier.priceAdjustment > 0 ? "+" : ""}$
-          {modifier.priceAdjustment.toFixed(2)}
+        <span className={`text-sm font-semibold ${modifier.priceAdjustment > 0 ? "text-green-600" : "text-red-600"}`}>
+          {modifier.priceAdjustment > 0 ? "+" : ""}${modifier.priceAdjustment.toFixed(2)}
         </span>
       )}
     </label>

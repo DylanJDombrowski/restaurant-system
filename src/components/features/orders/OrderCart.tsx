@@ -11,7 +11,7 @@ import {
 } from "@/lib/types";
 import { useMemo, useState } from "react";
 import AppetizerCustomizer from "./AppetizerCustomizer";
-import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
+import PizzaCustomizer from "./PizzaCustomizer";
 import SandwichCustomizer from "./SandwichCustomizer";
 
 /**
@@ -356,7 +356,7 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
 
       {/* PIZZA MODAL CUSTOMIZER */}
       {showCustomizer && customizingItem && (
-        <ModalPizzaCustomizer
+        <PizzaCustomizer
           item={customizingItem}
           availableToppings={availableToppings}
           availableModifiers={availableModifiers}

@@ -3,6 +3,7 @@
 import { ConfiguredCartItem, MenuCategory, MenuItemWithVariants, Modifier, Topping } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
 import AppetizerCustomizer from "./AppetizerCustomizer";
+import PizzaCustomizer from "./PizzaCustomizer";
 import SandwichCustomizer from "./SandwichCustomizer";
 
 /**
@@ -30,7 +31,7 @@ interface NavigationState {
   selectedCategory: MenuCategory | null;
 }
 
-export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: MenuNavigatorProps) {
+export default function MenuNavigator({ menuItems, onAddToCart, restaurantId, modifiers, toppings }: MenuNavigatorProps) {
   // ==========================================
   // SIMPLIFIED NAVIGATION STATE
   // ==========================================
@@ -250,7 +251,6 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
   // CUSTOMIZER COMPLETION HANDLERS
   // ==========================================
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handlePizzaCustomizerComplete = useCallback(
     (updatedItem: ConfiguredCartItem) => {
       console.log("✅ Pizza customization completed");
@@ -291,28 +291,6 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
 
   return (
     <>
-      {/* 🔧 DEBUG PANEL - Shows current state */}
-      <div className="fixed top-4 right-4 bg-black text-white p-3 rounded z-[9999] text-xs font-mono">
-        <div className="text-yellow-400 font-bold">PIZZA MODAL DEBUG:</div>
-        <div>
-          showPizzaCustomizer: <span className="text-green-400">{showPizzaCustomizer.toString()}</span>
-        </div>
-        <div>
-          customizerItem: <span className="text-green-400">{customizerItem ? "EXISTS" : "NULL"}</span>
-        </div>
-        <div>
-          selectedItem: <span className="text-green-400">{selectedItem ? "EXISTS" : "NULL"}</span>
-        </div>
-        <div>
-          navState.view: <span className="text-green-400">{navState.view}</span>
-        </div>
-        {customizerItem && (
-          <div>
-            Item name: <span className="text-blue-400">{customizerItem.menuItemName}</span>
-          </div>
-        )}
-      </div>
-
       {/* MAIN CONTENT - Categories View */}
       {navState.view === "categories" && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
@@ -369,49 +347,18 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
         shouldRender: showPizzaCustomizer && customizerItem && selectedItem,
       })}
 
-      {/* ✅ PIZZA MODAL - NOW THIS WILL RENDER! */}
-      {showPizzaCustomizer && customizerItem && selectedItem ? (
+      {showPizzaCustomizer && customizerItem && selectedItem && (
         <>
-          {console.log("🔧 RENDER: Pizza modal SHOULD be rendering now!")}
-
-          {/* Simple test modal */}
-          <div
-            className="fixed inset-0 flex items-center justify-center"
-            style={{
-              zIndex: 9999,
-              backgroundColor: "rgba(0,0,0,0.5)",
-            }}
-          >
-            <div className="bg-white p-8 rounded-lg shadow-xl max-w-md">
-              <h2 className="text-2xl font-bold mb-4 text-gray-900">🍕 Pizza Modal Test</h2>
-              <p className="mb-2">SUCCESS! The modal is working!</p>
-              <p className="mb-2 text-sm text-gray-600">Pizza: {customizerItem.menuItemName}</p>
-              <p className="mb-4 text-sm text-gray-600">Variant: {customizerItem.variantName}</p>
-
-              <div className="flex gap-3">
-                <button onClick={handleCustomizerCancel} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                  Close Test
-                </button>
-                <button
-                  onClick={() => {
-                    console.log("🔧 Ready to implement real ModalPizzaCustomizer!");
-                    alert("Ready to add the real pizza customizer! The modal system is working.");
-                  }}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  Implement Real Modal
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          {console.log("🔧 RENDER: Pizza modal NOT rendering because:", {
-            showPizzaCustomizer: !showPizzaCustomizer ? "FALSE" : "true",
-            customizerItem: !customizerItem ? "MISSING" : "exists",
-            selectedItem: !selectedItem ? "MISSING" : "exists",
-          })}
+          {console.log("🔧 RENDER: Pizza customizer rendering!")}
+          <PizzaCustomizer
+            item={customizerItem}
+            menuItemWithVariants={selectedItem}
+            availableToppings={toppings}
+            availableModifiers={modifiers}
+            onComplete={handlePizzaCustomizerComplete}
+            onCancel={handleCustomizerCancel}
+            isOpen={showPizzaCustomizer}
+          />
         </>
       )}
 
@@ -501,71 +448,34 @@ interface CategoryItemsGridProps {
 
 function CategoryItemsGrid({ items, onItemSelect }: CategoryItemsGridProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 max-h-[500px] overflow-y-auto">
+    <div className="grid grid-cols-2 gap-3 max-h-[500px] overflow-y-auto">
       {items.map((item) => (
         <ItemCard key={item.id} item={item} onSelect={() => onItemSelect(item)} />
       ))}
     </div>
   );
 }
-
 interface ItemCardProps {
   item: MenuItemWithVariants;
   onSelect: () => void;
 }
 
 function ItemCard({ item, onSelect }: ItemCardProps) {
-  const hasVariants = item.variants && item.variants.length > 0;
-
-  const getPriceDisplay = () => {
-    if (hasVariants && item.variants.length > 0) {
-      const prices = item.variants.map((v) => v.price || 0);
-      const minPrice = Math.min(...prices);
-      const maxPrice = Math.max(...prices);
-
-      if (minPrice === maxPrice) {
-        return `$${minPrice.toFixed(2)}`;
-      } else {
-        return `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
-      }
-    } else {
-      return `$${(item.base_price || 0).toFixed(2)}`;
-    }
-  };
-
-  const getActionText = (categoryName?: string) => {
-    if (!categoryName) return "Add to Cart";
-
-    const category = categoryName.toLowerCase();
-    if (category.includes("pizza")) return "Customize Pizza";
-    if (category.includes("sandwich")) return "Build Sandwich";
-    if (category.includes("appetizer")) return "Customize Order";
-    if (category.includes("chicken")) return "Select Options";
-    if (category.includes("pasta")) return "Choose Sauce";
-    return "Add to Cart";
-  };
-
   return (
     <button
       onClick={onSelect}
-      className="bg-white hover:bg-gray-50 border border-gray-200 hover:border-blue-300 rounded-lg p-4 text-left transition-all duration-200 hover:shadow-md w-full"
+      className="bg-white hover:bg-gray-50 border border-gray-200 hover:border-blue-300 rounded-lg p-3 text-left transition-all duration-200 hover:shadow-md w-full"
     >
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-center">
+        {/* Left: Just the name */}
         <div className="flex-1">
-          <h5 className="font-bold text-gray-900 mb-1 text-lg">{item.name}</h5>
-          {item.description && <p className="text-sm text-gray-600 mb-3 line-clamp-2">{item.description}</p>}
-
-          <div className="flex items-center gap-2 text-xs">
-            {hasVariants && (
-              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">{item.variants.length} sizes</span>
-            )}
-            <span className="text-gray-500">~{item.prep_time_minutes || 15} min</span>
-          </div>
+          <h5 className="font-bold text-gray-900 text-base">{item.name}</h5>
+          <div className="text-xs text-gray-500 mt-1">~{item.prep_time_minutes || 15} min</div>
         </div>
 
+        {/* Right: Simple price */}
         <div className="text-right ml-4">
-          <div className="text-xl font-bold text-green-600 mb-1">{getPriceDisplay()}</div>
-          <div className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded">{getActionText(item.category?.name)}</div>
+          <div className="text-lg font-bold text-green-600">${(item.base_price || 0).toFixed(2)}</div>
         </div>
       </div>
     </button>
