@@ -287,45 +287,7 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
   // RENDER LOGIC
   // ==========================================
 
-  if (navState.view === "categories") {
-    return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-xl font-bold text-gray-900">Menu Categories</h3>
-          <p className="text-sm text-gray-600 mt-1">Choose a category to start ordering</p>
-        </div>
-
-        <div className="p-6">
-          <CategoryGrid categories={categorizedItems} onCategorySelect={handleCategorySelect} />
-        </div>
-      </div>
-    );
-  }
-
-  if (navState.view === "category-items") {
-    return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleBackToCategories}
-              className="flex items-center text-blue-600 hover:text-blue-800 font-medium transition-colors"
-            >
-              ← Categories
-            </button>
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">{navState.selectedCategory?.name}</h3>
-              <p className="text-sm text-gray-600">{currentCategoryItems.length} items available</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6">
-          <CategoryItemsGrid items={currentCategoryItems} onItemSelect={handleItemSelect} />
-        </div>
-      </div>
-    );
-  }
+  // 🔧 FIXED MenuNavigator - Single return statement with modals
 
   return (
     <>
@@ -351,7 +313,7 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
         )}
       </div>
 
-      {/* Your existing navigation views */}
+      {/* MAIN CONTENT - Categories View */}
       {navState.view === "categories" && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
           <div className="p-6 border-b border-gray-200">
@@ -364,6 +326,7 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
         </div>
       )}
 
+      {/* MAIN CONTENT - Category Items View */}
       {navState.view === "category-items" && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
           <div className="p-6 border-b border-gray-200">
@@ -386,7 +349,7 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
         </div>
       )}
 
-      {/* Default fallback view */}
+      {/* MAIN CONTENT - Default/Loading View */}
       {navState.view !== "categories" && navState.view !== "category-items" && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex items-center justify-center">
           <div className="text-center">
@@ -406,12 +369,12 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
         shouldRender: showPizzaCustomizer && customizerItem && selectedItem,
       })}
 
-      {/* PIZZA MODAL - WITH EXTRA DEBUG */}
+      {/* ✅ PIZZA MODAL - NOW THIS WILL RENDER! */}
       {showPizzaCustomizer && customizerItem && selectedItem ? (
         <>
           {console.log("🔧 RENDER: Pizza modal SHOULD be rendering now!")}
 
-          {/* Simple test modal first */}
+          {/* Simple test modal */}
           <div
             className="fixed inset-0 flex items-center justify-center"
             style={{
@@ -421,7 +384,7 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
           >
             <div className="bg-white p-8 rounded-lg shadow-xl max-w-md">
               <h2 className="text-2xl font-bold mb-4 text-gray-900">🍕 Pizza Modal Test</h2>
-              <p className="mb-2">If you see this, the modal is working!</p>
+              <p className="mb-2">SUCCESS! The modal is working!</p>
               <p className="mb-2 text-sm text-gray-600">Pizza: {customizerItem.menuItemName}</p>
               <p className="mb-4 text-sm text-gray-600">Variant: {customizerItem.variantName}</p>
 
@@ -431,12 +394,12 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
                 </button>
                 <button
                   onClick={() => {
-                    console.log("🔧 Switching to real modal...");
-                    // This would switch to the real modal
+                    console.log("🔧 Ready to implement real ModalPizzaCustomizer!");
+                    alert("Ready to add the real pizza customizer! The modal system is working.");
                   }}
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
-                  Show Real Modal
+                  Implement Real Modal
                 </button>
               </div>
             </div>
@@ -452,7 +415,7 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
         </>
       )}
 
-      {/* OTHER MODALS (unchanged) */}
+      {/* OTHER MODALS - These will now work too! */}
       {showSandwichCustomizer && selectedItem && (
         <SandwichCustomizer
           item={selectedItem}
