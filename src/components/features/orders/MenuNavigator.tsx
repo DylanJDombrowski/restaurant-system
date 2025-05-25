@@ -3,7 +3,6 @@
 import { ConfiguredCartItem, MenuCategory, MenuItemWithVariants, Modifier, Topping } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
 import AppetizerCustomizer from "./AppetizerCustomizer";
-import ModalPizzaCustomizer from "./ModalPizzaCustomizer";
 import SandwichCustomizer from "./SandwichCustomizer";
 
 /**
@@ -31,7 +30,7 @@ interface NavigationState {
   selectedCategory: MenuCategory | null;
 }
 
-export default function MenuNavigator({ menuItems, toppings, modifiers, onAddToCart, restaurantId }: MenuNavigatorProps) {
+export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: MenuNavigatorProps) {
   // ==========================================
   // SIMPLIFIED NAVIGATION STATE
   // ==========================================
@@ -251,6 +250,7 @@ export default function MenuNavigator({ menuItems, toppings, modifiers, onAddToC
   // CUSTOMIZER COMPLETION HANDLERS
   // ==========================================
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handlePizzaCustomizerComplete = useCallback(
     (updatedItem: ConfiguredCartItem) => {
       console.log("✅ Pizza customization completed");
@@ -329,29 +329,130 @@ export default function MenuNavigator({ menuItems, toppings, modifiers, onAddToC
 
   return (
     <>
-      {/* Default fallback */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-lg text-gray-600 mb-4">Loading menu...</div>
-          <button onClick={handleBackToCategories} className="text-blue-600 hover:text-blue-800 font-medium">
-            ← Back to Categories
-          </button>
+      {/* 🔧 DEBUG PANEL - Shows current state */}
+      <div className="fixed top-4 right-4 bg-black text-white p-3 rounded z-[9999] text-xs font-mono">
+        <div className="text-yellow-400 font-bold">PIZZA MODAL DEBUG:</div>
+        <div>
+          showPizzaCustomizer: <span className="text-green-400">{showPizzaCustomizer.toString()}</span>
         </div>
+        <div>
+          customizerItem: <span className="text-green-400">{customizerItem ? "EXISTS" : "NULL"}</span>
+        </div>
+        <div>
+          selectedItem: <span className="text-green-400">{selectedItem ? "EXISTS" : "NULL"}</span>
+        </div>
+        <div>
+          navState.view: <span className="text-green-400">{navState.view}</span>
+        </div>
+        {customizerItem && (
+          <div>
+            Item name: <span className="text-blue-400">{customizerItem.menuItemName}</span>
+          </div>
+        )}
       </div>
 
-      {/* CUSTOMIZER MODALS */}
-      {showPizzaCustomizer && customizerItem && selectedItem && (
-        <ModalPizzaCustomizer
-          item={customizerItem}
-          menuItemWithVariants={selectedItem}
-          availableToppings={toppings}
-          availableModifiers={modifiers}
-          onComplete={handlePizzaCustomizerComplete}
-          onCancel={handleCustomizerCancel}
-          isOpen={showPizzaCustomizer}
-        />
+      {/* Your existing navigation views */}
+      {navState.view === "categories" && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-xl font-bold text-gray-900">Menu Categories</h3>
+            <p className="text-sm text-gray-600 mt-1">Choose a category to start ordering</p>
+          </div>
+          <div className="p-6">
+            <CategoryGrid categories={categorizedItems} onCategorySelect={handleCategorySelect} />
+          </div>
+        </div>
       )}
 
+      {navState.view === "category-items" && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleBackToCategories}
+                className="flex items-center text-blue-600 hover:text-blue-800 font-medium transition-colors"
+              >
+                ← Categories
+              </button>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">{navState.selectedCategory?.name}</h3>
+                <p className="text-sm text-gray-600">{currentCategoryItems.length} items available</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6">
+            <CategoryItemsGrid items={currentCategoryItems} onItemSelect={handleItemSelect} />
+          </div>
+        </div>
+      )}
+
+      {/* Default fallback view */}
+      {navState.view !== "categories" && navState.view !== "category-items" && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-lg text-gray-600 mb-4">Loading menu...</div>
+            <button onClick={handleBackToCategories} className="text-blue-600 hover:text-blue-800 font-medium">
+              ← Back to Categories
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 🔧 MODAL RENDER DEBUG */}
+      {console.log("🔧 RENDER CHECK: Modal conditions:", {
+        showPizzaCustomizer,
+        customizerItem: !!customizerItem,
+        selectedItem: !!selectedItem,
+        shouldRender: showPizzaCustomizer && customizerItem && selectedItem,
+      })}
+
+      {/* PIZZA MODAL - WITH EXTRA DEBUG */}
+      {showPizzaCustomizer && customizerItem && selectedItem ? (
+        <>
+          {console.log("🔧 RENDER: Pizza modal SHOULD be rendering now!")}
+
+          {/* Simple test modal first */}
+          <div
+            className="fixed inset-0 flex items-center justify-center"
+            style={{
+              zIndex: 9999,
+              backgroundColor: "rgba(0,0,0,0.5)",
+            }}
+          >
+            <div className="bg-white p-8 rounded-lg shadow-xl max-w-md">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">🍕 Pizza Modal Test</h2>
+              <p className="mb-2">If you see this, the modal is working!</p>
+              <p className="mb-2 text-sm text-gray-600">Pizza: {customizerItem.menuItemName}</p>
+              <p className="mb-4 text-sm text-gray-600">Variant: {customizerItem.variantName}</p>
+
+              <div className="flex gap-3">
+                <button onClick={handleCustomizerCancel} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+                  Close Test
+                </button>
+                <button
+                  onClick={() => {
+                    console.log("🔧 Switching to real modal...");
+                    // This would switch to the real modal
+                  }}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Show Real Modal
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {console.log("🔧 RENDER: Pizza modal NOT rendering because:", {
+            showPizzaCustomizer: !showPizzaCustomizer ? "FALSE" : "true",
+            customizerItem: !customizerItem ? "MISSING" : "exists",
+            selectedItem: !selectedItem ? "MISSING" : "exists",
+          })}
+        </>
+      )}
+
+      {/* OTHER MODALS (unchanged) */}
       {showSandwichCustomizer && selectedItem && (
         <SandwichCustomizer
           item={selectedItem}
