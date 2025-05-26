@@ -250,6 +250,7 @@ export default function MenuNavigator({
 
       const categoryName = item.category?.name;
 
+      // ENTERPRISE-GRADE ROUTING LOGIC
       if (categoryName === "Pizzas") {
         console.log("🍕 Opening pizza customizer directly");
         openPizzaCustomizer(item);
@@ -260,8 +261,21 @@ export default function MenuNavigator({
         console.log("🍗 Opening appetizer customizer directly");
         openAppetizerCustomizer(item);
       } else if (categoryName === "Chicken") {
-        console.log("🍗 Opening chicken customizer directly");
-        openChickenCustomizer(item);
+        const itemName = item.name.toLowerCase();
+
+        // Individual pieces go directly to cart
+        if (
+          itemName.includes("breast") ||
+          itemName.includes("thigh") ||
+          itemName.includes("leg") ||
+          itemName.includes("wing")
+        ) {
+          console.log("🍗 Adding individual chicken piece directly to cart");
+          addDirectToCart(item);
+        } else {
+          console.log("🍗 Opening chicken customizer for:", itemName);
+          openChickenCustomizer(item);
+        }
       } else if (categoryName === "Pasta") {
         console.log("🍝 Opening pasta customizer directly");
         openPastaCustomizer(item);
