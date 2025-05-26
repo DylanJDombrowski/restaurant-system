@@ -109,15 +109,6 @@ function getPieceCount(variant: MenuItemVariant | null): number {
   return match ? parseInt(match[1]) : 8;
 }
 
-function scaleWhiteMeatPrice(
-  basePrice: number,
-  variant: MenuItemVariant | null
-): number {
-  const pieceCount = getPieceCount(variant);
-  const scaleFactor = pieceCount / 8; // 8 PC as base
-  return Math.round(basePrice * scaleFactor * 100) / 100;
-}
-
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
@@ -172,6 +163,36 @@ export default function ChickenCustomizer({
   // DATA LOADING
   // ==========================================
 
+  const setDefaultModifiers = useCallback(
+    (availableModifiers: Modifier[]) => {
+      // Only set defaults for family packs
+      if (!isChickenType(item, selectedVariant, "family")) return;
+
+      const defaultModifierIds = availableModifiers
+        .filter((m) => {
+          const category = m.category.toLowerCase();
+          const name = m.name.toLowerCase();
+
+          // For family packs - auto-select garlic bread and coleslaw
+          return (
+            category === "chicken_family_sides" &&
+            (name.includes("garlic bread") || name.includes("coleslaw"))
+          );
+        })
+        .map((m) => m.id);
+
+      console.log("🔧 Setting default family sides:", defaultModifierIds);
+
+      if (defaultModifierIds.length > 0) {
+        setConfiguration((prev) => ({
+          ...prev,
+          selectedModifiers: defaultModifierIds,
+        }));
+      }
+    },
+    [item, selectedVariant]
+  );
+
   const loadModifiers = useCallback(async () => {
     try {
       setLoading(true);
@@ -192,6 +213,11 @@ export default function ChickenCustomizer({
           selectedModifiers: existingIds,
         }));
       } else {
+        console.log(
+          "🔧 Setting initial defaults for:",
+          item.name,
+          selectedVariant?.name
+        );
         setDefaultModifiers(data.data || []);
       }
     } catch (error) {
@@ -199,32 +225,13 @@ export default function ChickenCustomizer({
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurantId, existingCartItem]);
-
-  const setDefaultModifiers = useCallback(
-    (availableModifiers: Modifier[]) => {
-      if (capabilities.defaultSides.length === 0) return;
-
-      const defaultModifierIds = availableModifiers
-        .filter(
-          (m) =>
-            m.category.includes("sides") &&
-            capabilities.defaultSides.some((defaultSide) =>
-              m.name.toLowerCase().includes(defaultSide.replace("_", " "))
-            )
-        )
-        .map((m) => m.id);
-
-      if (defaultModifierIds.length > 0) {
-        setConfiguration((prev) => ({
-          ...prev,
-          selectedModifiers: defaultModifierIds,
-        }));
-      }
-    },
-    [capabilities.defaultSides]
-  );
+  }, [
+    restaurantId,
+    existingCartItem,
+    item.name,
+    selectedVariant?.name,
+    setDefaultModifiers,
+  ]);
 
   useEffect(() => {
     if (isOpen) {
@@ -237,29 +244,54 @@ export default function ChickenCustomizer({
   // ==========================================
 
   const availableModifiers = useMemo(() => {
-    return modifiers.filter((modifier) => {
-      // Filter based on capabilities
-      if (
-        modifier.category.includes("white_meat") &&
-        !capabilities.allowsWhiteMeat
-      )
-        return false;
-      if (modifier.category.includes("sides") && !capabilities.allowsSides)
-        return false;
-      if (
-        modifier.category.includes("condiment") &&
-        !capabilities.allowsCondiments
-      )
-        return false;
-      if (
-        modifier.category.includes("preparation") &&
-        !capabilities.allowsPreparation
-      )
-        return false;
+    const filtered = modifiers.filter((modifier) => {
+      const category = modifier.category.toLowerCase();
 
-      return true;
+      // For bulk chicken - ONLY chicken_preparation (Extra Crispy, Regular Cooking)
+      if (isChickenType(item, selectedVariant, "bulk")) {
+        return category === "chicken_preparation";
+      }
+
+      // For family packs - only specific family categories
+      if (isChickenType(item, selectedVariant, "family")) {
+        const pieceCount = getPieceCount(selectedVariant);
+        const isAllowed =
+          category === `chicken_white_meat_${pieceCount}pc_family` ||
+          category === "chicken_family_sides" ||
+          category === "chicken_preparation" ||
+          category === "chicken_condiment";
+
+        if (isAllowed) {
+          console.log(
+            "🔧 Family pack allowing:",
+            modifier.name,
+            "(",
+            category,
+            ")"
+          );
+        }
+        return isAllowed;
+      }
+
+      // For regular chicken - only specific regular categories
+      const pieceCount = getPieceCount(selectedVariant);
+      return (
+        category === `chicken_white_meat_${pieceCount}pc` ||
+        category === "chicken_8pc_sides" ||
+        category === "chicken_preparation" ||
+        category === "chicken_condiment"
+      );
     });
-  }, [modifiers, capabilities]);
+
+    console.log(
+      "🔧 Available modifiers for",
+      item.name,
+      selectedVariant?.name,
+      ":",
+      filtered.length
+    );
+    return filtered;
+  }, [modifiers, item, selectedVariant]);
 
   const modifiersByCategory = useMemo(() => {
     const categories = new Map<string, Modifier[]>();
@@ -286,13 +318,7 @@ export default function ChickenCustomizer({
         const modifier = modifiers.find((m) => m.id === modifierId);
         if (!modifier) return total;
 
-        let price = modifier.price_adjustment;
-
-        // Scale white meat pricing by piece count
-        if (modifier.category.includes("white_meat")) {
-          price = scaleWhiteMeatPrice(price, selectedVariant);
-        }
-
+        const price = modifier.price_adjustment;
         return total + price;
       },
       0
@@ -310,13 +336,25 @@ export default function ChickenCustomizer({
   // EVENT HANDLERS
   // ==========================================
 
-  const handleVariantSelect = useCallback((variantId: string) => {
-    setConfiguration((prev) => ({
-      ...prev,
-      selectedVariantId: variantId,
-      selectedModifiers: [], // Reset modifiers when variant changes
-    }));
-  }, []);
+  const handleVariantSelect = useCallback(
+    (variantId: string) => {
+      setConfiguration((prev) => ({
+        ...prev,
+        selectedVariantId: variantId,
+        selectedModifiers: [], // Reset modifiers when variant changes
+      }));
+
+      // Set defaults for the new variant after a brief delay
+      setTimeout(() => {
+        const newVariant = item.variants?.find((v) => v.id === variantId);
+        if (newVariant && isChickenType(item, newVariant, "family")) {
+          console.log("🔧 Variant changed to family pack, setting defaults");
+          setDefaultModifiers(modifiers);
+        }
+      }, 100);
+    },
+    [modifiers, item, setDefaultModifiers]
+  );
 
   const handleModifierToggle = useCallback((modifierId: string) => {
     setConfiguration((prev) => ({
@@ -342,12 +380,7 @@ export default function ChickenCustomizer({
         const modifier = modifiers.find((m) => m.id === modifierId);
         if (!modifier) throw new Error(`Modifier ${modifierId} not found`);
 
-        let price = modifier.price_adjustment;
-
-        // Apply scaling for white meat
-        if (modifier.category.includes("white_meat")) {
-          price = scaleWhiteMeatPrice(price, selectedVariant);
-        }
+        const price = modifier.price_adjustment;
 
         return {
           id: modifier.id,
@@ -429,14 +462,20 @@ export default function ChickenCustomizer({
     categoryModifiers: Modifier[]
   ) => {
     const categoryDisplayNames: Record<string, string> = {
-      white_meat: "White Meat Options",
-      sides: "Sides",
-      family_sides: "Family Pack Sides",
-      preparation: "Preparation",
-      condiments: "Condiments & Sauces",
+      chicken_white_meat: "White Meat Options",
+      chicken_family_sides: "Family Pack Sides",
+      chicken_8pc_sides: "Included Sides",
+      chicken_preparation: "Preparation",
+      chicken_condiment: "Condiments & Sauces",
     };
 
-    const displayName = categoryDisplayNames[category] || category;
+    // Get base category name (remove piece count specifics)
+    let baseCategoryName = category;
+    if (category.includes("chicken_white_meat")) {
+      baseCategoryName = "chicken_white_meat";
+    }
+
+    const displayName = categoryDisplayNames[baseCategoryName] || category;
     const showPricing =
       category.includes("white_meat") || category.includes("condiment");
 
@@ -457,10 +496,8 @@ export default function ChickenCustomizer({
               modifier.id
             );
 
-            let displayPrice = modifier.price_adjustment;
-            if (modifier.category.includes("white_meat")) {
-              displayPrice = scaleWhiteMeatPrice(displayPrice, selectedVariant);
-            }
+            const displayPrice = modifier.price_adjustment;
+            // Price scaling is already handled in your database, so no need to scale here
 
             return (
               <label
