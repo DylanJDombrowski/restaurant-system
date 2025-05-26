@@ -1,121 +1,39 @@
-// src/components/features/orders/ChickenCustomizer.tsx - FIXED VERSION
+// ==================================================
+// CORRECTED CHICKEN CUSTOMIZER WITH PROPER TYPES
+// ==================================================
+
 "use client";
-import { useState, useMemo, useCallback, useEffect } from "react";
+
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
-  ConfiguredCartItem,
   MenuItemWithVariants,
   MenuItemVariant,
-  ConfiguredModifier,
+  ConfiguredCartItem,
   Modifier,
+  ConfiguredModifier,
 } from "@/lib/types";
-
-/**
- * 🍗 SIMPLE CHICKEN CUSTOMIZER - FIXED
- *
- * FIXES APPLIED:
- * ✅ Bulk chicken: only Extra Crispy (no Regular Cooking)
- * ✅ Individual pieces: handled by MenuNavigator (direct to cart)
- * ✅ Family packs: garlic bread + coleslaw default (NO broasted potatoes)
- * ✅ White meat pricing scales with piece count
- * ✅ Dark meat options (no pricing)
- * ✅ Proper section ordering
- */
+import { useChickenCustomization } from "@/lib/utils/variant-modifier-system";
 
 interface ChickenCustomizerProps {
   item: MenuItemWithVariants;
-  existingCartItem?: ConfiguredCartItem;
-  onComplete: (cartItem: ConfiguredCartItem) => void;
+  selectedVariant?: MenuItemVariant;
+  existingCartItem?: ConfiguredCartItem | null;
+  onComplete: (configuredItem: ConfiguredCartItem) => void;
   onCancel: () => void;
   isOpen: boolean;
   restaurantId: string;
 }
 
-interface ChickenConfiguration {
-  selectedVariantId: string | null;
-  selectedModifiers: string[];
-  specialInstructions: string;
+interface WhiteMeatTier {
+  id: string;
+  name: string;
+  level: "none" | "normal" | "extra" | "xxtra";
+  multiplier: number;
 }
-
-// ==========================================
-// SIMPLE BUSINESS LOGIC HELPERS
-// ==========================================
-
-function isChickenType(
-  item: MenuItemWithVariants,
-  variant: MenuItemVariant | null,
-  type: string
-): boolean {
-  const itemName = item.name.toLowerCase();
-  const variantName = variant?.name.toLowerCase() || "";
-
-  switch (type) {
-    case "bulk":
-      return (
-        itemName.includes("bulk") || (variant?.price || item.base_price) > 40
-      );
-    case "family":
-      return itemName.includes("family") || variantName.includes("family");
-    case "individual":
-      return (
-        itemName.includes("breast") ||
-        itemName.includes("thigh") ||
-        itemName.includes("leg") ||
-        itemName.includes("wing")
-      );
-    default:
-      return false;
-  }
-}
-
-function getChickenCapabilities(
-  item: MenuItemWithVariants,
-  variant: MenuItemVariant | null
-) {
-  if (isChickenType(item, variant, "bulk")) {
-    return {
-      allowsWhiteMeat: false,
-      allowsSides: false,
-      allowsCondiments: false,
-      allowsPreparation: true,
-      defaultSides: [],
-      message: "Bulk orders come as mixed chicken with limited customization",
-    };
-  }
-
-  if (isChickenType(item, variant, "family")) {
-    return {
-      allowsWhiteMeat: true,
-      allowsSides: true,
-      allowsCondiments: true,
-      allowsPreparation: true,
-      defaultSides: ["garlic_bread", "coleslaw"], // NO broasted potatoes
-      message: null,
-    };
-  }
-
-  // Regular chicken (8 PC, 12 PC, etc.)
-  return {
-    allowsWhiteMeat: true,
-    allowsSides: true,
-    allowsCondiments: true,
-    allowsPreparation: true,
-    defaultSides: variant?.name.includes("8") ? ["broasted_potatoes"] : [],
-    message: null,
-  };
-}
-
-function getPieceCount(variant: MenuItemVariant | null): number {
-  if (!variant) return 8;
-  const match = variant.name.match(/(\d+)\s*pc/i);
-  return match ? parseInt(match[1]) : 8;
-}
-
-// ==========================================
-// MAIN COMPONENT
-// ==========================================
 
 export default function ChickenCustomizer({
   item,
+  selectedVariant,
   existingCartItem,
   onComplete,
   onCancel,
@@ -126,91 +44,18 @@ export default function ChickenCustomizer({
   // STATE MANAGEMENT
   // ==========================================
 
-  const [configuration, setConfiguration] = useState<ChickenConfiguration>(
-    () => {
-      const initialVariantId =
-        existingCartItem?.variantId ||
-        (item.variants && item.variants.length > 0
-          ? item.variants[0].id
-          : null);
-
-      return {
-        selectedVariantId: initialVariantId,
-        selectedModifiers: [],
-        specialInstructions: existingCartItem?.specialInstructions || "",
-      };
-    }
+  const [currentVariant, setCurrentVariant] = useState<MenuItemVariant | null>(
+    selectedVariant || (item.variants && item.variants[0]) || null
   );
-
-  const [modifiers, setModifiers] = useState<Modifier[]>([]);
+  const [allModifiers, setAllModifiers] = useState<Modifier[]>([]);
+  const [selectedModifiers, setSelectedModifiers] = useState<
+    ConfiguredModifier[]
+  >([]);
+  const [selectedWhiteMeatTier, setSelectedWhiteMeatTier] =
+    useState<WhiteMeatTier | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [specialInstructions, setSpecialInstructions] = useState("");
   const [loading, setLoading] = useState(true);
-
-  // Get selected variant
-  const selectedVariant = useMemo(() => {
-    if (!configuration.selectedVariantId || !item.variants) return null;
-    return (
-      item.variants.find((v) => v.id === configuration.selectedVariantId) ||
-      null
-    );
-  }, [configuration.selectedVariantId, item.variants]);
-
-  // Get capabilities for current selection
-  const capabilities = useMemo(
-    () => getChickenCapabilities(item, selectedVariant),
-    [item, selectedVariant]
-  );
-
-  // ==========================================
-  // SET DEFAULT MODIFIERS FUNCTION
-  // ==========================================
-
-  const setDefaultModifiers = useCallback(
-    (availableModifiers: Modifier[]) => {
-      // Only set defaults for family packs and regular chicken with sides
-      if (isChickenType(item, selectedVariant, "bulk")) return;
-
-      const defaultModifierIds = availableModifiers
-        .filter((m) => {
-          const category = m.category.toLowerCase();
-          const name = m.name.toLowerCase();
-
-          // For family packs - auto-select garlic bread and coleslaw
-          if (isChickenType(item, selectedVariant, "family")) {
-            return (
-              category === "chicken_family_sides" &&
-              (name.includes("garlic bread") || name.includes("coleslaw"))
-            );
-          }
-
-          // For regular chicken with 8 PC - auto-select broasted potatoes (not extra potatoes)
-          if (getPieceCount(selectedVariant) === 8) {
-            return (
-              category === "chicken_8pc_sides" &&
-              name.includes("broasted potatoes") &&
-              name.includes("default")
-            );
-          }
-
-          return false;
-        })
-        .map((m) => m.id);
-
-      console.log(
-        "🔧 Setting default sides:",
-        defaultModifierIds.map(
-          (id) => availableModifiers.find((m) => m.id === id)?.name
-        )
-      );
-
-      if (defaultModifierIds.length > 0) {
-        setConfiguration((prev) => ({
-          ...prev,
-          selectedModifiers: defaultModifierIds,
-        }));
-      }
-    },
-    [item, selectedVariant]
-  );
 
   // ==========================================
   // DATA LOADING
@@ -219,42 +64,19 @@ export default function ChickenCustomizer({
   const loadModifiers = useCallback(async () => {
     try {
       setLoading(true);
-
       const response = await fetch(
         `/api/menu/modifiers?restaurant_id=${restaurantId}`
       );
-      if (!response.ok) throw new Error("Failed to load modifiers");
-
-      const data = await response.json();
-      setModifiers(data.data || []);
-
-      // Parse existing or set defaults
-      if (existingCartItem?.selectedModifiers) {
-        const existingIds = existingCartItem.selectedModifiers.map((m) => m.id);
-        setConfiguration((prev) => ({
-          ...prev,
-          selectedModifiers: existingIds,
-        }));
-      } else {
-        console.log(
-          "🔧 Setting initial defaults for:",
-          item.name,
-          selectedVariant?.name
-        );
-        setDefaultModifiers(data.data || []);
+      if (response.ok) {
+        const data = await response.json();
+        setAllModifiers(data.data || []);
       }
     } catch (error) {
-      console.error("Error loading chicken modifiers:", error);
+      console.error("Failed to load modifiers:", error);
     } finally {
       setLoading(false);
     }
-  }, [
-    restaurantId,
-    existingCartItem,
-    item.name,
-    selectedVariant?.name,
-    setDefaultModifiers,
-  ]);
+  }, [restaurantId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -263,616 +85,456 @@ export default function ChickenCustomizer({
   }, [isOpen, loadModifiers]);
 
   // ==========================================
-  // MODIFIER FILTERING
+  // VARIANT-AWARE MODIFIER SYSTEM
   // ==========================================
 
-  const availableModifiers = useMemo(() => {
-    const filtered = modifiers.filter((modifier) => {
-      const category = modifier.category.toLowerCase();
+  // Always call the hook, but handle empty data gracefully
+  const chickenCustomizationData = useChickenCustomization(
+    currentVariant || {
+      id: "",
+      menu_item_id: "",
+      name: "",
+      price: 0,
+      serves: "",
+      sort_order: 0,
+      is_available: true,
+      prep_time_minutes: 0,
+      size_code: "",
+    },
+    allModifiers
+  );
 
-      // For bulk chicken - ONLY chicken_preparation but exclude "Regular Cooking"
-      if (isChickenType(item, selectedVariant, "bulk")) {
-        return (
-          category === "chicken_preparation" &&
-          !modifier.name.includes("Regular Cooking")
-        );
+  // Use the data directly, with fallbacks for safety
+  const {
+    availableModifiers,
+    whiteMeatTiers,
+    defaultSelections,
+    calculatePrice,
+    validate,
+  } =
+    currentVariant && allModifiers.length > 0
+      ? chickenCustomizationData
+      : {
+          availableModifiers: {
+            whiteMeat: [],
+            sides: [],
+            preparation: [],
+            condiments: [],
+          },
+          whiteMeatTiers: [],
+          defaultSelections: [],
+          calculatePrice: () => 0,
+          validate: () => ({ isValid: true, errors: [], warnings: [] }),
+        };
+
+  // ==========================================
+  // EFFECTS FOR SETTING DEFAULTS AND EXISTING STATE
+  // ==========================================
+
+  useEffect(() => {
+    // Set defaults when variant changes or modifiers load
+    if (currentVariant && defaultSelections.length > 0 && !existingCartItem) {
+      console.log("🐔 Setting default selections for", currentVariant.name);
+      setSelectedModifiers(defaultSelections);
+
+      // Set default white meat tier to "none" (all dark meat)
+      const noneTier = whiteMeatTiers.find((t) => t.level === "none");
+      if (noneTier) {
+        setSelectedWhiteMeatTier(noneTier);
       }
+    }
+  }, [currentVariant, defaultSelections, whiteMeatTiers, existingCartItem]);
 
-      // For family packs - only specific family categories
-      if (isChickenType(item, selectedVariant, "family")) {
-        const pieceCount = getPieceCount(selectedVariant);
-        const isAllowed =
-          category === `chicken_white_meat_${pieceCount}pc_family` ||
-          category === "chicken_family_sides" ||
-          (category === "chicken_preparation" &&
-            !modifier.name.includes("Regular Cooking")) ||
-          category === "chicken_condiment";
+  useEffect(() => {
+    // Restore existing cart item state
+    if (existingCartItem && currentVariant) {
+      console.log("🔄 Restoring existing cart item state");
+      setQuantity(existingCartItem.quantity);
+      setSpecialInstructions(existingCartItem.specialInstructions || "");
+      setSelectedModifiers(existingCartItem.selectedModifiers || []);
 
-        if (isAllowed) {
-          console.log(
-            "🔧 Family pack allowing:",
-            modifier.name,
-            "(",
-            category,
-            ")"
-          );
-        }
-        return isAllowed;
-      }
-
-      // For regular chicken - only specific regular categories with correct piece count
-      const pieceCount = getPieceCount(selectedVariant);
-      return (
-        category === `chicken_white_meat_${pieceCount}pc` ||
-        category === "chicken_8pc_sides" ||
-        (category === "chicken_preparation" &&
-          !modifier.name.includes("Regular Cooking")) ||
-        category === "chicken_condiment"
+      // Try to determine white meat tier from existing modifiers
+      const whiteMeatMod = existingCartItem.selectedModifiers?.find((m) =>
+        m.name.includes("White Meat")
       );
-    });
-
-    console.log(
-      "🔧 Available modifiers for",
-      item.name,
-      selectedVariant?.name,
-      ":",
-      filtered.length
-    );
-    return filtered;
-  }, [modifiers, item, selectedVariant]);
-
-  const modifiersByCategory = useMemo(() => {
-    const categories = new Map<string, Modifier[]>();
-
-    availableModifiers.forEach((modifier) => {
-      if (!categories.has(modifier.category)) {
-        categories.set(modifier.category, []);
+      if (whiteMeatMod) {
+        const tier = whiteMeatTiers.find((t) => t.id === whiteMeatMod.id);
+        if (tier) {
+          setSelectedWhiteMeatTier(tier);
+        }
       }
-      categories.get(modifier.category)!.push(modifier);
-    });
-
-    return categories;
-  }, [availableModifiers]);
+    }
+  }, [existingCartItem, currentVariant, whiteMeatTiers]);
 
   // ==========================================
   // PRICE CALCULATION
   // ==========================================
 
-  const calculatedPrice = useMemo(() => {
-    const basePrice = selectedVariant?.price || item.base_price;
-
-    const modifierCost = configuration.selectedModifiers.reduce(
-      (total, modifierId) => {
-        const modifier = modifiers.find((m) => m.id === modifierId);
-        if (!modifier) return total;
-
-        const price = modifier.price_adjustment;
-        return total + price;
-      },
-      0
-    );
-
-    return basePrice + modifierCost;
+  const itemPrice = useMemo(() => {
+    if (!currentVariant) return 0;
+    return calculatePrice(selectedModifiers, selectedWhiteMeatTier);
   }, [
-    selectedVariant,
-    item.base_price,
-    configuration.selectedModifiers,
-    modifiers,
+    currentVariant,
+    selectedModifiers,
+    selectedWhiteMeatTier,
+    calculatePrice,
   ]);
+
+  const totalPrice = itemPrice * quantity;
 
   // ==========================================
   // EVENT HANDLERS
   // ==========================================
 
-  const handleVariantSelect = useCallback(
+  const handleVariantChange = useCallback(
     (variantId: string) => {
-      setConfiguration((prev) => ({
-        ...prev,
-        selectedVariantId: variantId,
-        selectedModifiers: [], // Reset modifiers when variant changes
-      }));
-
-      // Set defaults for the new variant after a brief delay
-      setTimeout(() => {
-        const newVariant = item.variants?.find((v) => v.id === variantId);
-        if (newVariant && isChickenType(item, newVariant, "family")) {
-          console.log("🔧 Variant changed to family pack, setting defaults");
-          setDefaultModifiers(modifiers);
-        }
-      }, 100);
+      const variant = item.variants?.find((v) => v.id === variantId);
+      if (variant) {
+        console.log("🔄 Variant changed to:", variant.name);
+        setCurrentVariant(variant);
+        // Reset selections when variant changes
+        setSelectedModifiers([]);
+        setSelectedWhiteMeatTier(null);
+      }
     },
-    [item.variants, modifiers, item, setDefaultModifiers]
+    [item.variants]
   );
 
-  const handleModifierToggle = useCallback((modifierId: string) => {
-    setConfiguration((prev) => ({
-      ...prev,
-      selectedModifiers: prev.selectedModifiers.includes(modifierId)
-        ? prev.selectedModifiers.filter((id) => id !== modifierId)
-        : [...prev.selectedModifiers, modifierId],
-    }));
+  const handleWhiteMeatTierChange = useCallback((tier: WhiteMeatTier) => {
+    console.log("🍗 White meat tier changed to:", tier.name);
+    setSelectedWhiteMeatTier(tier);
   }, []);
 
-  // ==========================================
-  // COMPLETION HANDLER
-  // ==========================================
+  const handleModifierToggle = useCallback((modifier: Modifier) => {
+    setSelectedModifiers((prev) => {
+      const existing = prev.find((m) => m.id === modifier.id);
+
+      if (existing) {
+        // Remove modifier
+        return prev.filter((m) => m.id !== modifier.id);
+      } else {
+        // Add modifier
+        return [
+          ...prev,
+          {
+            id: modifier.id,
+            name: modifier.name,
+            priceAdjustment: modifier.price_adjustment,
+          },
+        ];
+      }
+    });
+  }, []);
 
   const handleComplete = useCallback(() => {
-    if (!configuration.selectedVariantId) {
-      alert("Please select a size/variant first.");
+    if (!currentVariant) return;
+
+    const validation = validate(selectedModifiers, selectedWhiteMeatTier);
+    if (!validation.isValid) {
+      alert(
+        "Please fix the following issues:\n" + validation.errors.join("\n")
+      );
       return;
     }
 
-    const selectedModifierObjects: ConfiguredModifier[] =
-      configuration.selectedModifiers.map((modifierId) => {
-        const modifier = modifiers.find((m) => m.id === modifierId);
-        if (!modifier) throw new Error(`Modifier ${modifierId} not found`);
+    // Build final modifier list including white meat tier
+    const finalModifiers = [...selectedModifiers];
+    if (selectedWhiteMeatTier && selectedWhiteMeatTier.level !== "none") {
+      const whiteMeatModifier = availableModifiers.whiteMeat.find(
+        (m) => m.id === selectedWhiteMeatTier.id
+      );
+      if (whiteMeatModifier) {
+        finalModifiers.push({
+          id: whiteMeatModifier.id,
+          name: selectedWhiteMeatTier.name,
+          priceAdjustment:
+            whiteMeatModifier.price_adjustment *
+            selectedWhiteMeatTier.multiplier,
+        });
+      }
+    }
 
-        const price = modifier.price_adjustment;
-
-        return {
-          id: modifier.id,
-          name: modifier.name,
-          priceAdjustment: price,
-        };
-      });
-
-    const cartItem: ConfiguredCartItem = {
+    const configuredItem: ConfiguredCartItem = {
       id:
-        existingCartItem?.id ||
-        `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        existingCartItem?.id || `${item.id}-${currentVariant.id}-${Date.now()}`,
       menuItemId: item.id,
       menuItemName: item.name,
-      variantId: configuration.selectedVariantId,
-      variantName: selectedVariant?.name || null,
-      quantity: existingCartItem?.quantity || 1,
-      basePrice: selectedVariant?.price || item.base_price,
-      selectedToppings: [],
-      selectedModifiers: selectedModifierObjects,
-      specialInstructions: configuration.specialInstructions,
-      totalPrice: calculatedPrice,
-      displayName: selectedVariant?.name
-        ? `${selectedVariant.name} ${item.name}`
-        : item.name,
+      variantId: currentVariant.id,
+      variantName: currentVariant.name,
+      quantity,
+      basePrice: currentVariant.price,
+      selectedToppings: [], // Not applicable for chicken
+      selectedModifiers: finalModifiers,
+      specialInstructions,
+      totalPrice: itemPrice,
+      displayName: `${item.name} (${currentVariant.name})`,
     };
 
-    console.log("🍗 Completed chicken customization:", cartItem);
-    onComplete(cartItem);
+    console.log("✅ Chicken customization completed:", configuredItem);
+    onComplete(configuredItem);
   }, [
-    configuration,
-    modifiers,
-    selectedVariant,
-    item,
-    calculatedPrice,
-    existingCartItem,
+    currentVariant,
+    validate,
+    selectedModifiers,
+    selectedWhiteMeatTier,
+    availableModifiers.whiteMeat,
+    existingCartItem?.id,
+    item.id,
+    item.name,
+    quantity,
+    specialInstructions,
+    itemPrice,
     onComplete,
   ]);
 
   // ==========================================
-  // RENDER HELPERS
+  // LOADING STATE
   // ==========================================
 
-  const renderVariantSelection = () => {
-    if (!item.variants || item.variants.length <= 1) return null;
-
+  if (loading) {
     return (
-      <section>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          Select Size/Type
-        </h3>
-        <div className="grid grid-cols-2 gap-3">
-          {item.variants.map((variant) => (
-            <button
-              key={variant.id}
-              onClick={() => handleVariantSelect(variant.id)}
-              className={`p-3 border-2 rounded-lg text-left transition-all ${
-                configuration.selectedVariantId === variant.id
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-200 hover:border-gray-300"
-              }`}
-            >
-              <div className="font-medium text-gray-900">{variant.name}</div>
-              <div className="text-lg font-bold text-green-600">
-                ${variant.price.toFixed(2)}
-              </div>
-              {variant.serves && (
-                <div className="text-xs text-gray-500">{variant.serves}</div>
-              )}
-            </button>
-          ))}
-        </div>
-      </section>
-    );
-  };
-
-  const renderWhiteMeatSection = (
-    category: string,
-    categoryModifiers: Modifier[]
-  ) => {
-    return (
-      <section key={category}>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          White Meat Options
-          <span className="text-sm font-normal text-gray-600 ml-2">
-            (Additional charges apply)
-          </span>
-        </h3>
-
-        <div className="space-y-2">
-          <label className="flex items-center justify-between p-2 border rounded hover:bg-gray-50">
-            <div className="flex items-center">
-              <input
-                type="radio"
-                name="whiteMeat"
-                value="none"
-                checked={
-                  !configuration.selectedModifiers.some((id) =>
-                    categoryModifiers.find((m) => m.id === id)
-                  )
-                }
-                onChange={() => {
-                  // Remove all white meat selections
-                  const whiteMeatIds = categoryModifiers.map((m) => m.id);
-                  setConfiguration((prev) => ({
-                    ...prev,
-                    selectedModifiers: prev.selectedModifiers.filter(
-                      (id) => !whiteMeatIds.includes(id)
-                    ),
-                  }));
-                }}
-                className="mr-3 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-gray-900">Regular Mix</span>
-            </div>
-            <span className="text-gray-500">No charge</span>
-          </label>
-
-          {categoryModifiers.map((modifier) => {
-            const isSelected = configuration.selectedModifiers.includes(
-              modifier.id
-            );
-            const displayPrice = modifier.price_adjustment;
-
-            return (
-              <label
-                key={modifier.id}
-                className="flex items-center justify-between p-2 border rounded hover:bg-gray-50"
-              >
-                <div className="flex items-center">
-                  <input
-                    type="radio"
-                    name="whiteMeat"
-                    value={modifier.id}
-                    checked={isSelected}
-                    onChange={() => {
-                      // Remove all other white meat selections, add this one
-                      const whiteMeatIds = categoryModifiers.map((m) => m.id);
-                      setConfiguration((prev) => ({
-                        ...prev,
-                        selectedModifiers: [
-                          ...prev.selectedModifiers.filter(
-                            (id) => !whiteMeatIds.includes(id)
-                          ),
-                          modifier.id,
-                        ],
-                      }));
-                    }}
-                    className="mr-3 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-gray-900">{modifier.name}</span>
-                </div>
-                <span className="text-green-600 font-medium">
-                  +${displayPrice.toFixed(2)}
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </section>
-    );
-  };
-
-  const renderDarkMeatSection = () => {
-    // Only show dark meat for non-bulk chicken
-    if (isChickenType(item, selectedVariant, "bulk")) return null;
-
-    return (
-      <section>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          Dark Meat Options
-          <span className="text-sm font-normal text-gray-600 ml-2">
-            (No additional charge)
-          </span>
-        </h3>
-
-        <div className="space-y-2">
-          <label className="flex items-center justify-between p-2 border rounded hover:bg-gray-50">
-            <div className="flex items-center">
-              <input
-                type="radio"
-                name="darkMeat"
-                value="regular"
-                defaultChecked
-                className="mr-3 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-gray-900">Regular Mix</span>
-            </div>
-            <span className="text-gray-500">No charge</span>
-          </label>
-
-          <label className="flex items-center justify-between p-2 border rounded hover:bg-gray-50">
-            <div className="flex items-center">
-              <input
-                type="radio"
-                name="darkMeat"
-                value="extra"
-                className="mr-3 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-gray-900">Extra Dark Meat</span>
-            </div>
-            <span className="text-gray-500">No charge</span>
-          </label>
-
-          <label className="flex items-center justify-between p-2 border rounded hover:bg-gray-50">
-            <div className="flex items-center">
-              <input
-                type="radio"
-                name="darkMeat"
-                value="xxtra"
-                className="mr-3 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-gray-900">XXtra Dark Meat</span>
-            </div>
-            <span className="text-gray-500">No charge</span>
-          </label>
-        </div>
-      </section>
-    );
-  };
-
-  const renderModifierCategory = (
-    category: string,
-    categoryModifiers: Modifier[]
-  ) => {
-    const categoryDisplayNames: Record<string, string> = {
-      chicken_white_meat: "White Meat Options",
-      chicken_family_sides: "Family Pack Sides",
-      chicken_8pc_sides: "Included Sides",
-      chicken_preparation: "Preparation",
-      chicken_condiment: "Condiments & Sauces",
-    };
-
-    // Get base category name (remove piece count specifics)
-    let baseCategoryName = category;
-    if (category.includes("chicken_white_meat")) {
-      baseCategoryName = "chicken_white_meat";
-    }
-
-    const displayName = categoryDisplayNames[baseCategoryName] || category;
-    const showPricing = category.includes("condiment");
-
-    // Special handling for preparation - show as single checkbox for "Extra Crispy"
-    if (category.includes("preparation")) {
-      const extraCrispyModifier = categoryModifiers.find((m) =>
-        m.name.includes("Extra Crispy")
-      );
-      if (!extraCrispyModifier) return null;
-
-      return (
-        <section key={category}>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">
-            Preparation
-            <span className="text-sm font-normal text-gray-600 ml-2">
-              (No additional charge)
-            </span>
-          </h3>
-
-          <div className="space-y-2">
-            <label className="flex items-center p-2 border rounded hover:bg-gray-50">
-              <input
-                type="checkbox"
-                checked={configuration.selectedModifiers.includes(
-                  extraCrispyModifier.id
-                )}
-                onChange={() => handleModifierToggle(extraCrispyModifier.id)}
-                className="mr-3 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-gray-900">Extra Crispy</span>
-              <span className="text-sm text-gray-500 ml-2">
-                (Regular cooking if not selected)
-              </span>
-            </label>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p>Loading chicken options...</p>
           </div>
-        </section>
-      );
-    }
-
-    return (
-      <section key={category}>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          {displayName}
-          {!showPricing && (
-            <span className="text-sm font-normal text-gray-600 ml-2">
-              (No additional charge)
-            </span>
-          )}
-        </h3>
-
-        <div className="space-y-2">
-          {categoryModifiers.map((modifier) => {
-            const isSelected = configuration.selectedModifiers.includes(
-              modifier.id
-            );
-            const displayPrice = modifier.price_adjustment;
-
-            return (
-              <label
-                key={modifier.id}
-                className="flex items-center justify-between p-2 border rounded hover:bg-gray-50"
-              >
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => handleModifierToggle(modifier.id)}
-                    className="mr-3 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-gray-900">{modifier.name}</span>
-                </div>
-                {displayPrice > 0 && (
-                  <span className="text-green-600 font-medium">
-                    +${displayPrice.toFixed(2)}
-                  </span>
-                )}
-              </label>
-            );
-          })}
         </div>
-      </section>
+      </div>
     );
-  };
+  }
+
+  if (!isOpen || !currentVariant) return null;
 
   // ==========================================
-  // MAIN RENDER
+  // RENDER COMPONENT
   // ==========================================
-
-  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Customize {item.name}
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              {selectedVariant ? (
-                <>
-                  {selectedVariant.name}
-                  {capabilities.message && (
-                    <span className="text-orange-600 ml-2">
-                      • {capabilities.message}
-                    </span>
-                  )}
-                </>
-              ) : (
-                "Select a size/type to continue"
-              )}
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-green-600">
-              ${calculatedPrice.toFixed(2)}
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">{item.name}</h2>
+              <p className="text-lg text-green-600 font-semibold">
+                ${totalPrice.toFixed(2)}{" "}
+                {quantity > 1 && `(${quantity} × $${itemPrice.toFixed(2)})`}
+              </p>
             </div>
-            <div className="text-sm text-gray-500">Current total</div>
+            <button
+              onClick={onCancel}
+              className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+            >
+              ×
+            </button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="p-6 text-center">
-              <div className="text-lg text-gray-600">
-                Loading customization options...
+        <div className="p-6 space-y-8">
+          {/* Variant Selection */}
+          {item.variants && item.variants.length > 1 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                Choose Size
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {item.variants.map((variant) => (
+                  <button
+                    key={variant.id}
+                    onClick={() => handleVariantChange(variant.id)}
+                    className={`p-3 rounded-lg border-2 text-left transition-all ${
+                      currentVariant?.id === variant.id
+                        ? "border-blue-500 bg-blue-50 text-blue-900"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="font-semibold">{variant.name}</div>
+                    <div className="text-sm text-gray-600">
+                      {variant.serves}
+                    </div>
+                    <div className="text-lg font-bold text-green-600">
+                      ${variant.price.toFixed(2)}
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
-          ) : (
-            <div className="p-6 space-y-6">
-              {renderVariantSelection()}
+          )}
 
-              {selectedVariant && (
-                <>
-                  {/* Show message for limited customization */}
-                  {capabilities.message && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                      <div className="text-orange-800 font-medium">
-                        Limited Customization
-                      </div>
-                      <div className="text-orange-700 text-sm mt-1">
-                        {capabilities.message}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* White Meat Options - MOVED TO TOP */}
-                  {Array.from(modifiersByCategory.entries())
-                    .filter(([category]) => category.includes("white_meat"))
-                    .map(([category, categoryModifiers]) =>
-                      renderWhiteMeatSection(category, categoryModifiers)
-                    )}
-
-                  {/* Dark Meat Options */}
-                  {renderDarkMeatSection()}
-
-                  {/* Sides */}
-                  {Array.from(modifiersByCategory.entries())
-                    .filter(([category]) => category.includes("sides"))
-                    .map(([category, categoryModifiers]) =>
-                      renderModifierCategory(category, categoryModifiers)
-                    )}
-
-                  {/* Preparation */}
-                  {Array.from(modifiersByCategory.entries())
-                    .filter(([category]) => category.includes("preparation"))
-                    .map(([category, categoryModifiers]) =>
-                      renderModifierCategory(category, categoryModifiers)
-                    )}
-
-                  {/* Condiments - MOVED TO BOTTOM */}
-                  {Array.from(modifiersByCategory.entries())
-                    .filter(([category]) => category.includes("condiment"))
-                    .map(([category, categoryModifiers]) =>
-                      renderModifierCategory(category, categoryModifiers)
-                    )}
-
-                  {/* Special Instructions */}
-                  <section>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                      Special Instructions
-                    </h3>
-                    <textarea
-                      placeholder="Any special requests for this chicken order..."
-                      value={configuration.specialInstructions}
-                      onChange={(e) =>
-                        setConfiguration((prev) => ({
-                          ...prev,
-                          specialInstructions: e.target.value,
-                        }))
-                      }
-                      rows={3}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          {/* White Meat Selection */}
+          {whiteMeatTiers.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                🍗 White Meat Options
+              </h3>
+              <div className="space-y-2">
+                {whiteMeatTiers.map((tier) => (
+                  <label key={tier.id} className="flex items-center space-x-3">
+                    <input
+                      type="radio"
+                      name="whiteMeatTier"
+                      checked={selectedWhiteMeatTier?.id === tier.id}
+                      onChange={() => handleWhiteMeatTierChange(tier)}
+                      className="w-4 h-4 text-blue-600"
                     />
-                  </section>
-                </>
-              )}
+                    <span className="flex-1">{tier.name}</span>
+                    {tier.multiplier > 0 && (
+                      <span className="text-green-600 font-semibold">
+                        +$
+                        {(
+                          availableModifiers.whiteMeat[0]?.price_adjustment *
+                            tier.multiplier || 0
+                        ).toFixed(2)}
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Sides Selection */}
+          {availableModifiers.sides.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                🥔 Included Sides
+              </h3>
+              <div className="space-y-2">
+                {availableModifiers.sides.map((modifier) => (
+                  <label
+                    key={modifier.id}
+                    className="flex items-center space-x-3"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedModifiers.some(
+                        (m) => m.id === modifier.id
+                      )}
+                      onChange={() => handleModifierToggle(modifier)}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="flex-1">{modifier.name}</span>
+                    {modifier.price_adjustment > 0 && (
+                      <span className="text-green-600 font-semibold">
+                        +${modifier.price_adjustment.toFixed(2)}
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Preparation Options */}
+          {availableModifiers.preparation.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                👨‍🍳 Preparation
+              </h3>
+              <div className="space-y-2">
+                {availableModifiers.preparation.map((modifier) => (
+                  <label
+                    key={modifier.id}
+                    className="flex items-center space-x-3"
+                  >
+                    <input
+                      type="radio"
+                      name="preparation"
+                      checked={selectedModifiers.some(
+                        (m) => m.id === modifier.id
+                      )}
+                      onChange={() => handleModifierToggle(modifier)}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="flex-1">{modifier.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Condiments */}
+          {availableModifiers.condiments.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                🧄 Condiments
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {availableModifiers.condiments.map((modifier) => (
+                  <label
+                    key={modifier.id}
+                    className="flex items-center space-x-3"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedModifiers.some(
+                        (m) => m.id === modifier.id
+                      )}
+                      onChange={() => handleModifierToggle(modifier)}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="flex-1">{modifier.name}</span>
+                    {modifier.price_adjustment > 0 && (
+                      <span className="text-green-600 font-semibold">
+                        +${modifier.price_adjustment.toFixed(2)}
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Quantity and Special Instructions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Quantity
+              </label>
+              <select
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value))}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {[1, 2, 3, 4, 5].map((num) => (
+                  <option key={num} value={num}>
+                    {num}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Special Instructions
+              </label>
+              <textarea
+                value={specialInstructions}
+                onChange={(e) => setSpecialInstructions(e.target.value)}
+                placeholder="Any special requests..."
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={3}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100 transition-colors"
-          >
-            Cancel
-          </button>
-
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-sm text-gray-600">Total:</div>
-              <div className="text-xl font-bold text-green-600">
-                ${calculatedPrice.toFixed(2)}
-              </div>
-            </div>
+        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6">
+          <div className="flex justify-between items-center">
+            <button
+              onClick={onCancel}
+              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
             <button
               onClick={handleComplete}
-              disabled={loading || !configuration.selectedVariantId}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              className="px-8 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold"
             >
-              {existingCartItem ? "Update Cart" : "Add to Cart"}
+              Add to Cart - ${totalPrice.toFixed(2)}
             </button>
           </div>
         </div>

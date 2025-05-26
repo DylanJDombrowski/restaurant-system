@@ -8,7 +8,13 @@
  * These define the fixed values our system recognizes
  */
 
-export type OrderStatus = "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled";
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready"
+  | "completed"
+  | "cancelled";
 
 export type StaffRole = "staff" | "manager" | "admin";
 export type OrderType = "pickup" | "delivery";
@@ -146,6 +152,7 @@ export interface Modifier {
   category: string;
   price_adjustment: number; // How much this modifier adds/subtracts
   is_available: boolean;
+  selected: boolean;
 }
 
 /**
@@ -245,7 +252,13 @@ export interface OrderItem {
  * MenuItem with its category information
  * Used throughout the staff interface for simple displays
  */
-export type ItemCategory = "pizza" | "sandwich" | "appetizer" | "side" | "beverage" | "dessert";
+export type ItemCategory =
+  | "pizza"
+  | "sandwich"
+  | "appetizer"
+  | "side"
+  | "beverage"
+  | "dessert";
 
 // Customization complexity levels
 export type CustomizationLevel =
@@ -380,7 +393,10 @@ export function isPizzaItem(item: MenuItem): boolean {
 }
 
 // Helper function to safely handle null/undefined strings
-export function safeString(value: SafeString, defaultValue: string = ""): string {
+export function safeString(
+  value: SafeString,
+  defaultValue: string = ""
+): string {
   return value ?? defaultValue;
 }
 
@@ -413,10 +429,13 @@ export function getItemCategory(item: MenuItem): ItemCategory {
   const itemType = item.item_type?.toLowerCase() || "";
 
   if (itemType.includes("pizza")) return "pizza";
-  if (itemType.includes("sandwich") || itemType.includes("sub")) return "sandwich";
-  if (itemType.includes("appetizer") || itemType.includes("app")) return "appetizer";
+  if (itemType.includes("sandwich") || itemType.includes("sub"))
+    return "sandwich";
+  if (itemType.includes("appetizer") || itemType.includes("app"))
+    return "appetizer";
   if (itemType.includes("side")) return "side";
-  if (itemType.includes("beverage") || itemType.includes("drink")) return "beverage";
+  if (itemType.includes("beverage") || itemType.includes("drink"))
+    return "beverage";
   if (itemType.includes("dessert")) return "dessert";
 
   // Default categorization by name patterns

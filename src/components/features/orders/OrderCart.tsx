@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import AppetizerCustomizer from "./AppetizerCustomizer";
 import PizzaCustomizer from "./PizzaCustomizer";
 import SandwichCustomizer from "./SandwichCustomizer";
+import ChickenCustomizer from "./ChickenCustomizer";
 
 /**
  * 🔄 RENAMED: OrderCart (formerly EnhancedCartSystem)
@@ -35,13 +36,21 @@ interface OrderCartProps {
   onCompleteOrder: () => void;
 }
 
-export default function OrderCart({ items, onUpdateItem, onRemoveItem, restaurantId, orderSummary, onCompleteOrder }: OrderCartProps) {
+export default function OrderCart({
+  items,
+  onUpdateItem,
+  onRemoveItem,
+  restaurantId,
+  orderSummary,
+  onCompleteOrder,
+}: OrderCartProps) {
   // ==========================================
   // STATE MANAGEMENT - SIMPLIFIED
   // ==========================================
 
   // Pizza customizer states
-  const [customizingItem, setCustomizingItem] = useState<ConfiguredCartItem | null>(null);
+  const [customizingItem, setCustomizingItem] =
+    useState<ConfiguredCartItem | null>(null);
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [availableToppings, setAvailableToppings] = useState<Topping[]>([]);
   const [availableModifiers, setAvailableModifiers] = useState<Modifier[]>([]);
@@ -49,12 +58,22 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
 
   // Sandwich customizer states
   const [showSandwichCustomizer, setShowSandwichCustomizer] = useState(false);
-  const [customizingSandwichItem, setCustomizingSandwichItem] = useState<MenuItemWithVariants | null>(null);
+  const [customizingSandwichItem, setCustomizingSandwichItem] =
+    useState<MenuItemWithVariants | null>(null);
 
   // Appetizer customizer states
   const [showAppetizerCustomizer, setShowAppetizerCustomizer] = useState(false);
-  const [customizingAppetizerItem, setCustomizingAppetizerItem] = useState<MenuItemWithVariants | null>(null);
-  const [customizingAppetizerVariant, setCustomizingAppetizerVariant] = useState<MenuItemVariant | null>(null);
+  const [customizingAppetizerItem, setCustomizingAppetizerItem] =
+    useState<MenuItemWithVariants | null>(null);
+  const [customizingAppetizerVariant, setCustomizingAppetizerVariant] =
+    useState<MenuItemVariant | null>(null);
+
+  // Chicken customizer states
+  const [showChickenCustomizer, setShowChickenCustomizer] = useState(false);
+  const [customizingChickenItem, setCustomizingChickenItem] =
+    useState<MenuItemWithVariants | null>(null);
+  const [customizingChickenVariant, setCustomizingChickenVariant] =
+    useState<MenuItemVariant | null>(null);
 
   // Order notes
   const [orderNotes, setOrderNotes] = useState("");
@@ -63,7 +82,10 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
   const cartStats = useMemo(() => {
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
     const uniqueItems = items.length;
-    const totalPrice = items.reduce((sum, item) => sum + item.totalPrice * item.quantity, 0);
+    const totalPrice = items.reduce(
+      (sum, item) => sum + item.totalPrice * item.quantity,
+      0
+    );
 
     return { totalItems, uniqueItems, totalPrice };
   }, [items]);
@@ -120,14 +142,18 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
     console.log("🔧 Cart customize for item:", item.menuItemName);
 
     try {
-      const menuResponse = await fetch(`/api/menu/full?restaurant_id=${restaurantId}`);
+      const menuResponse = await fetch(
+        `/api/menu/full?restaurant_id=${restaurantId}`
+      );
       if (!menuResponse.ok) {
         console.error("Failed to load menu data for customization");
         return;
       }
 
       const menuData = await menuResponse.json();
-      const fullMenuItem = menuData.data.menu_items.find((mi: MenuItemWithVariants) => mi.id === item.menuItemId);
+      const fullMenuItem = menuData.data.menu_items.find(
+        (mi: MenuItemWithVariants) => mi.id === item.menuItemId
+      );
 
       if (!fullMenuItem) {
         console.error("Menu item not found for customization");
@@ -141,56 +167,71 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
         allows_custom_toppings: fullMenuItem.allows_custom_toppings,
       });
 
-      // 🎯 ROUTING LOGIC WITH APPETIZER SUPPORT
+      // 🎯 ROUTING LOGIC WITH CHICKEN SUPPORT
 
-      // Check if it's an appetizer
-      if (fullMenuItem.category?.name === "Appetizers") {
-        console.log("🍗 Opening appetizer customizer from cart");
+      // 🍗 NEW: Check if it's chicken (using category name)
+      if (fullMenuItem.category?.name === "Chicken") {
+        console.log("🍗 Opening ENHANCED chicken customizer from cart");
 
         // Find the variant if this cart item has one
         let selectedVariant = null;
         if (item.variantId && fullMenuItem.variants) {
-          selectedVariant = fullMenuItem.variants.find((v: MenuItemVariant) => v.id === item.variantId) || null;
+          selectedVariant =
+            fullMenuItem.variants.find(
+              (v: MenuItemVariant) => v.id === item.variantId
+            ) || null;
+        }
+
+        setCustomizingChickenItem(fullMenuItem);
+        setCustomizingChickenVariant(selectedVariant);
+        setCustomizingItem(item); // Store existing cart item for state preservation
+        setShowChickenCustomizer(true);
+        return;
+      }
+
+      // Existing routing logic for other categories...
+      if (fullMenuItem.category?.name === "Appetizers") {
+        console.log("🍗 Opening appetizer customizer from cart");
+        // ... existing appetizer logic
+        let selectedVariant = null;
+        if (item.variantId && fullMenuItem.variants) {
+          selectedVariant =
+            fullMenuItem.variants.find(
+              (v: MenuItemVariant) => v.id === item.variantId
+            ) || null;
         }
 
         setCustomizingAppetizerItem(fullMenuItem);
         setCustomizingAppetizerVariant(selectedVariant);
-        setCustomizingItem(item); // Store existing cart item for state preservation
+        setCustomizingItem(item);
         setShowAppetizerCustomizer(true);
         return;
       }
 
-      // Check if it's a sandwich
       if (fullMenuItem.category?.name === "Sandwiches") {
         console.log("🥪 Opening sandwich customizer from cart");
+        // ... existing sandwich logic
         setCustomizingSandwichItem(fullMenuItem);
         setCustomizingItem(item);
         setShowSandwichCustomizer(true);
         return;
       }
 
-      // Pizza or customizable items
-      if (fullMenuItem.item_type === "pizza" || fullMenuItem.allows_custom_toppings) {
+      if (
+        fullMenuItem.item_type === "pizza" ||
+        fullMenuItem.allows_custom_toppings
+      ) {
         console.log("🍕 Opening pizza customizer with existing state");
-
-        // Preserve ALL existing state
+        // ... existing pizza logic
         const safeItem: ConfiguredCartItem = {
           ...item,
-          // Keep existing selections (don't reset to empty arrays)
           selectedToppings: item.selectedToppings || [],
           selectedModifiers: item.selectedModifiers || [],
           specialInstructions: item.specialInstructions || "",
-          // Preserve pricing information
           basePrice: item.basePrice,
           totalPrice: item.totalPrice,
           quantity: item.quantity,
         };
-
-        console.log("🔧 Passing to pizza customizer:", {
-          toppings: safeItem.selectedToppings.length,
-          modifiers: safeItem.selectedModifiers.length,
-          instructions: safeItem.specialInstructions,
-        });
 
         setCustomizingItem(safeItem);
         await loadCustomizerData();
@@ -202,18 +243,7 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
       alert("This item doesn't have customization options.");
     } catch (error) {
       console.error("Error determining customization type:", error);
-
-      // Fallback also preserves state
-      const safeItem: ConfiguredCartItem = {
-        ...item,
-        selectedToppings: item.selectedToppings || [],
-        selectedModifiers: item.selectedModifiers || [],
-        specialInstructions: item.specialInstructions || "",
-      };
-
-      setCustomizingItem(safeItem);
-      await loadCustomizerData();
-      setShowCustomizer(true);
+      // ... existing fallback logic
     }
   };
 
@@ -222,7 +252,9 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
   // ==========================================
 
   // Sandwich customization handlers
-  const handleSandwichCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
+  const handleSandwichCustomizationComplete = (
+    updatedItem: ConfiguredCartItem
+  ) => {
     console.log("🥪 Sandwich customization completed:", updatedItem);
 
     // Update the SAME cart item (preserve ID and other properties)
@@ -260,12 +292,40 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
   };
 
   // Appetizer customization handlers
-  const handleAppetizerCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
+  const handleAppetizerCustomizationComplete = (
+    updatedItem: ConfiguredCartItem
+  ) => {
     console.log("🍗 Appetizer customization completed:", updatedItem);
     onUpdateItem(updatedItem.id, updatedItem);
     setShowAppetizerCustomizer(false);
     setCustomizingAppetizerItem(null);
     setCustomizingAppetizerVariant(null);
+    setCustomizingItem(null);
+  };
+
+  const handleChickenCustomizationComplete = (
+    updatedItem: ConfiguredCartItem
+  ) => {
+    console.log("🍗 Enhanced chicken customization completed:", updatedItem);
+
+    // Update the SAME cart item (preserve ID and other properties)
+    const finalItem: ConfiguredCartItem = {
+      ...updatedItem,
+      id: customizingItem?.id || updatedItem.id, // Keep original cart item ID
+      quantity: customizingItem?.quantity || updatedItem.quantity, // Keep original quantity if not changed
+    };
+
+    onUpdateItem(finalItem.id, finalItem);
+    setShowChickenCustomizer(false);
+    setCustomizingChickenItem(null);
+    setCustomizingChickenVariant(null);
+    setCustomizingItem(null);
+  };
+
+  const handleChickenCustomizationCancel = () => {
+    setShowChickenCustomizer(false);
+    setCustomizingChickenItem(null);
+    setCustomizingChickenVariant(null);
     setCustomizingItem(null);
   };
 
@@ -299,7 +359,11 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
         <div className="px-4 py-3 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">
             Current Order
-            {cartStats.totalItems > 0 && <span className="ml-2 text-sm font-normal text-gray-600">({cartStats.totalItems} items)</span>}
+            {cartStats.totalItems > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-600">
+                ({cartStats.totalItems} items)
+              </span>
+            )}
           </h3>
         </div>
 
@@ -312,10 +376,14 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
                 <CartItemCard
                   key={item.id}
                   item={item}
-                  onQuantityChange={(quantity) => handleQuantityChange(item.id, quantity)}
+                  onQuantityChange={(quantity) =>
+                    handleQuantityChange(item.id, quantity)
+                  }
                   onCustomize={() => handleCustomizeItem(item)}
                   onRemove={() => onRemoveItem(item.id)}
-                  customizationLoading={loadingCustomizerData && customizingItem?.id === item.id}
+                  customizationLoading={
+                    loadingCustomizerData && customizingItem?.id === item.id
+                  }
                 />
               ))}
             </div>
@@ -325,7 +393,9 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
         {/* Order Notes */}
         {items.length > 0 && (
           <div className="px-4 py-3 border-t border-gray-200">
-            <label className="block text-sm font-medium text-gray-900 mb-1">Order Notes</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">
+              Order Notes
+            </label>
             <textarea
               placeholder="Special instructions for this order..."
               value={orderNotes}
@@ -345,7 +415,9 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
               onClick={onCompleteOrder}
               disabled={!canCompleteOrder()}
               className={`w-full mt-4 py-3 px-4 rounded-lg font-semibold transition-colors ${
-                canCompleteOrder() ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                canCompleteOrder()
+                  ? "bg-green-600 text-white hover:bg-green-700"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
               }`}
             >
               {getCompletionButtonText()}
@@ -389,6 +461,19 @@ export default function OrderCart({ items, onUpdateItem, onRemoveItem, restauran
           restaurantId={restaurantId}
         />
       )}
+
+      {/* ENHANCED CHICKEN MODAL CUSTOMIZER */}
+      {showChickenCustomizer && customizingChickenItem && (
+        <ChickenCustomizer
+          item={customizingChickenItem}
+          selectedVariant={customizingChickenVariant || undefined}
+          existingCartItem={customizingItem || undefined} // Pass existing state for preservation
+          onComplete={handleChickenCustomizationComplete}
+          onCancel={handleChickenCustomizationCancel}
+          isOpen={showChickenCustomizer}
+          restaurantId={restaurantId}
+        />
+      )}
     </>
   );
 }
@@ -402,7 +487,9 @@ function CartEmptyState() {
     <div className="p-8 text-center text-gray-500">
       <div className="text-4xl mb-4">🛒</div>
       <h4 className="text-lg font-medium text-gray-900 mb-2">Cart is Empty</h4>
-      <p className="text-sm">Add items from the menu to get started with this order.</p>
+      <p className="text-sm">
+        Add items from the menu to get started with this order.
+      </p>
     </div>
   );
 }
@@ -415,18 +502,33 @@ interface CartItemCardProps {
   customizationLoading?: boolean;
 }
 
-function CartItemCard({ item, onQuantityChange, onCustomize, onRemove, customizationLoading = false }: CartItemCardProps) {
-  const canCustomize = item.selectedToppings !== undefined || item.selectedModifiers !== undefined;
+function CartItemCard({
+  item,
+  onQuantityChange,
+  onCustomize,
+  onRemove,
+  customizationLoading = false,
+}: CartItemCardProps) {
+  const canCustomize =
+    item.selectedToppings !== undefined || item.selectedModifiers !== undefined;
 
   const getItemDescription = (): string => {
     const parts: string[] = [];
 
     if (item.selectedToppings && item.selectedToppings.length > 0) {
-      const addedToppings = item.selectedToppings.filter((t: ConfiguredTopping) => !t.isDefault || t.amount === "extra");
-      const removedDefaults = item.selectedToppings.filter((t: ConfiguredTopping) => t.isDefault && t.amount === "none");
+      const addedToppings = item.selectedToppings.filter(
+        (t: ConfiguredTopping) => !t.isDefault || t.amount === "extra"
+      );
+      const removedDefaults = item.selectedToppings.filter(
+        (t: ConfiguredTopping) => t.isDefault && t.amount === "none"
+      );
 
       if (addedToppings.length > 0) {
-        const toppingNames = addedToppings.map((t: ConfiguredTopping) => (t.amount === "extra" ? `Extra ${t.name}` : t.name)).slice(0, 3);
+        const toppingNames = addedToppings
+          .map((t: ConfiguredTopping) =>
+            t.amount === "extra" ? `Extra ${t.name}` : t.name
+          )
+          .slice(0, 3);
 
         if (addedToppings.length > 3) {
           toppingNames.push(`+${addedToppings.length - 3} more`);
@@ -436,13 +538,17 @@ function CartItemCard({ item, onQuantityChange, onCustomize, onRemove, customiza
       }
 
       if (removedDefaults.length > 0) {
-        const removedNames = removedDefaults.map((t: ConfiguredTopping) => t.name);
+        const removedNames = removedDefaults.map(
+          (t: ConfiguredTopping) => t.name
+        );
         parts.push(`No: ${removedNames.join(", ")}`);
       }
     }
 
     if (item.selectedModifiers && item.selectedModifiers.length > 0) {
-      const modifierNames = item.selectedModifiers.map((m: ConfiguredModifier) => m.name);
+      const modifierNames = item.selectedModifiers.map(
+        (m: ConfiguredModifier) => m.name
+      );
       parts.push(modifierNames.join(", "));
     }
 
@@ -456,12 +562,20 @@ function CartItemCard({ item, onQuantityChange, onCustomize, onRemove, customiza
     <div className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow">
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-gray-900 text-base">{item.displayName}</div>
+          <div className="font-semibold text-gray-900 text-base">
+            {item.displayName}
+          </div>
 
-          {itemDescription && <div className="text-sm text-gray-600 mt-1 line-clamp-2">{itemDescription}</div>}
+          {itemDescription && (
+            <div className="text-sm text-gray-600 mt-1 line-clamp-2">
+              {itemDescription}
+            </div>
+          )}
 
           {item.specialInstructions && item.specialInstructions.trim() && (
-            <div className="text-sm text-blue-600 mt-1 italic">Note: {item.specialInstructions}</div>
+            <div className="text-sm text-blue-600 mt-1 italic">
+              Note: {item.specialInstructions}
+            </div>
           )}
         </div>
 
@@ -473,7 +587,9 @@ function CartItemCard({ item, onQuantityChange, onCustomize, onRemove, customiza
             >
               −
             </button>
-            <span className="px-2 py-1 text-sm font-semibold min-w-[1.5rem] text-center">{item.quantity}</span>
+            <span className="px-2 py-1 text-sm font-semibold min-w-[1.5rem] text-center">
+              {item.quantity}
+            </span>
             <button
               onClick={() => onQuantityChange(item.quantity + 1)}
               className="bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded w-7 h-7 flex items-center justify-center text-sm font-bold transition-colors"
@@ -482,7 +598,9 @@ function CartItemCard({ item, onQuantityChange, onCustomize, onRemove, customiza
             </button>
           </div>
 
-          <div className="text-base font-bold text-green-600 min-w-[4rem] text-right">${itemTotal.toFixed(2)}</div>
+          <div className="text-base font-bold text-green-600 min-w-[4rem] text-right">
+            ${itemTotal.toFixed(2)}
+          </div>
         </div>
       </div>
 
@@ -504,7 +622,9 @@ function CartItemCard({ item, onQuantityChange, onCustomize, onRemove, customiza
         </button>
       </div>
 
-      <div className="text-xs text-gray-500 mt-1">${item.totalPrice.toFixed(2)} each</div>
+      <div className="text-xs text-gray-500 mt-1">
+        ${item.totalPrice.toFixed(2)} each
+      </div>
     </div>
   );
 }
@@ -523,18 +643,24 @@ function OrderSummaryDisplay({ summary }: OrderSummaryDisplayProps) {
     <div className="space-y-2">
       <div className="flex justify-between text-sm">
         <span className="text-gray-700">Subtotal:</span>
-        <span className="font-semibold text-gray-900">${summary.subtotal.toFixed(2)}</span>
+        <span className="font-semibold text-gray-900">
+          ${summary.subtotal.toFixed(2)}
+        </span>
       </div>
 
       <div className="flex justify-between text-sm">
         <span className="text-gray-700">Tax:</span>
-        <span className="font-semibold text-gray-900">${summary.tax.toFixed(2)}</span>
+        <span className="font-semibold text-gray-900">
+          ${summary.tax.toFixed(2)}
+        </span>
       </div>
 
       {summary.deliveryFee > 0 && (
         <div className="flex justify-between text-sm">
           <span className="text-gray-700">Delivery Fee:</span>
-          <span className="font-semibold text-gray-900">${summary.deliveryFee.toFixed(2)}</span>
+          <span className="font-semibold text-gray-900">
+            ${summary.deliveryFee.toFixed(2)}
+          </span>
         </div>
       )}
 
@@ -550,9 +676,16 @@ function OrderSummaryDisplay({ summary }: OrderSummaryDisplayProps) {
 
 export function useCartStatistics(items: ConfiguredCartItem[]) {
   return useMemo(() => {
-    const totalItems = items.reduce((sum: number, item: ConfiguredCartItem) => sum + item.quantity, 0);
+    const totalItems = items.reduce(
+      (sum: number, item: ConfiguredCartItem) => sum + item.quantity,
+      0
+    );
     const uniqueItems = items.length;
-    const subtotal = items.reduce((sum: number, item: ConfiguredCartItem) => sum + item.totalPrice * item.quantity, 0);
+    const subtotal = items.reduce(
+      (sum: number, item: ConfiguredCartItem) =>
+        sum + item.totalPrice * item.quantity,
+      0
+    );
 
     const tax = subtotal * 0.08;
     const deliveryFee = 0;
