@@ -1,16 +1,76 @@
-// src/app/api/menu/calculate-price/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
+import { ApiResponse } from "@/lib/types";
 
-/**
- * POST /api/menu/calculate-price
- *
- * Enhanced version with proper type handling for Supabase relationships
- */
-export async function POST(request: NextRequest) {
+// Proper types for request body
+interface ToppingSelection {
+  id: string;
+  amount: "light" | "normal" | "extra" | "xxtra";
+}
+
+interface PriceCalculationRequest {
+  variantId: string;
+  toppingSelections?: ToppingSelection[];
+  modifierIds?: string[];
+}
+
+// Database response types
+interface VariantWithMenuItem {
+  id: string;
+  name: string;
+  price: number;
+  size_code: string;
+  crust_type?: string;
+  menu_items: {
+    name: string;
+    restaurant_id: string;
+  };
+}
+
+interface CustomizationFromDB {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  category: string;
+  base_price: number;
+  price_type: "fixed" | "multiplied" | "tiered";
+  pricing_rules: {
+    size_multipliers?: Record<string, number>;
+    tier_multipliers?: Record<string, number>;
+    variant_base_prices?: Record<string, number>;
+  };
+  applies_to: string[];
+  sort_order: number;
+  is_available: boolean;
+  description?: string;
+}
+
+// Response types
+interface PriceBreakdownItem {
+  name: string;
+  price: number;
+  amount?: string;
+}
+
+interface PriceCalculationResponse {
+  basePrice: number;
+  baseName: string;
+  toppingCost: number;
+  modifierCost: number;
+  finalPrice: number;
+  breakdown: {
+    base: PriceBreakdownItem;
+    toppings: PriceBreakdownItem[];
+    modifiers: PriceBreakdownItem[];
+  };
+}
+
+export async function POST(
+  request: NextRequest
+): Promise<NextResponse<ApiResponse<PriceCalculationResponse>>> {
   try {
-    const body = await request.json();
-    const { variantId, toppingIds = [], modifierIds = [] } = body;
+    const body: PriceCalculationRequest = await request.json();
+    const { variantId, toppingSelections = [], modifierIds = [] } = body;
 
     if (!variantId) {
       return NextResponse.json(
@@ -20,15 +80,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Get the base price for the selected variant
-    // Notice how we're being explicit about the expected structure
     const { data: variantData, error: variantError } = await supabaseServer
       .from("menu_item_variants")
       .select(
         `
         id, 
         name, 
-        price, 
-        menu_items!inner(name, pizza_style)
+        price,
+        size_code,
+        crust_type,
+        menu_items!inner(name, restaurant_id)
       `
       )
       .eq("id", variantId)
@@ -42,11 +103,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Extract the menu item data safely
-    // Supabase returns menu_items as an array, so we take the first element
-    const menuItem = Array.isArray(variantData.menu_items)
-      ? variantData.menu_items[0]
-      : variantData.menu_items;
+    // Map menu_items to match VariantWithMenuItem type
+    const variant: VariantWithMenuItem = {
+      ...variantData,
+      menu_items: Array.isArray(variantData.menu_items)
+        ? variantData.menu_items[0]
+        : variantData.menu_items,
+    };
+    const menuItem = variant.menu_items;
 
     if (!menuItem) {
       return NextResponse.json(
@@ -55,87 +119,102 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 3: Calculate topping costs with proper type handling
+    // Step 2: Calculate topping costs using new customizations table
     let toppingCost = 0;
-    const toppingBreakdown: Array<{ name: string; price: number }> = [];
+    const toppingBreakdown: PriceBreakdownItem[] = [];
 
-    if (toppingIds.length > 0) {
-      const { data: toppingPricesData, error: toppingsError } =
+    if (toppingSelections.length > 0) {
+      const toppingIds = toppingSelections.map((t) => t.id);
+
+      const { data: customizations, error: customizationsError } =
         await supabaseServer
-          .from("topping_prices")
-          .select(
-            `
-          price,
-          toppings!inner(name)
-        `
-          )
-          .eq("menu_item_variant_id", variantId)
-          .in("topping_id", toppingIds);
+          .from("customizations")
+          .select("*")
+          .eq("restaurant_id", menuItem.restaurant_id)
+          .in("id", toppingIds)
+          .like("category", "topping_%");
 
-      if (toppingsError) {
-        console.error("Error loading topping prices:", toppingsError);
+      if (customizationsError) {
+        console.error(
+          "Error loading topping customizations:",
+          customizationsError
+        );
         return NextResponse.json(
-          { error: toppingsError.message },
+          { error: customizationsError.message },
           { status: 500 }
         );
       }
 
-      // Process each topping price, handling the array structure properly
-      toppingPricesData?.forEach((tp) => {
-        const topping = Array.isArray(tp.toppings)
-          ? tp.toppings[0]
-          : tp.toppings;
-        if (topping && topping.name) {
-          toppingCost += tp.price;
+      // Calculate prices using mathematical formulas
+      toppingSelections.forEach((selection) => {
+        const customization = (customizations as CustomizationFromDB[])?.find(
+          (c) => c.id === selection.id
+        );
+        if (customization) {
+          const calculatedPrice = calculateToppingPrice(
+            customization,
+            variant.size_code || "medium",
+            selection.amount || "normal"
+          );
+
+          toppingCost += calculatedPrice;
           toppingBreakdown.push({
-            name: topping.name,
-            price: tp.price,
+            name: customization.name,
+            price: calculatedPrice,
+            amount: selection.amount || "normal",
           });
         }
       });
     }
 
-    // Step 4: Calculate modifier costs (no relationship complexity here)
+    // Step 3: Calculate modifier costs using new customizations table
     let modifierCost = 0;
-    const modifierBreakdown: Array<{ name: string; price: number }> = [];
+    const modifierBreakdown: PriceBreakdownItem[] = [];
 
     if (modifierIds.length > 0) {
-      const { data: modifiers, error: modifiersError } = await supabaseServer
-        .from("modifiers")
-        .select("name, price_adjustment")
-        .in("id", modifierIds);
+      const { data: customizations, error: customizationsError } =
+        await supabaseServer
+          .from("customizations")
+          .select("*")
+          .eq("restaurant_id", menuItem.restaurant_id)
+          .in("id", modifierIds)
+          .neq("category", "topping_%");
 
-      if (modifiersError) {
-        console.error("Error loading modifiers:", modifiersError);
+      if (customizationsError) {
+        console.error(
+          "Error loading modifier customizations:",
+          customizationsError
+        );
         return NextResponse.json(
-          { error: modifiersError.message },
+          { error: customizationsError.message },
           { status: 500 }
         );
       }
 
-      modifiers?.forEach((modifier) => {
-        modifierCost += modifier.price_adjustment;
+      (customizations as CustomizationFromDB[])?.forEach((customization) => {
+        const calculatedPrice = calculateModifierPrice(customization, variant);
+        modifierCost += calculatedPrice;
         modifierBreakdown.push({
-          name: modifier.name,
-          price: modifier.price_adjustment,
+          name: customization.name,
+          price: calculatedPrice,
         });
       });
     }
 
-    // Step 5: Calculate final price and return detailed breakdown
-    const finalPrice = variantData.price + toppingCost + modifierCost;
+    // Step 4: Calculate final price and return detailed breakdown
+    const finalPrice = variant.price + toppingCost + modifierCost;
 
     return NextResponse.json({
       data: {
-        basePrice: variantData.price,
-        baseName: `${menuItem.name} - ${variantData.name}`,
+        basePrice: variant.price,
+        baseName: `${menuItem.name} - ${variant.name}`,
         toppingCost,
         modifierCost,
         finalPrice,
         breakdown: {
           base: {
-            name: `${menuItem.name} - ${variantData.name}`,
-            price: variantData.price,
+            name: `${menuItem.name} - ${variant.name}`,
+            price: variant.price,
           },
           toppings: toppingBreakdown,
           modifiers: modifierBreakdown,
@@ -149,5 +228,49 @@ export async function POST(request: NextRequest) {
       { error: "Internal server error" },
       { status: 500 }
     );
+  }
+}
+
+// ==================================================
+// 3. PRICING CALCULATION FUNCTIONS - Type Safe
+// ==================================================
+
+function calculateToppingPrice(
+  customization: CustomizationFromDB,
+  sizeCode: string,
+  amount: string
+): number {
+  const basePrice = customization.base_price;
+  const pricingRules = customization.pricing_rules;
+
+  // Get size multiplier
+  const sizeMultiplier = pricingRules?.size_multipliers?.[sizeCode] || 1.0;
+
+  // Get tier multiplier
+  const tierMultiplier = pricingRules?.tier_multipliers?.[amount] || 1.0;
+
+  return Math.round(basePrice * sizeMultiplier * tierMultiplier * 100) / 100;
+}
+
+function calculateModifierPrice(
+  customization: CustomizationFromDB,
+  variant: VariantWithMenuItem
+): number {
+  const pricingType = customization.price_type;
+  const basePrice = customization.base_price;
+  const pricingRules = customization.pricing_rules;
+
+  switch (pricingType) {
+    case "fixed":
+      return basePrice;
+
+    case "tiered":
+      // For chicken white meat upgrades
+      const variantBasePrice =
+        pricingRules?.variant_base_prices?.[variant.size_code];
+      return variantBasePrice || basePrice;
+
+    default:
+      return basePrice;
   }
 }

@@ -1,5 +1,116 @@
 // src/lib/types/index.ts - Clean, Working Type System
 // Starting simple and building up gradually
+/**
+ * ===================================================================
+ * NEW: CUSTOMIZATION SYSTEM TYPES
+ * ===================================================================
+ * These support the new unified customizations table
+ */
+
+/**
+ * Customization from the new unified customizations table
+ * This replaces the old separate toppings/modifiers tables
+ */
+export interface Customization {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  category: CustomizationCategory;
+  base_price: number;
+  price_type: PricingType;
+  pricing_rules: CustomizationPricingRules;
+  applies_to: ItemCategory[];
+  sort_order: number;
+  is_available: boolean;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Customization categories enum
+ */
+export type CustomizationCategory =
+  | "topping_normal" // Pepperoni, Sausage, Mushrooms, etc.
+  | "topping_premium" // Chicken, Meatballs - 2x normal pricing
+  | "topping_beef" // Italian Beef - 3x normal pricing
+  | "topping_cheese" // Extra Mozzarella, Feta
+  | "topping_sauce" // BBQ Sauce, Alfredo, No Sauce, etc.
+  | "white_meat" // Chicken white meat upgrades
+  | "sides" // Included/optional sides
+  | "preparation" // Well Done, Cut in Half, etc.
+  | "condiments"; // Hot Sauce, Ranch, etc.
+
+/**
+ * Pricing type enum
+ */
+export type PricingType = "fixed" | "multiplied" | "tiered";
+
+/**
+ * Pricing rules structure for customizations
+ */
+export interface CustomizationPricingRules {
+  // For pizza toppings - price varies by size
+  size_multipliers?: Record<string, number>;
+
+  // For tier-based pricing (normal/extra/xxtra)
+  tier_multipliers?: Record<string, number>;
+
+  // For chicken white meat - base price varies by variant
+  variant_base_prices?: Record<string, number>;
+
+  // Any additional rules can be added here
+  [key: string]: unknown;
+}
+
+/**
+ * Database response type for customizations
+ * (what we get back from Supabase queries)
+ */
+export type CustomizationFromDB = Customization;
+
+/**
+ * Request types for pricing calculations
+ */
+export interface ToppingSelection {
+  id: string;
+  amount: ToppingAmount; // Reuse existing ToppingAmount type
+}
+
+export interface PriceCalculationRequest {
+  variantId: string;
+  toppingSelections?: ToppingSelection[];
+  modifierIds?: string[];
+}
+
+export interface PriceBreakdownItem {
+  name: string;
+  price: number;
+  amount?: string;
+}
+
+export interface PriceCalculationResponse {
+  basePrice: number;
+  baseName: string;
+  toppingCost: number;
+  modifierCost: number;
+  finalPrice: number;
+  breakdown: {
+    base: PriceBreakdownItem;
+    toppings: PriceBreakdownItem[];
+    modifiers: PriceBreakdownItem[];
+  };
+}
+
+/**
+ * Enhanced menu response that includes customizations
+ */
+export interface FullMenuResponse {
+  menu_items: MenuItemWithVariants[];
+  toppings: Topping[]; // Legacy format for compatibility
+  modifiers: Modifier[]; // Legacy format for compatibility
+  customizations: Customization[]; // New unified customizations
+}
 
 /**
  * ===================================================================
