@@ -429,10 +429,10 @@ export default function PizzaCustomizer({
       // Amount multipliers
       const amountMultipliers: Record<ToppingAmount, number> = {
         none: 0,
-        light: 0.75,
+        light: 1.0,
         normal: 1.0,
-        extra: 2.0, // Your data shows extra = 2x normal
-        xxtra: 3.0, // Your data shows xxtra = 3x normal
+        extra: 2.0,
+        xxtra: 3.0,
       };
 
       let basePrice = topping.basePrice;
