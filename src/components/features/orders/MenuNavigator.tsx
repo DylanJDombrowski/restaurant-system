@@ -2,6 +2,7 @@
 "use client";
 import {
   ConfiguredCartItem,
+  Customization,
   MenuCategory,
   MenuItemWithVariants,
   Modifier,
@@ -26,6 +27,7 @@ interface MenuNavigatorProps {
   menuItems: MenuItemWithVariants[];
   toppings: Topping[];
   modifiers: Modifier[];
+  customizations?: Customization[];
   onAddToCart: (configuredItem: ConfiguredCartItem) => void;
   restaurantId: string;
 }
@@ -43,6 +45,7 @@ export default function MenuNavigator({
   restaurantId,
   modifiers,
   toppings,
+  customizations,
 }: MenuNavigatorProps) {
   // ==========================================
   // SIMPLIFIED NAVIGATION STATE
@@ -427,6 +430,7 @@ export default function MenuNavigator({
           menuItemWithVariants={selectedItem}
           availableToppings={toppings}
           availableModifiers={modifiers}
+          availableCustomizations={customizations}
           onComplete={handlePizzaCustomizerComplete}
           onCancel={handleCustomizerCancel}
           isOpen={showPizzaCustomizer}
