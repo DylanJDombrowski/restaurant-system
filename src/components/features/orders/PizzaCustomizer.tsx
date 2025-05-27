@@ -859,11 +859,13 @@ function ToppingSelector({ topping, onChange }: ToppingSelectorProps) {
   const amountOptions: {
     value: ToppingAmount;
     label: string;
+    multiplier: string;
   }[] = [
-    { value: "none", label: "None" },
-    { value: "light", label: "Light" },
-    { value: "normal", label: "Normal" },
-    { value: "extra", label: "Extra" },
+    { value: "none", label: "None", multiplier: "" },
+    { value: "light", label: "Light", multiplier: "1x" },
+    { value: "normal", label: "Normal", multiplier: "1x" },
+    { value: "extra", label: "Extra", multiplier: "2x" },
+    { value: "xxtra", label: "XXtra", multiplier: "3x" },
   ];
 
   return (
@@ -874,7 +876,7 @@ function ToppingSelector({ topping, onChange }: ToppingSelectorProps) {
           : "border-gray-200"
       }`}
     >
-      <div className="flex justify-between items-center mb-2">
+      <div className="flex justify-between items-center mb-3">
         <div className="flex items-center gap-2">
           <span className="font-medium text-gray-900">{topping.name}</span>
           {topping.isDefault && (
@@ -895,25 +897,31 @@ function ToppingSelector({ topping, onChange }: ToppingSelectorProps) {
         )}
       </div>
 
-      <div className="grid grid-cols-4 gap-1">
+      {/* ✅ NEW: Dropdown instead of 4 buttons */}
+      <select
+        value={topping.amount}
+        onChange={(e) => onChange(e.target.value as ToppingAmount)}
+        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      >
         {amountOptions.map((option) => (
-          <button
-            key={option.value}
-            onClick={() => onChange(option.value)}
-            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-              topping.amount === option.value
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            {option.label}
-          </button>
+          <option key={option.value} value={option.value}>
+            {option.label} {option.multiplier && `(${option.multiplier})`}
+            {option.value !== "none" &&
+              topping.basePrice > 0 &&
+              ` - $${(
+                topping.basePrice * getMultiplierForAmount(option.value)
+              ).toFixed(2)}`}
+          </option>
         ))}
-      </div>
+      </select>
     </div>
   );
 }
 
+function getMultiplierForAmount(amount: ToppingAmount): number {
+  const multipliers = { none: 0, light: 0.75, normal: 1, extra: 2, xxtra: 3 };
+  return multipliers[amount] || 0;
+}
 interface ModifierSelectorProps {
   modifier: ModifierConfiguration;
   onChange: (selected: boolean) => void;
