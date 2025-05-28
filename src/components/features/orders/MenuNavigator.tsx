@@ -1,4 +1,4 @@
-// src/components/features/orders/MenuNavigator.tsx - FIXED VERSION
+// src/components/features/orders/MenuNavigator.tsx - UPDATED with Enhanced Pizza Customizer
 "use client";
 import {
   ConfiguredCartItem,
@@ -10,17 +10,18 @@ import {
 } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
 import AppetizerCustomizer from "./AppetizerCustomizer";
-import PizzaCustomizer from "./PizzaCustomizer";
+import EnhancedPizzaCustomizer from "./PizzaCustomizer"; // 🆕 NEW: Enhanced version
 import SandwichCustomizer from "./SandwichCustomizer";
 import ChickenCustomizer from "./ChickenCustomizer";
+
 /**
- * 🎯 FIXED: CATEGORY-FIRST NAVIGATION SYSTEM
+ * 🎯 UPDATED: MenuNavigator with Enhanced Pizza Customizer
  *
- * FIXES APPLIED:
- * 1. ✅ Removed double variant selection - customizers handle sizing internally
- * 2. ✅ Fixed sandwich routing to open customizer properly
- * 3. ✅ Simplified item selection flow
- * 4. ✅ Added missing customizers for other categories
+ * Changes:
+ * ✅ Replaced PizzaCustomizer with EnhancedPizzaCustomizer
+ * ✅ Simplified pizza routing - no more variant pre-selection
+ * ✅ Enhanced pizza customizer handles everything internally
+ * ✅ Maintains compatibility with other customizers
  */
 
 interface MenuNavigatorProps {
@@ -43,12 +44,9 @@ export default function MenuNavigator({
   menuItems,
   onAddToCart,
   restaurantId,
-  modifiers,
-  toppings,
-  customizations,
 }: MenuNavigatorProps) {
   // ==========================================
-  // SIMPLIFIED NAVIGATION STATE
+  // NAVIGATION STATE
   // ==========================================
   const [navState, setNavState] = useState<NavigationState>({
     view: "categories",
@@ -58,7 +56,8 @@ export default function MenuNavigator({
   // ==========================================
   // CUSTOMIZER STATES
   // ==========================================
-  const [showPizzaCustomizer, setShowPizzaCustomizer] = useState(false);
+  const [showEnhancedPizzaCustomizer, setShowEnhancedPizzaCustomizer] =
+    useState(false); // 🆕 NEW
   const [showSandwichCustomizer, setShowSandwichCustomizer] = useState(false);
   const [showAppetizerCustomizer, setShowAppetizerCustomizer] = useState(false);
   const [showChickenCustomizer, setShowChickenCustomizer] = useState(false);
@@ -169,8 +168,6 @@ export default function MenuNavigator({
           `➕ Adding to cart: ${cartItem.displayName} - $${cartItem.totalPrice}`
         );
         onAddToCart(cartItem);
-
-        // Stay in category view after adding simple items
       } catch (error) {
         console.error("Error adding item to cart:", error);
         alert("Error adding item to cart. Please try again.");
@@ -184,7 +181,7 @@ export default function MenuNavigator({
   // ==========================================
 
   const closeAllCustomizers = useCallback(() => {
-    setShowPizzaCustomizer(false);
+    setShowEnhancedPizzaCustomizer(false); // 🆕 NEW
     setShowSandwichCustomizer(false);
     setShowAppetizerCustomizer(false);
     setShowChickenCustomizer(false);
@@ -208,6 +205,21 @@ export default function MenuNavigator({
     setShowChickenCustomizer(true);
   }, []);
 
+  // 🆕 NEW: Enhanced Pizza Customizer Handler
+  const openEnhancedPizzaCustomizer = useCallback(
+    (item: MenuItemWithVariants) => {
+      console.log("🍕 Opening ENHANCED pizza customizer for:", item.name);
+
+      const cartItem = createCartItem(item);
+      console.log("🍕 Created cart item for enhanced customizer:", cartItem);
+
+      setCustomizerItem(cartItem);
+      setSelectedItem(item); // Keep for reference
+      setShowEnhancedPizzaCustomizer(true);
+    },
+    [createCartItem]
+  );
+
   const openPastaCustomizer = useCallback(
     (item: MenuItemWithVariants) => {
       // TODO: Implement PastaCustomizer component
@@ -217,33 +229,10 @@ export default function MenuNavigator({
     [addDirectToCart]
   );
 
-  const openPizzaCustomizer = useCallback(
-    (item: MenuItemWithVariants) => {
-      console.log("🔧 DEBUG: openPizzaCustomizer called with:", item.name);
-
-      const cartItem = createCartItem(item);
-      console.log("🔧 DEBUG: Created cart item:", cartItem);
-
-      setCustomizerItem(cartItem);
-      console.log("🔧 DEBUG: Set customizerItem");
-
-      setShowPizzaCustomizer(true);
-      console.log("🔧 DEBUG: Set showPizzaCustomizer to true");
-
-      // Add a small delay to check if state actually updates
-      setTimeout(() => {
-        console.log(
-          "🔧 DEBUG: After timeout - showPizzaCustomizer should be true"
-        );
-      }, 100);
-    },
-    [createCartItem]
-  );
-
   const handleItemSelect = useCallback(
     (item: MenuItemWithVariants) => {
       console.log(
-        "🍕 Selected item:",
+        "🍽️ Selected item:",
         item.name,
         "Category:",
         item.category?.name
@@ -253,10 +242,10 @@ export default function MenuNavigator({
 
       const categoryName = item.category?.name;
 
-      // ENTERPRISE-GRADE ROUTING LOGIC
+      // 🎯 ENHANCED ROUTING LOGIC
       if (categoryName === "Pizzas") {
-        console.log("🍕 Opening pizza customizer directly");
-        openPizzaCustomizer(item);
+        console.log("🍕 Opening ENHANCED pizza customizer directly");
+        openEnhancedPizzaCustomizer(item); // 🆕 NEW: Use enhanced customizer
       } else if (categoryName === "Sandwiches") {
         console.log("🥪 Opening sandwich customizer directly");
         openSandwichCustomizer(item);
@@ -291,7 +280,7 @@ export default function MenuNavigator({
       }
     },
     [
-      openPizzaCustomizer,
+      openEnhancedPizzaCustomizer, // 🆕 NEW: Enhanced pizza customizer
       openSandwichCustomizer,
       openAppetizerCustomizer,
       openChickenCustomizer,
@@ -299,13 +288,15 @@ export default function MenuNavigator({
       addDirectToCart,
     ]
   );
+
   // ==========================================
   // CUSTOMIZER COMPLETION HANDLERS
   // ==========================================
 
-  const handlePizzaCustomizerComplete = useCallback(
+  // 🆕 NEW: Enhanced Pizza Customizer Handler
+  const handleEnhancedPizzaCustomizerComplete = useCallback(
     (updatedItem: ConfiguredCartItem) => {
-      console.log("✅ Pizza customization completed");
+      console.log("✅ Enhanced pizza customization completed");
       onAddToCart(updatedItem);
       closeAllCustomizers();
     },
@@ -345,10 +336,8 @@ export default function MenuNavigator({
   }, [closeAllCustomizers]);
 
   // ==========================================
-  // RENDER LOGIC
+  // RENDER
   // ==========================================
-
-  // 🔧 FIXED MenuNavigator - Single return statement with modals
 
   return (
     <>
@@ -400,40 +389,14 @@ export default function MenuNavigator({
         </div>
       )}
 
-      {/* MAIN CONTENT - Default/Loading View */}
-      {navState.view !== "categories" && navState.view !== "category-items" && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-lg text-gray-600 mb-4">Loading menu...</div>
-            <button
-              onClick={handleBackToCategories}
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              ← Back to Categories
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 🔧 MODAL RENDER DEBUG */}
-      {console.log("🔧 RENDER CHECK: Modal conditions:", {
-        showPizzaCustomizer,
-        customizerItem: !!customizerItem,
-        selectedItem: !!selectedItem,
-        shouldRender: showPizzaCustomizer && customizerItem && selectedItem,
-      })}
-
-      {/* PIZZA MODAL */}
-      {showPizzaCustomizer && customizerItem && selectedItem && (
-        <PizzaCustomizer
+      {/* 🆕 NEW: ENHANCED PIZZA MODAL CUSTOMIZER */}
+      {showEnhancedPizzaCustomizer && customizerItem && (
+        <EnhancedPizzaCustomizer
           item={customizerItem}
-          menuItemWithVariants={selectedItem}
-          availableToppings={toppings}
-          availableModifiers={modifiers}
-          availableCustomizations={customizations}
-          onComplete={handlePizzaCustomizerComplete}
+          onComplete={handleEnhancedPizzaCustomizerComplete}
           onCancel={handleCustomizerCancel}
-          isOpen={showPizzaCustomizer}
+          isOpen={showEnhancedPizzaCustomizer}
+          restaurantId={restaurantId}
         />
       )}
 
@@ -473,7 +436,7 @@ export default function MenuNavigator({
 }
 
 // ==========================================
-// SUB-COMPONENTS
+// SUB-COMPONENTS (Unchanged)
 // ==========================================
 
 interface CategoryGridProps {
@@ -553,6 +516,7 @@ function CategoryItemsGrid({ items, onItemSelect }: CategoryItemsGridProps) {
     </div>
   );
 }
+
 interface ItemCardProps {
   item: MenuItemWithVariants;
   onSelect: () => void;
