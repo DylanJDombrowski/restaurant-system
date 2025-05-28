@@ -1,8 +1,13 @@
+// src/app/api/menu/calculate-price/route.ts - FIXED TypeScript Types
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { ApiResponse } from "@/lib/types";
 
-// Proper types for request body
+// ===================================================================
+// PROPERLY TYPED INTERFACES
+// ===================================================================
+
+// Request types
 interface ToppingSelection {
   id: string;
   amount: "light" | "normal" | "extra" | "xxtra";
@@ -14,17 +19,19 @@ interface PriceCalculationRequest {
   modifierIds?: string[];
 }
 
-// Database response types
+// Database response types - exact matches for Supabase queries
+interface MenuItemFromVariant {
+  name: string;
+  restaurant_id: string;
+}
+
 interface VariantWithMenuItem {
   id: string;
   name: string;
   price: number;
   size_code: string;
   crust_type?: string;
-  menu_items: {
-    name: string;
-    restaurant_id: string;
-  };
+  menu_items: MenuItemFromVariant;
 }
 
 interface CustomizationFromDB {
@@ -65,6 +72,10 @@ interface PriceCalculationResponse {
   };
 }
 
+// ===================================================================
+// MAIN API HANDLER
+// ===================================================================
+
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse<ApiResponse<PriceCalculationResponse>>> {
@@ -80,7 +91,7 @@ export async function POST(
     }
 
     // Step 1: Get the base price for the selected variant
-    const { data: variantData, error: variantError } = await supabaseServer
+    const { data: variantDataRaw, error: variantError } = await supabaseServer
       .from("menu_item_variants")
       .select(
         `
@@ -95,7 +106,7 @@ export async function POST(
       .eq("id", variantId)
       .single();
 
-    if (variantError || !variantData) {
+    if (variantError || !variantDataRaw) {
       console.error("Variant query error:", variantError);
       return NextResponse.json(
         { error: "Invalid variant ID" },
@@ -103,14 +114,9 @@ export async function POST(
       );
     }
 
-    // Map menu_items to match VariantWithMenuItem type
-    const variant: VariantWithMenuItem = {
-      ...variantData,
-      menu_items: Array.isArray(variantData.menu_items)
-        ? variantData.menu_items[0]
-        : variantData.menu_items,
-    };
-    const menuItem = variant.menu_items;
+    // Type assertion after validation
+    const variantData = variantDataRaw as unknown as VariantWithMenuItem;
+    const menuItem = variantData.menu_items;
 
     if (!menuItem) {
       return NextResponse.json(
@@ -126,7 +132,7 @@ export async function POST(
     if (toppingSelections.length > 0) {
       const toppingIds = toppingSelections.map((t) => t.id);
 
-      const { data: customizations, error: customizationsError } =
+      const { data: customizationsData, error: customizationsError } =
         await supabaseServer
           .from("customizations")
           .select("*")
@@ -145,15 +151,16 @@ export async function POST(
         );
       }
 
+      const customizations =
+        (customizationsData as CustomizationFromDB[]) || [];
+
       // Calculate prices using mathematical formulas
       toppingSelections.forEach((selection) => {
-        const customization = (customizations as CustomizationFromDB[])?.find(
-          (c) => c.id === selection.id
-        );
+        const customization = customizations.find((c) => c.id === selection.id);
         if (customization) {
           const calculatedPrice = calculateToppingPrice(
             customization,
-            variant.size_code || "medium",
+            variantData.size_code || "medium",
             selection.amount || "normal"
           );
 
@@ -172,7 +179,7 @@ export async function POST(
     const modifierBreakdown: PriceBreakdownItem[] = [];
 
     if (modifierIds.length > 0) {
-      const { data: customizations, error: customizationsError } =
+      const { data: customizationsData, error: customizationsError } =
         await supabaseServer
           .from("customizations")
           .select("*")
@@ -191,8 +198,14 @@ export async function POST(
         );
       }
 
-      (customizations as CustomizationFromDB[])?.forEach((customization) => {
-        const calculatedPrice = calculateModifierPrice(customization, variant);
+      const customizations =
+        (customizationsData as CustomizationFromDB[]) || [];
+
+      customizations.forEach((customization) => {
+        const calculatedPrice = calculateModifierPrice(
+          customization,
+          variantData
+        );
         modifierCost += calculatedPrice;
         modifierBreakdown.push({
           name: customization.name,
@@ -202,19 +215,19 @@ export async function POST(
     }
 
     // Step 4: Calculate final price and return detailed breakdown
-    const finalPrice = variant.price + toppingCost + modifierCost;
+    const finalPrice = variantData.price + toppingCost + modifierCost;
 
     return NextResponse.json({
       data: {
-        basePrice: variant.price,
-        baseName: `${menuItem.name} - ${variant.name}`,
+        basePrice: variantData.price,
+        baseName: `${menuItem.name} - ${variantData.name}`,
         toppingCost,
         modifierCost,
         finalPrice,
         breakdown: {
           base: {
-            name: `${menuItem.name} - ${variant.name}`,
-            price: variant.price,
+            name: `${menuItem.name} - ${variantData.name}`,
+            price: variantData.price,
           },
           toppings: toppingBreakdown,
           modifiers: modifierBreakdown,
@@ -231,9 +244,9 @@ export async function POST(
   }
 }
 
-// ==================================================
-// 3. PRICING CALCULATION FUNCTIONS - Type Safe
-// ==================================================
+// ===================================================================
+// PRICING CALCULATION FUNCTIONS - Properly Typed
+// ===================================================================
 
 function calculateToppingPrice(
   customization: CustomizationFromDB,

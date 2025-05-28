@@ -616,3 +616,300 @@ export interface CreateStaffFormData {
   password: string;
   restaurant_id: string;
 }
+
+/**
+ * ===================================================================
+ * ENHANCED PIZZA SYSTEM TYPES
+ * ===================================================================
+ */
+
+/**
+ * Pizza-specific crust pricing from the database
+ */
+export interface CrustPricing {
+  id: string;
+  restaurant_id: string;
+  size_code: string; // "10in", "12in", "14in", "16in"
+  crust_type: string; // "thin", "double_dough", "stuffed", "gluten_free"
+  base_price: number;
+  upcharge: number;
+  is_available: boolean;
+}
+
+/**
+ * Pizza customization from the unified customizations table
+ */
+export interface PizzaCustomization {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  category: string;
+  base_price: number;
+  price_type: "fixed" | "multiplied" | "tiered";
+  pricing_rules: {
+    size_multipliers?: Record<string, number>;
+    tier_multipliers?: Record<string, number>;
+  };
+  applies_to: string[];
+  sort_order: number;
+  is_available: boolean;
+  description?: string;
+}
+
+/**
+ * Pizza template for specialty pizzas
+ */
+export interface PizzaTemplate {
+  id: string;
+  restaurant_id: string;
+  menu_item_id: string;
+  name: string;
+  markup_type: string;
+  credit_limit_percentage: number;
+  is_active: boolean;
+  template_toppings?: PizzaTemplateTopping[];
+}
+
+/**
+ * Template topping configuration
+ */
+export interface PizzaTemplateTopping {
+  id: string;
+  template_id: string;
+  customization_id: string;
+  customization_name: string;
+  default_amount: string;
+  is_removable: boolean;
+  substitution_tier: string;
+  sort_order: number;
+}
+
+/**
+ * Enhanced menu item variant with crust pricing integration
+ */
+export interface PizzaMenuItemVariant extends MenuItemVariant {
+  base_price_from_crust?: number;
+  crust_upcharge?: number;
+}
+
+/**
+ * Enhanced pizza menu item with templates and crust data
+ */
+export interface PizzaMenuItem extends MenuItemWithVariants {
+  variants: PizzaMenuItemVariant[];
+  pizza_template?: PizzaTemplate;
+}
+
+/**
+ * Complete pizza menu response from /api/menu/pizza
+ */
+export interface PizzaMenuResponse {
+  pizza_items: PizzaMenuItem[];
+  crust_pricing: CrustPricing[];
+  pizza_customizations: PizzaCustomization[];
+  pizza_templates: PizzaTemplate[];
+  available_sizes: string[];
+  available_crusts: string[];
+}
+
+/**
+ * Pizza pricing calculation request
+ */
+export interface PizzaPriceCalculationRequest {
+  restaurantId: string;
+  sizeCode: string;
+  crustType: string;
+  toppingSelections?: {
+    id: string;
+    amount: "light" | "normal" | "extra" | "xxtra";
+  }[];
+  templateId?: string;
+}
+
+/**
+ * Price breakdown item from database function
+ */
+export interface PizzaPriceBreakdownItem {
+  name: string;
+  price: number;
+  type: "base" | "crust" | "topping" | "modifier";
+  amount?: string;
+  category?: string;
+  is_default?: boolean;
+}
+
+/**
+ * Pizza pricing calculation response
+ */
+export interface PizzaPriceCalculationResponse {
+  basePrice: number;
+  crustUpcharge: number;
+  toppingCost: number;
+  substitutionCredit: number;
+  finalPrice: number;
+  breakdown: PizzaPriceBreakdownItem[];
+  sizeCode: string;
+  crustType: string;
+  estimatedPrepTime?: number;
+  warnings?: string[];
+}
+
+/**
+ * Enhanced pizza customizer props
+ */
+export interface EnhancedPizzaCustomizerProps {
+  item: ConfiguredCartItem;
+  menuItemWithVariants?: PizzaMenuItem; // Now includes crust data
+  availableToppings: Topping[]; // Legacy compatibility
+  availableModifiers: Modifier[]; // Legacy compatibility
+  pizzaMenuData?: PizzaMenuResponse; // NEW: Complete pizza data
+  onComplete: (updatedItem: ConfiguredCartItem) => void;
+  onCancel: () => void;
+  isOpen: boolean;
+  restaurantId: string;
+}
+
+/**
+ * Crust selection state
+ */
+export interface CrustSelection {
+  sizeCode: string;
+  crustType: string;
+  basePrice: number;
+  upcharge: number;
+  displayName: string;
+}
+
+/**
+ * Pizza configuration state for the customizer
+ */
+export interface PizzaConfiguration {
+  selectedCrust: CrustSelection | null;
+  selectedToppings: Map<
+    string,
+    {
+      customization: PizzaCustomization;
+      amount: ToppingAmount;
+      calculatedPrice: number;
+    }
+  >;
+  selectedModifiers: Set<string>;
+  specialInstructions: string;
+  isSpecialtyPizza: boolean;
+  templateId?: string;
+}
+
+/**
+ * Pizza customizer state management
+ */
+export interface PizzaCustomizerState {
+  configuration: PizzaConfiguration;
+  currentPrice: PizzaPriceCalculationResponse | null;
+  isCalculatingPrice: boolean;
+  pricingError: string | null;
+  availableCrusts: CrustPricing[];
+  availableSizes: string[];
+  isLoading: boolean;
+  error: string | null;
+}
+
+/**
+ * Enhanced configured cart item for pizzas
+ */
+export interface EnhancedPizzaCartItem extends ConfiguredCartItem {
+  // Crust information
+  crustSelection?: CrustSelection;
+
+  // Template information (for specialty pizzas)
+  templateId?: string;
+  templateName?: string;
+  isSpecialtyPizza?: boolean;
+
+  // Enhanced pricing breakdown
+  pricingBreakdown?: PizzaPriceBreakdownItem[];
+  estimatedPrepTime?: number;
+  warnings?: string[];
+
+  // Database-driven pricing
+  isDatabasePriced: boolean;
+  lastPriceCalculation?: string; // ISO timestamp
+}
+
+/**
+ * Pizza customizer hooks
+ */
+export interface UsePizzaMenuOptions {
+  restaurantId: string;
+  enabled?: boolean;
+}
+
+export interface UsePizzaMenuReturn {
+  data: PizzaMenuResponse | null;
+  isLoading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+}
+
+export interface UsePizzaPricingOptions {
+  restaurantId: string;
+  debounceMs?: number;
+}
+
+export interface UsePizzaPricingReturn {
+  calculatePrice: (
+    request: PizzaPriceCalculationRequest
+  ) => Promise<PizzaPriceCalculationResponse>;
+  currentPrice: PizzaPriceCalculationResponse | null;
+  isCalculating: boolean;
+  error: string | null;
+  lastCalculation: Date | null;
+}
+
+/**
+ * API Response wrappers
+ */
+export type PizzaMenuApiResponse = ApiResponse<PizzaMenuResponse>;
+export type PizzaPricingApiResponse =
+  ApiResponse<PizzaPriceCalculationResponse>;
+
+/**
+ * Utility types for pizza system
+ */
+export type PizzaSize = "10in" | "12in" | "14in" | "16in";
+export type PizzaCrustType =
+  | "thin"
+  | "double_dough"
+  | "stuffed"
+  | "gluten_free";
+export type PizzaToppingCategory =
+  | "topping_normal"
+  | "topping_premium"
+  | "topping_beef"
+  | "topping_cheese"
+  | "topping_sauce";
+
+/**
+ * Pizza customization complexity levels
+ */
+export type PizzaComplexity = "simple" | "moderate" | "complex" | "specialty";
+
+/**
+ * Helper functions (can be implemented in utils)
+ */
+export interface PizzaUtils {
+  getCrustDisplayName: (
+    crustType: PizzaCrustType,
+    sizeCode: PizzaSize
+  ) => string;
+  getSizeDisplayName: (sizeCode: PizzaSize) => string;
+  getToppingCategoryIcon: (category: string) => string;
+  calculateComplexity: (
+    toppingCount: number,
+    isSpecialty: boolean
+  ) => PizzaComplexity;
+  formatPrepTime: (minutes: number) => string;
+  validatePizzaConfiguration: (config: PizzaConfiguration) => {
+    isValid: boolean;
+    errors: string[];
+  };
+}
