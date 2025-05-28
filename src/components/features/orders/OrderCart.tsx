@@ -52,8 +52,8 @@ export default function OrderCart({
   const [customizingItem, setCustomizingItem] =
     useState<ConfiguredCartItem | null>(null);
   const [showCustomizer, setShowCustomizer] = useState(false);
-  const [availableToppings, setAvailableToppings] = useState<Topping[]>([]);
-  const [availableModifiers, setAvailableModifiers] = useState<Modifier[]>([]);
+  const [, setAvailableToppings] = useState<Topping[]>([]);
+  const [, setAvailableModifiers] = useState<Modifier[]>([]);
   const [loadingCustomizerData, setLoadingCustomizerData] = useState(false);
 
   // Sandwich customizer states
@@ -430,11 +430,10 @@ export default function OrderCart({
       {showCustomizer && customizingItem && (
         <PizzaCustomizer
           item={customizingItem}
-          availableToppings={availableToppings}
-          availableModifiers={availableModifiers}
           onComplete={handleCustomizationComplete}
           onCancel={handleCustomizationCancel}
           isOpen={showCustomizer}
+          restaurantId={restaurantId}
         />
       )}
 
