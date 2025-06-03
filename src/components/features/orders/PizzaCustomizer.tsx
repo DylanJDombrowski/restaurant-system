@@ -1,39 +1,62 @@
-// src/components/features/orders/PizzaCustomizer.tsx
+// src/components/features/orders/EnhancedPizzaCustomizer.tsx
 "use client";
 import type {
   ConfiguredCartItem,
   ToppingAmount,
-  CrustPricing,
   PizzaMenuResponse,
   PizzaPriceCalculationResponse,
+  PizzaCustomization,
+  CrustPricing,
 } from "@/lib/types";
 import { useCallback, useEffect, useState } from "react";
 
 /**
  * 🍕 ENHANCED PIZZA CUSTOMIZER - FIXED VERSION
- * Fixed circular dependency issues by moving helper functions outside component
+ *
+ * FIXES:
+ * ✅ Real-time pricing calculation
+ * ✅ Default thin crust selection
+ * ✅ Filters out stuffed crust (belongs to stuffed pizza category)
+ * ✅ Compact topping display
+ * ✅ Active toppings shown first
+ * ✅ Proper API integration
  */
 
 // ===================================================================
-// HELPER FUNCTIONS (OUTSIDE COMPONENT TO AVOID CIRCULAR DEPS)
+// INTERFACES
 // ===================================================================
 
-const getCrustDisplayName = (crustType: string, sizeCode: string): string => {
-  const baseNames: Record<string, string> = {
-    thin: "Thin Crust",
-    double_dough: "Double Dough",
-    stuffed: "Stuffed Crust",
-    gluten_free: "Gluten Free",
-  };
+interface ToppingState {
+  id: string;
+  name: string;
+  category: string;
+  amount: ToppingAmount;
+  basePrice: number;
+  calculatedPrice: number;
+  isActive: boolean;
+  isSpecialtyDefault: boolean;
+  tier: "normal" | "premium" | "beef";
+}
 
-  const baseName = baseNames[crustType] || crustType.replace("_", " ");
+interface CrustOption {
+  sizeCode: string;
+  crustType: string;
+  basePrice: number;
+  upcharge: number;
+  displayName: string;
+}
 
-  if (crustType === "gluten_free" && sizeCode === "10in") {
-    return `${baseName} (10" only)`;
-  }
+interface EnhancedPizzaCustomizerProps {
+  item: ConfiguredCartItem;
+  onComplete: (updatedItem: ConfiguredCartItem) => void;
+  onCancel: () => void;
+  isOpen: boolean;
+  restaurantId: string;
+}
 
-  return baseName;
-};
+// ===================================================================
+// HELPER FUNCTIONS
+// ===================================================================
 
 const getSizeDisplayName = (sizeCode: string): string => {
   const sizeNames: Record<string, string> = {
@@ -45,6 +68,15 @@ const getSizeDisplayName = (sizeCode: string): string => {
   return sizeNames[sizeCode] || sizeCode;
 };
 
+const getCrustDisplayName = (crustType: string): string => {
+  const crustNames: Record<string, string> = {
+    thin: "Thin Crust",
+    double_dough: "Double Dough",
+    gluten_free: "Gluten Free",
+  };
+  return crustNames[crustType] || crustType;
+};
+
 const getTierFromCategory = (
   category: string
 ): "normal" | "premium" | "beef" => {
@@ -53,103 +85,21 @@ const getTierFromCategory = (
   return "normal";
 };
 
-const safeGroupToppingsByCategory = (toppings: ToppingConfiguration[]) => {
-  if (!toppings || toppings.length === 0) {
-    return {};
-  }
-
-  return toppings.reduce((acc, topping) => {
-    const categoryKey = topping.category.replace("topping_", "");
-    const displayCategory = categoryKey === "normal" ? "meats" : categoryKey;
-
-    if (!acc[displayCategory]) {
-      acc[displayCategory] = [];
-    }
-    acc[displayCategory].push(topping);
-    return acc;
-  }, {} as Record<string, ToppingConfiguration[]>);
-};
-
-const getAvailableCrusts = (
-  selectedSize: string,
-  pizzaMenuData: PizzaMenuResponse | null
-) => {
-  if (!selectedSize || !pizzaMenuData) return [];
-
-  return pizzaMenuData.crust_pricing
-    .filter((cp) => cp.size_code === selectedSize)
-    .map((cp) => ({
-      sizeCode: cp.size_code,
-      crustType: cp.crust_type,
-      basePrice: cp.base_price,
-      upcharge: cp.upcharge,
-      displayName: getCrustDisplayName(cp.crust_type, cp.size_code),
-      isSpecial: cp.crust_type === "stuffed" || cp.crust_type === "gluten_free",
-    }))
-    .sort((a, b) => {
-      // Sort: thin first, then double_dough, then special crusts
-      const order = { thin: 1, double_dough: 2, gluten_free: 3, stuffed: 4 };
-      const aOrder = order[a.crustType as keyof typeof order] || 999;
-      const bOrder = order[b.crustType as keyof typeof order] || 999;
-      return aOrder - bOrder;
-    });
-};
-
-// ===================================================================
-// COMPONENT INTERFACES
-// ===================================================================
-
-interface ToppingConfiguration {
-  id: string;
-  name: string;
-  category: string;
-  amount: ToppingAmount;
-  calculatedPrice: number;
-  basePrice: number;
-  isPremium: boolean;
-  tier: "normal" | "premium" | "beef";
-}
-
-interface ModifierConfiguration {
-  id: string;
-  name: string;
-  priceAdjustment: number;
-  selected: boolean;
-}
-
-interface CrustSelection {
-  sizeCode: string;
-  crustType: string;
-  basePrice: number;
-  upcharge: number;
-  displayName: string;
-  isSpecial: boolean;
-}
-
-interface PizzaCustomizerProps {
-  item: ConfiguredCartItem;
-  onComplete: (updatedItem: ConfiguredCartItem) => void;
-  onCancel: () => void;
-  isOpen: boolean;
-  restaurantId: string;
-}
-
 // ===================================================================
 // MAIN COMPONENT
 // ===================================================================
 
-export default function PizzaCustomizer({
+export default function EnhancedPizzaCustomizer({
   item,
   onComplete,
   onCancel,
   isOpen,
   restaurantId,
-}: PizzaCustomizerProps) {
+}: EnhancedPizzaCustomizerProps) {
   // ==========================================
   // STATE MANAGEMENT
   // ==========================================
 
-  // Loading and data states
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pizzaMenuData, setPizzaMenuData] = useState<PizzaMenuResponse | null>(
@@ -158,155 +108,28 @@ export default function PizzaCustomizer({
 
   // Selection states
   const [selectedSize, setSelectedSize] = useState<string>("");
-  const [selectedCrust, setSelectedCrust] = useState<CrustSelection | null>(
-    null
-  );
-  const [toppings, setToppings] = useState<ToppingConfiguration[]>([]);
-  const [modifiers, setModifiers] = useState<ModifierConfiguration[]>([]);
+  const [selectedCrust, setSelectedCrust] = useState<CrustOption | null>(null);
+  const [toppings, setToppings] = useState<ToppingState[]>([]);
   const [specialInstructions, setSpecialInstructions] = useState(
     item.specialInstructions || ""
   );
 
-  // Pricing states
-  const [currentPricing] = useState<PizzaPriceCalculationResponse | null>(null);
-  const [isCalculatingPrice] = useState(false);
-  const [pricingError] = useState<string | null>(null);
+  // 🆕 FIXED: Real pricing states
+  const [currentPricing, setCurrentPricing] =
+    useState<PizzaPriceCalculationResponse | null>(null);
+  const [isCalculatingPrice, setIsCalculatingPrice] = useState(false);
+  const [pricingError, setPricingError] = useState<string | null>(null);
 
   // ==========================================
-  // DERIVED STATE (NO USEMEMO - DIRECT CALCULATION)
+  // LOAD PIZZA MENU DATA
   // ==========================================
-
-  const availableCrusts = getAvailableCrusts(selectedSize, pizzaMenuData);
-  const groupToppingsByCategory = safeGroupToppingsByCategory(toppings);
-
-  // ==========================================
-  // DATA LOADING
-  // ==========================================
-
-  const initializeFromCartItem = useCallback(
-    (menuData: PizzaMenuResponse) => {
-      console.log("🔄 Initializing from cart item:", item);
-
-      // Initialize size and crust from existing variant
-      if (item.variantId && menuData.pizza_items.length > 0) {
-        const pizzaItem = menuData.pizza_items.find((pi) =>
-          pi.variants.some((v) => v.id === item.variantId)
-        );
-
-        if (pizzaItem) {
-          const variant = pizzaItem.variants.find(
-            (v) => v.id === item.variantId
-          );
-          if (variant) {
-            setSelectedSize(variant.size_code);
-
-            const crustData = menuData.crust_pricing.find(
-              (cp) =>
-                cp.size_code === variant.size_code &&
-                cp.crust_type === variant.crust_type
-            );
-
-            if (crustData) {
-              setSelectedCrust({
-                sizeCode: crustData.size_code,
-                crustType: crustData.crust_type,
-                basePrice: crustData.base_price,
-                upcharge: crustData.upcharge,
-                displayName: getCrustDisplayName(
-                  crustData.crust_type,
-                  crustData.size_code
-                ),
-                isSpecial:
-                  crustData.crust_type === "stuffed" ||
-                  crustData.crust_type === "gluten_free",
-              });
-            }
-          }
-        }
-      } else {
-        // Default to medium if available
-        const defaultSize = menuData.available_sizes.includes("12in")
-          ? "12in"
-          : menuData.available_sizes.includes("medium")
-          ? "medium"
-          : menuData.available_sizes[0];
-        setSelectedSize(defaultSize);
-      }
-
-      // Initialize toppings
-      const toppingConfigs: ToppingConfiguration[] = [];
-
-      // Process existing selected toppings
-      if (item.selectedToppings) {
-        item.selectedToppings.forEach((selectedTopping) => {
-          const customization = menuData.pizza_customizations.find(
-            (c) => c.id === selectedTopping.id
-          );
-          if (customization) {
-            toppingConfigs.push({
-              id: customization.id,
-              name: customization.name,
-              category: customization.category,
-              amount: selectedTopping.amount,
-              calculatedPrice: selectedTopping.price,
-              basePrice: customization.base_price,
-              isPremium:
-                customization.category.includes("premium") ||
-                customization.category.includes("beef"),
-              tier: getTierFromCategory(customization.category),
-            });
-          }
-        });
-      }
-
-      // Add remaining toppings as "none"
-      menuData.pizza_customizations
-        .filter((c) => c.category.startsWith("topping_"))
-        .forEach((customization) => {
-          const existing = toppingConfigs.find(
-            (t) => t.id === customization.id
-          );
-          if (!existing) {
-            toppingConfigs.push({
-              id: customization.id,
-              name: customization.name,
-              category: customization.category,
-              amount: "none",
-              calculatedPrice: 0,
-              basePrice: customization.base_price,
-              isPremium:
-                customization.category.includes("premium") ||
-                customization.category.includes("beef"),
-              tier: getTierFromCategory(customization.category),
-            });
-          }
-        });
-
-      setToppings(toppingConfigs);
-
-      // Initialize modifiers
-      const modifierConfigs: ModifierConfiguration[] =
-        menuData.pizza_customizations
-          .filter((c) => !c.category.startsWith("topping_"))
-          .map((c) => ({
-            id: c.id,
-            name: c.name,
-            priceAdjustment: c.base_price,
-            selected:
-              item.selectedModifiers?.some((m) => m.id === c.id) || false,
-          }));
-
-      setModifiers(modifierConfigs);
-    },
-    [item]
-  );
 
   const loadPizzaMenuData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      console.log("🍕 Loading pizza menu data...");
+      console.log("🍕 Loading enhanced pizza menu data...");
 
       const response = await fetch(
         `/api/menu/pizza?restaurant_id=${restaurantId}`
@@ -323,8 +146,35 @@ export default function PizzaCustomizer({
       console.log("✅ Pizza menu data loaded:", result.data);
       setPizzaMenuData(result.data);
 
-      // Initialize selections from existing cart item
-      initializeFromCartItem(result.data);
+      // 🆕 AUTO-SELECT DEFAULT SIZE AND CRUST
+      const availableSizes = result.data.available_sizes || [];
+      const defaultSize = availableSizes.includes("12in")
+        ? "12in"
+        : availableSizes[0];
+
+      if (defaultSize) {
+        setSelectedSize(defaultSize);
+
+        // 🆕 AUTO-SELECT THIN CRUST (excluding stuffed)
+        const thinCrustForSize = result.data.crust_pricing.find(
+          (cp: CrustPricing) =>
+            cp.size_code === defaultSize && cp.crust_type === "thin"
+        );
+
+        if (thinCrustForSize) {
+          const defaultCrust: CrustOption = {
+            sizeCode: thinCrustForSize.size_code,
+            crustType: thinCrustForSize.crust_type,
+            basePrice: thinCrustForSize.base_price,
+            upcharge: thinCrustForSize.upcharge,
+            displayName: getCrustDisplayName(thinCrustForSize.crust_type),
+          };
+          setSelectedCrust(defaultCrust);
+        }
+      }
+
+      // Initialize toppings
+      initializeToppings(result.data);
     } catch (error) {
       console.error("Error loading pizza menu:", error);
       setError(
@@ -333,7 +183,121 @@ export default function PizzaCustomizer({
     } finally {
       setIsLoading(false);
     }
-  }, [initializeFromCartItem, restaurantId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurantId]);
+
+  // ==========================================
+  // INITIALIZE TOPPINGS
+  // ==========================================
+
+  const initializeToppings = (menuData: PizzaMenuResponse) => {
+    const toppingConfigs: ToppingState[] = [];
+
+    // Get pizza toppings from customizations
+    const pizzaToppings = menuData.pizza_customizations.filter(
+      (c: PizzaCustomization) => c.category.startsWith("topping_")
+    );
+
+    pizzaToppings.forEach((customization: PizzaCustomization) => {
+      // Check if this topping was already selected in the cart item
+      const existingTopping = item.selectedToppings?.find(
+        (t) => t.id === customization.id
+      );
+
+      toppingConfigs.push({
+        id: customization.id,
+        name: customization.name,
+        category: customization.category,
+        amount: existingTopping?.amount || "none",
+        basePrice: customization.base_price,
+        calculatedPrice: existingTopping?.price || 0,
+        isActive: existingTopping ? existingTopping.amount !== "none" : false,
+        isSpecialtyDefault: existingTopping?.isDefault || false,
+        tier: getTierFromCategory(customization.category),
+      });
+    });
+
+    // 🆕 SORT: Active/specialty toppings first, then by name
+    toppingConfigs.sort((a, b) => {
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+      if (a.isSpecialtyDefault && !b.isSpecialtyDefault) return -1;
+      if (!a.isSpecialtyDefault && b.isSpecialtyDefault) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    setToppings(toppingConfigs);
+  };
+
+  // ==========================================
+  // REAL-TIME PRICING CALCULATION
+  // ==========================================
+
+  const calculatePrice = useCallback(async () => {
+    if (!selectedCrust || !pizzaMenuData) {
+      return;
+    }
+
+    try {
+      setIsCalculatingPrice(true);
+      setPricingError(null);
+
+      const activeToppings = toppings
+        .filter((t) => t.amount !== "none")
+        .map((t) => ({
+          customization_id: t.id,
+          amount: t.amount,
+        }));
+
+      console.log("💰 Calculating price for:", {
+        size: selectedCrust.sizeCode,
+        crust: selectedCrust.crustType,
+        toppings: activeToppings.length,
+      });
+
+      // 🆕 CALL YOUR DATABASE PRICING FUNCTION
+      const response = await fetch("/api/menu/pizza/calculate-price", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          restaurant_id: restaurantId,
+          size_code: selectedCrust.sizeCode,
+          crust_type: selectedCrust.crustType,
+          toppings: activeToppings,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to calculate price");
+      }
+
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      console.log("✅ Price calculated:", result.data);
+      setCurrentPricing(result.data);
+    } catch (error) {
+      console.error("Error calculating price:", error);
+      setPricingError(
+        error instanceof Error ? error.message : "Pricing calculation failed"
+      );
+    } finally {
+      setIsCalculatingPrice(false);
+    }
+  }, [selectedCrust, toppings, pizzaMenuData, restaurantId]);
+
+  // 🆕 TRIGGER PRICE CALCULATION WHEN SELECTIONS CHANGE
+  useEffect(() => {
+    if (selectedCrust && toppings.length > 0) {
+      const timeoutId = setTimeout(() => {
+        calculatePrice();
+      }, 300); // Debounce for 300ms
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [selectedCrust, toppings, calculatePrice]);
 
   // Load data on mount
   useEffect(() => {
@@ -349,10 +313,26 @@ export default function PizzaCustomizer({
   const handleSizeSelect = (sizeCode: string) => {
     console.log("📏 Size selected:", sizeCode);
     setSelectedSize(sizeCode);
-    setSelectedCrust(null); // Reset crust selection
+
+    // Auto-select thin crust for new size (excluding stuffed)
+    const thinCrustForSize = pizzaMenuData?.crust_pricing.find(
+      (cp: CrustPricing) =>
+        cp.size_code === sizeCode && cp.crust_type === "thin"
+    );
+
+    if (thinCrustForSize) {
+      const newCrust: CrustOption = {
+        sizeCode: thinCrustForSize.size_code,
+        crustType: thinCrustForSize.crust_type,
+        basePrice: thinCrustForSize.base_price,
+        upcharge: thinCrustForSize.upcharge,
+        displayName: getCrustDisplayName(thinCrustForSize.crust_type),
+      };
+      setSelectedCrust(newCrust);
+    }
   };
 
-  const handleCrustSelect = (crust: CrustSelection) => {
+  const handleCrustSelect = (crust: CrustOption) => {
     console.log("🍞 Crust selected:", crust);
     setSelectedCrust(crust);
   };
@@ -361,40 +341,23 @@ export default function PizzaCustomizer({
     console.log(`🍕 Changing topping ${toppingId} to ${newAmount}`);
     setToppings((prev) =>
       prev.map((topping) =>
-        topping.id === toppingId ? { ...topping, amount: newAmount } : topping
-      )
-    );
-  };
-
-  const handleModifierChange = (modifierId: string, selected: boolean) => {
-    console.log(`🔧 Changing modifier ${modifierId} to ${selected}`);
-    setModifiers((prev) =>
-      prev.map((modifier) =>
-        modifier.id === modifierId ? { ...modifier, selected } : modifier
+        topping.id === toppingId
+          ? { ...topping, amount: newAmount, isActive: newAmount !== "none" }
+          : topping
       )
     );
   };
 
   const handleSave = () => {
-    if (!selectedCrust) {
-      console.error("❌ Cannot save without crust selection");
+    if (!selectedCrust || !currentPricing) {
+      console.error("❌ Cannot save without crust selection and pricing");
       return;
     }
 
     console.log("💾 Saving enhanced pizza customization...");
 
-    // Create variant ID based on crust selection
-    const matchingVariant = pizzaMenuData?.pizza_items
-      .flatMap((pi) => pi.variants)
-      .find(
-        (v) =>
-          v.size_code === selectedCrust.sizeCode &&
-          v.crust_type === selectedCrust.crustType
-      );
-
     const updatedItem: ConfiguredCartItem = {
       ...item,
-      variantId: matchingVariant?.id || null,
       variantName: `${getSizeDisplayName(selectedCrust.sizeCode)} ${
         selectedCrust.displayName
       }`,
@@ -406,18 +369,12 @@ export default function PizzaCustomizer({
           name: t.name,
           amount: t.amount,
           price: t.calculatedPrice,
-          isDefault: false,
+          isDefault: t.isSpecialtyDefault,
           category: t.category,
         })),
-      selectedModifiers: modifiers
-        .filter((m) => m.selected)
-        .map((m) => ({
-          id: m.id,
-          name: m.name,
-          priceAdjustment: m.priceAdjustment,
-        })),
+      selectedModifiers: [], // Can add modifiers later
       specialInstructions,
-      totalPrice: currentPricing?.finalPrice || selectedCrust.basePrice,
+      totalPrice: currentPricing.finalPrice,
       displayName: `${getSizeDisplayName(selectedCrust.sizeCode)} ${
         selectedCrust.displayName
       } ${item.menuItemName}`,
@@ -433,9 +390,25 @@ export default function PizzaCustomizer({
 
   if (!isOpen) return null;
 
-  const canProceedToReview = selectedCrust;
+  const availableCrusts =
+    selectedSize && pizzaMenuData
+      ? pizzaMenuData.crust_pricing
+          .filter(
+            (cp: CrustPricing) =>
+              cp.size_code === selectedSize && cp.crust_type !== "stuffed" // 🆕 EXCLUDE STUFFED CRUST
+          )
+          .map((cp: CrustPricing) => ({
+            sizeCode: cp.size_code,
+            crustType: cp.crust_type,
+            basePrice: cp.base_price,
+            upcharge: cp.upcharge,
+            displayName: getCrustDisplayName(cp.crust_type),
+          }))
+      : [];
+
   const finalPrice =
     currentPricing?.finalPrice || selectedCrust?.basePrice || 0;
+  const canSave = selectedCrust && !isCalculatingPrice;
 
   // ==========================================
   // RENDER
@@ -443,7 +416,7 @@ export default function PizzaCustomizer({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
@@ -485,7 +458,7 @@ export default function PizzaCustomizer({
           ) : (
             <div className="p-6 space-y-6">
               {/* Size Selection */}
-              <SizeSelectionSection
+              <SizeSelection
                 availableSizes={pizzaMenuData?.available_sizes || []}
                 selectedSize={selectedSize}
                 onSizeSelect={handleSizeSelect}
@@ -494,7 +467,7 @@ export default function PizzaCustomizer({
 
               {/* Crust Selection */}
               {selectedSize && (
-                <CrustSelectionSection
+                <CrustSelection
                   selectedSize={selectedSize}
                   availableCrusts={availableCrusts}
                   selectedCrust={selectedCrust}
@@ -502,27 +475,18 @@ export default function PizzaCustomizer({
                 />
               )}
 
-              {/* Topping Selection */}
-              {selectedCrust &&
-                Object.keys(groupToppingsByCategory).length > 0 && (
-                  <ToppingSelectionSection
-                    toppingsByCategory={groupToppingsByCategory}
-                    onToppingChange={handleToppingChange}
-                    selectedSize={selectedCrust.sizeCode}
-                  />
-                )}
-
-              {/* Modifier Selection */}
-              {selectedCrust && modifiers.length > 0 && (
-                <ModifierSelectionSection
-                  modifiers={modifiers}
-                  onModifierChange={handleModifierChange}
+              {/* 🆕 COMPACT TOPPING SELECTION */}
+              {selectedCrust && toppings.length > 0 && (
+                <CompactToppingSelection
+                  toppings={toppings}
+                  onToppingChange={handleToppingChange}
+                  selectedSize={selectedCrust.sizeCode}
                 />
               )}
 
               {/* Special Instructions */}
               {selectedCrust && (
-                <SpecialInstructionsSection
+                <SpecialInstructions
                   instructions={specialInstructions}
                   onChange={setSpecialInstructions}
                 />
@@ -549,10 +513,10 @@ export default function PizzaCustomizer({
             </div>
             <button
               onClick={handleSave}
-              disabled={!canProceedToReview}
+              disabled={!canSave}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
-              {canProceedToReview ? "Update Cart" : "Choose Size & Crust"}
+              {canSave ? "Update Cart" : "Loading..."}
             </button>
           </div>
         </div>
@@ -562,40 +526,36 @@ export default function PizzaCustomizer({
 }
 
 // ==========================================
-// SECTION COMPONENTS (SIMPLIFIED)
+// SUB-COMPONENTS
 // ==========================================
 
-interface SizeSelectionSectionProps {
-  availableSizes: string[];
-  selectedSize: string;
-  onSizeSelect: (size: string) => void;
-  crustPricing: CrustPricing[];
-}
-
-function SizeSelectionSection({
+function SizeSelection({
   availableSizes,
   selectedSize,
   onSizeSelect,
   crustPricing,
-}: SizeSelectionSectionProps) {
+}: {
+  availableSizes: string[];
+  selectedSize: string;
+  onSizeSelect: (size: string) => void;
+  crustPricing: CrustPricing[];
+}) {
   const getMinPriceForSize = (sizeCode: string): number => {
     const sizePrices = crustPricing
-      .filter((cp) => cp.size_code === sizeCode)
+      .filter((cp) => cp.size_code === sizeCode && cp.crust_type !== "stuffed")
       .map((cp) => cp.base_price);
     return sizePrices.length > 0 ? Math.min(...sizePrices) : 0;
   };
 
   return (
     <section>
-      <h3 className="text-lg font-semibold text-gray-900 mb-3">
-        Step 1: Choose Size
-      </h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-3">Choose Size</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {availableSizes.map((size) => (
           <button
             key={size}
             onClick={() => onSizeSelect(size)}
-            className={`p-4 rounded-lg border-2 transition-all text-left hover:shadow-md ${
+            className={`p-4 rounded-lg border-2 transition-all text-center hover:shadow-md ${
               selectedSize === size
                 ? "border-blue-600 bg-blue-50 shadow-md"
                 : "border-gray-200 hover:border-gray-300"
@@ -614,90 +574,76 @@ function SizeSelectionSection({
   );
 }
 
-interface CrustSelectionSectionProps {
-  selectedSize: string;
-  availableCrusts: CrustSelection[];
-  selectedCrust: CrustSelection | null;
-  onCrustSelect: (crust: CrustSelection) => void;
-}
-
-function CrustSelectionSection({
+function CrustSelection({
   selectedSize,
   availableCrusts,
   selectedCrust,
   onCrustSelect,
-}: CrustSelectionSectionProps) {
+}: {
+  selectedSize: string;
+  availableCrusts: CrustOption[];
+  selectedCrust: CrustOption | null;
+  onCrustSelect: (crust: CrustOption) => void;
+}) {
   return (
     <section>
       <h3 className="text-lg font-semibold text-gray-900 mb-3">
-        Step 2: Choose Crust ({getSizeDisplayName(selectedSize)})
+        Choose Crust ({getSizeDisplayName(selectedSize)})
       </h3>
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {availableCrusts.map((crust) => (
-          <label
+          <button
             key={`${crust.sizeCode}-${crust.crustType}`}
-            className={`flex items-center justify-between p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
+            onClick={() => onCrustSelect(crust)}
+            className={`p-4 rounded-lg border-2 transition-all hover:shadow-md ${
               selectedCrust?.crustType === crust.crustType
                 ? "border-blue-600 bg-blue-50 shadow-md"
                 : "border-gray-200 hover:border-gray-300"
             }`}
-            onClick={() => onCrustSelect(crust)}
           >
-            <div className="flex items-center">
-              <input
-                type="radio"
-                name="crust"
-                value={crust.crustType}
-                checked={selectedCrust?.crustType === crust.crustType}
-                onChange={() => onCrustSelect(crust)}
-                className="mr-3 text-blue-600 focus:ring-blue-500"
-              />
-              <div>
-                <div className="font-semibold text-gray-900 flex items-center">
-                  {crust.displayName}
-                  {crust.isSpecial && (
-                    <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
-                      Special
-                    </span>
-                  )}
-                </div>
-                {crust.upcharge > 0 && (
-                  <div className="text-sm text-gray-600">
-                    +${crust.upcharge.toFixed(2)} upcharge
-                  </div>
-                )}
-              </div>
+            <div className="font-semibold text-gray-900">
+              {crust.displayName}
             </div>
-            <div className="text-lg font-bold text-green-600">
+            <div className="text-lg font-bold text-green-600 mt-2">
               ${crust.basePrice.toFixed(2)}
             </div>
-          </label>
+            {crust.upcharge > 0 && (
+              <div className="text-sm text-gray-600">
+                +${crust.upcharge.toFixed(2)} upcharge
+              </div>
+            )}
+          </button>
         ))}
       </div>
     </section>
   );
 }
 
-interface ToppingSelectionSectionProps {
-  toppingsByCategory: Record<string, ToppingConfiguration[]>;
-  onToppingChange: (toppingId: string, amount: ToppingAmount) => void;
-  selectedSize: string;
-}
-
-function ToppingSelectionSection({
-  toppingsByCategory,
+// 🆕 COMPACT TOPPING SELECTION
+function CompactToppingSelection({
+  toppings,
   onToppingChange,
   selectedSize,
-}: ToppingSelectionSectionProps) {
+}: {
+  toppings: ToppingState[];
+  onToppingChange: (toppingId: string, amount: ToppingAmount) => void;
+  selectedSize: string;
+}) {
+  // Group toppings by category for better organization
+  const groupedToppings = toppings.reduce((acc, topping) => {
+    const category = topping.category.replace("topping_", "");
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(topping);
+    return acc;
+  }, {} as Record<string, ToppingState[]>);
+
   const getCategoryIcon = (category: string) => {
     const icons: Record<string, string> = {
-      meats: "🥓",
       normal: "🥓",
-      vegetables: "🥬",
-      cheese: "🧀",
-      sauce: "🍅",
       premium: "⭐",
       beef: "🥩",
+      cheese: "🧀",
+      sauce: "🍅",
     };
     return icons[category] || "🍕";
   };
@@ -705,155 +651,76 @@ function ToppingSelectionSection({
   return (
     <section>
       <h3 className="text-lg font-semibold text-gray-900 mb-3">
-        Step 3: Choose Toppings
+        Choose Toppings
         <span className="text-sm font-normal text-gray-600 ml-2">
-          (Prices shown for {getSizeDisplayName(selectedSize)} size)
+          (Prices for {getSizeDisplayName(selectedSize)})
         </span>
       </h3>
 
-      {Object.entries(toppingsByCategory).map(
-        ([category, categoryToppings]) => (
-          <div key={category} className="mb-6">
-            <h4 className="text-base font-medium text-gray-800 mb-3 capitalize flex items-center">
-              <span className="mr-2">{getCategoryIcon(category)}</span>
-              {category}
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {categoryToppings.map((topping) => (
-                <ToppingSelector
-                  key={topping.id}
-                  topping={topping}
-                  onChange={(amount) => onToppingChange(topping.id, amount)}
-                />
-              ))}
-            </div>
-          </div>
-        )
-      )}
-    </section>
-  );
-}
+      {Object.entries(groupedToppings).map(([category, categoryToppings]) => (
+        <div key={category} className="mb-4">
+          <h4 className="text-sm font-medium text-gray-800 mb-2 capitalize flex items-center">
+            <span className="mr-1">{getCategoryIcon(category)}</span>
+            {category === "normal" ? "Meats" : category}
+          </h4>
 
-interface ToppingSelectorProps {
-  topping: ToppingConfiguration;
-  onChange: (amount: ToppingAmount) => void;
-}
-
-function ToppingSelector({ topping, onChange }: ToppingSelectorProps) {
-  const amountOptions: {
-    value: ToppingAmount;
-    label: string;
-    multiplier: string;
-  }[] = [
-    { value: "none", label: "None", multiplier: "" },
-    { value: "light", label: "Light", multiplier: "0.75x" },
-    { value: "normal", label: "Normal", multiplier: "1x" },
-    { value: "extra", label: "Extra", multiplier: "2x" },
-    { value: "xxtra", label: "XXtra", multiplier: "3x" },
-  ];
-
-  return (
-    <div
-      className={`border rounded-lg p-3 transition-all ${
-        topping.amount !== "none"
-          ? "border-blue-500 bg-blue-50"
-          : "border-gray-200"
-      }`}
-    >
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-gray-900">{topping.name}</span>
-          {topping.isPremium && (
-            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
-              {topping.tier === "beef" ? "Premium Beef" : "Premium"}
-            </span>
-          )}
-        </div>
-        {topping.calculatedPrice > 0 && (
-          <span className="text-sm font-semibold text-green-600">
-            +${topping.calculatedPrice.toFixed(2)}
-          </span>
-        )}
-      </div>
-
-      <select
-        value={topping.amount}
-        onChange={(e) => onChange(e.target.value as ToppingAmount)}
-        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-      >
-        {amountOptions.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label} {option.multiplier && `(${option.multiplier})`}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-interface ModifierSelectionSectionProps {
-  modifiers: ModifierConfiguration[];
-  onModifierChange: (modifierId: string, selected: boolean) => void;
-}
-
-function ModifierSelectionSection({
-  modifiers,
-  onModifierChange,
-}: ModifierSelectionSectionProps) {
-  return (
-    <section>
-      <h3 className="text-lg font-semibold text-gray-900 mb-3">
-        Step 4: Special Preparations
-      </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {modifiers.map((modifier) => (
-          <label
-            key={modifier.id}
-            className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-              modifier.selected
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={modifier.selected}
-                onChange={(e) =>
-                  onModifierChange(modifier.id, e.target.checked)
-                }
-                className="mr-3 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="font-medium text-gray-900">{modifier.name}</span>
-            </div>
-            {modifier.priceAdjustment !== 0 && (
-              <span
-                className={`text-sm font-semibold ${
-                  modifier.priceAdjustment > 0
-                    ? "text-green-600"
-                    : "text-red-600"
+          {/* 🆕 COMPACT GRID - MORE TOPPINGS VISIBLE */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            {categoryToppings.map((topping) => (
+              <div
+                key={topping.id}
+                className={`border rounded-lg p-2 transition-all ${
+                  topping.isActive
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300"
                 }`}
               >
-                {modifier.priceAdjustment > 0 ? "+" : ""}$
-                {modifier.priceAdjustment.toFixed(2)}
-              </span>
-            )}
-          </label>
-        ))}
-      </div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium text-gray-900 truncate">
+                    {topping.name}
+                  </span>
+                  {topping.tier !== "normal" && (
+                    <span className="text-xs bg-yellow-100 text-yellow-800 px-1 rounded">
+                      {topping.tier === "beef" ? "🥩" : "⭐"}
+                    </span>
+                  )}
+                </div>
+
+                <select
+                  value={topping.amount}
+                  onChange={(e) =>
+                    onToppingChange(topping.id, e.target.value as ToppingAmount)
+                  }
+                  className="w-full text-xs border border-gray-300 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="none">None</option>
+                  <option value="light">Light</option>
+                  <option value="normal">Normal</option>
+                  <option value="extra">Extra</option>
+                  <option value="xxtra">XXtra</option>
+                </select>
+
+                {topping.calculatedPrice > 0 && (
+                  <div className="text-xs font-semibold text-green-600 mt-1">
+                    +${topping.calculatedPrice.toFixed(2)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </section>
   );
 }
 
-interface SpecialInstructionsSectionProps {
-  instructions: string;
-  onChange: (instructions: string) => void;
-}
-
-function SpecialInstructionsSection({
+function SpecialInstructions({
   instructions,
   onChange,
-}: SpecialInstructionsSectionProps) {
+}: {
+  instructions: string;
+  onChange: (instructions: string) => void;
+}) {
   return (
     <section>
       <h3 className="text-lg font-semibold text-gray-900 mb-3">
@@ -863,16 +730,12 @@ function SpecialInstructionsSection({
         placeholder="Any special requests for this pizza..."
         value={instructions}
         onChange={(e) => onChange(e.target.value)}
-        rows={3}
+        rows={2}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
       />
     </section>
   );
 }
-
-// ==========================================
-// LOADING & ERROR STATES
-// ==========================================
 
 function LoadingState() {
   return (
@@ -886,12 +749,13 @@ function LoadingState() {
   );
 }
 
-interface ErrorStateProps {
+function ErrorState({
+  error,
+  onRetry,
+}: {
   error: string;
   onRetry: () => void;
-}
-
-function ErrorState({ error, onRetry }: ErrorStateProps) {
+}) {
   return (
     <div className="p-8 text-center">
       <div className="text-red-500 text-4xl mb-4">⚠️</div>

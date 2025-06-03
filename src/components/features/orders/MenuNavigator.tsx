@@ -1,8 +1,7 @@
-// src/components/features/orders/MenuNavigator.tsx - UPDATED with Enhanced Pizza Customizer
+// src/components/features/orders/MenuNavigator.tsx - UPDATED
 "use client";
 import {
   ConfiguredCartItem,
-  Customization,
   MenuCategory,
   MenuItemWithVariants,
   Modifier,
@@ -10,17 +9,17 @@ import {
 } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
 import AppetizerCustomizer from "./AppetizerCustomizer";
-import EnhancedPizzaCustomizer from "./PizzaCustomizer"; // 🆕 NEW: Enhanced version
+import EnhancedPizzaCustomizer from "./PizzaCustomizer";
 import SandwichCustomizer from "./SandwichCustomizer";
 import ChickenCustomizer from "./ChickenCustomizer";
 
 /**
  * 🎯 UPDATED: MenuNavigator with Enhanced Pizza Customizer
  *
- * Changes:
- * ✅ Replaced PizzaCustomizer with EnhancedPizzaCustomizer
- * ✅ Simplified pizza routing - no more variant pre-selection
- * ✅ Enhanced pizza customizer handles everything internally
+ * Key Changes:
+ * ✅ Uses EnhancedPizzaCustomizer for all pizza items
+ * ✅ Filters out stuffed pizzas from regular pizza category
+ * ✅ Enhanced customizer handles all pizza logic internally
  * ✅ Maintains compatibility with other customizers
  */
 
@@ -28,7 +27,6 @@ interface MenuNavigatorProps {
   menuItems: MenuItemWithVariants[];
   toppings: Topping[];
   modifiers: Modifier[];
-  customizations?: Customization[];
   onAddToCart: (configuredItem: ConfiguredCartItem) => void;
   restaurantId: string;
 }
@@ -72,6 +70,27 @@ export default function MenuNavigator({
   // DATA ORGANIZATION
   // ==========================================
 
+  // 🆕 FILTER OUT STUFFED PIZZAS from regular pizza category
+  const filteredMenuItems = useMemo(() => {
+    return menuItems.filter((item) => {
+      // If it's a pizza category, exclude stuffed pizzas
+      if (item.category?.name === "Pizzas") {
+        // Check if this is a stuffed pizza by looking at variants or item type
+        const hasStuffedVariants = item.variants?.some(
+          (v) => v.crust_type === "stuffed"
+        );
+        const isStuffedPizza =
+          item.name?.toLowerCase().includes("stuffed") ||
+          item.item_type?.includes("stuffed");
+
+        // Exclude stuffed pizzas from regular pizza category
+        return !hasStuffedVariants && !isStuffedPizza;
+      }
+
+      return true; // Include all other items
+    });
+  }, [menuItems]);
+
   // Group items by category
   const categorizedItems = useMemo(() => {
     const categoryMap = new Map<
@@ -82,7 +101,7 @@ export default function MenuNavigator({
       }
     >();
 
-    menuItems.forEach((item) => {
+    filteredMenuItems.forEach((item) => {
       if (item.category) {
         const categoryId = item.category.id;
 
@@ -101,7 +120,7 @@ export default function MenuNavigator({
     return Array.from(categoryMap.values()).sort(
       (a, b) => a.category.sort_order - b.category.sort_order
     );
-  }, [menuItems]);
+  }, [filteredMenuItems]);
 
   // Get items for currently selected category
   const currentCategoryItems = useMemo(() => {
@@ -136,7 +155,7 @@ export default function MenuNavigator({
 
   const createCartItem = useCallback(
     (item: MenuItemWithVariants): ConfiguredCartItem => {
-      // For items with variants, use the first variant as default (customizer will handle selection)
+      // For items with variants, use the first variant as default
       const defaultVariant =
         item.variants && item.variants.length > 0 ? item.variants[0] : null;
       const basePrice = defaultVariant?.price ?? item.base_price;
@@ -189,6 +208,21 @@ export default function MenuNavigator({
     setCustomizerItem(null);
   }, []);
 
+  // 🆕 NEW: Enhanced Pizza Customizer Handler
+  const openEnhancedPizzaCustomizer = useCallback(
+    (item: MenuItemWithVariants) => {
+      console.log("🍕 Opening ENHANCED pizza customizer for:", item.name);
+
+      const cartItem = createCartItem(item);
+      console.log("🍕 Created cart item for enhanced customizer:", cartItem);
+
+      setCustomizerItem(cartItem);
+      setSelectedItem(item);
+      setShowEnhancedPizzaCustomizer(true);
+    },
+    [createCartItem]
+  );
+
   const openSandwichCustomizer = useCallback((item: MenuItemWithVariants) => {
     setSelectedItem(item);
     setShowSandwichCustomizer(true);
@@ -205,30 +239,6 @@ export default function MenuNavigator({
     setShowChickenCustomizer(true);
   }, []);
 
-  // 🆕 NEW: Enhanced Pizza Customizer Handler
-  const openEnhancedPizzaCustomizer = useCallback(
-    (item: MenuItemWithVariants) => {
-      console.log("🍕 Opening ENHANCED pizza customizer for:", item.name);
-
-      const cartItem = createCartItem(item);
-      console.log("🍕 Created cart item for enhanced customizer:", cartItem);
-
-      setCustomizerItem(cartItem);
-      setSelectedItem(item); // Keep for reference
-      setShowEnhancedPizzaCustomizer(true);
-    },
-    [createCartItem]
-  );
-
-  const openPastaCustomizer = useCallback(
-    (item: MenuItemWithVariants) => {
-      // TODO: Implement PastaCustomizer component
-      console.log("🚧 Pasta customizer not yet implemented");
-      addDirectToCart(item);
-    },
-    [addDirectToCart]
-  );
-
   const handleItemSelect = useCallback(
     (item: MenuItemWithVariants) => {
       console.log(
@@ -243,7 +253,7 @@ export default function MenuNavigator({
       const categoryName = item.category?.name;
 
       // 🎯 ENHANCED ROUTING LOGIC
-      if (categoryName === "Pizzas") {
+      if (categoryName === "Pizzas" || categoryName === "Pizza") {
         console.log("🍕 Opening ENHANCED pizza customizer directly");
         openEnhancedPizzaCustomizer(item); // 🆕 NEW: Use enhanced customizer
       } else if (categoryName === "Sandwiches") {
@@ -268,9 +278,6 @@ export default function MenuNavigator({
           console.log("🍗 Opening chicken customizer for:", itemName);
           openChickenCustomizer(item);
         }
-      } else if (categoryName === "Pasta") {
-        console.log("🍝 Opening pasta customizer directly");
-        openPastaCustomizer(item);
       } else if (categoryName === "Beverages" || categoryName === "Sides") {
         console.log("🥤 Adding simple item directly to cart");
         addDirectToCart(item);
@@ -284,7 +291,6 @@ export default function MenuNavigator({
       openSandwichCustomizer,
       openAppetizerCustomizer,
       openChickenCustomizer,
-      openPastaCustomizer,
       addDirectToCart,
     ]
   );
@@ -376,6 +382,8 @@ export default function MenuNavigator({
                 </h3>
                 <p className="text-sm text-gray-600">
                   {currentCategoryItems.length} items available
+                  {navState.selectedCategory?.name === "Pizzas" &&
+                    " (Stuffed pizzas in separate category)"}
                 </p>
               </div>
             </div>
@@ -400,7 +408,7 @@ export default function MenuNavigator({
         />
       )}
 
-      {/* SANDWICH MODAL */}
+      {/* OTHER CUSTOMIZERS (unchanged) */}
       {showSandwichCustomizer && selectedItem && (
         <SandwichCustomizer
           item={selectedItem}
@@ -410,7 +418,6 @@ export default function MenuNavigator({
         />
       )}
 
-      {/* APPETIZER MODAL */}
       {showAppetizerCustomizer && selectedItem && (
         <AppetizerCustomizer
           item={selectedItem}
@@ -421,7 +428,6 @@ export default function MenuNavigator({
         />
       )}
 
-      {/* CHICKEN MODAL */}
       {showChickenCustomizer && selectedItem && (
         <ChickenCustomizer
           item={selectedItem}
@@ -436,7 +442,7 @@ export default function MenuNavigator({
 }
 
 // ==========================================
-// SUB-COMPONENTS (Unchanged)
+// SUB-COMPONENTS (Same as before)
 // ==========================================
 
 interface CategoryGridProps {
@@ -457,14 +463,16 @@ function CategoryGrid({ categories, onCategorySelect }: CategoryGridProps) {
     if (name.includes("pasta")) return "🍝";
     if (name.includes("beverage") || name.includes("drink")) return "🥤";
     if (name.includes("side")) return "🍟";
+    if (name.includes("stuffed")) return "🥧"; // Special icon for stuffed pizzas
     if (name.includes("dessert")) return "🍰";
     return "🍽️";
   };
 
   const getCategoryDescription = (categoryName: string) => {
     const name = categoryName.toLowerCase();
-    if (name.includes("pizza"))
-      return "Customizable pizzas with fresh toppings";
+    if (name.includes("pizza") && !name.includes("stuffed"))
+      return "Customizable thin & double dough pizzas";
+    if (name.includes("stuffed")) return "Deep-dish stuffed pizzas";
     if (name.includes("sandwich")) return "Build your perfect sandwich";
     if (name.includes("appetizer")) return "Wings, mozzarella sticks & more";
     if (name.includes("chicken")) return "Family packs & chicken dinners";
@@ -529,15 +537,12 @@ function ItemCard({ item, onSelect }: ItemCardProps) {
       className="bg-white hover:bg-gray-50 border border-gray-200 hover:border-blue-300 rounded-lg p-3 text-left transition-all duration-200 hover:shadow-md w-full"
     >
       <div className="flex justify-between items-center">
-        {/* Left: Just the name */}
         <div className="flex-1">
           <h5 className="font-bold text-gray-900 text-base">{item.name}</h5>
           <div className="text-xs text-gray-500 mt-1">
             ~{item.prep_time_minutes || 15} min
           </div>
         </div>
-
-        {/* Right: Simple price */}
         <div className="text-right ml-4">
           <div className="text-lg font-bold text-green-600">
             ${(item.base_price || 0).toFixed(2)}
