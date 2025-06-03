@@ -1,11 +1,11 @@
 // src/components/features/orders/PizzaCustomizer.tsx
 "use client";
-import {
+import type {
   ConfiguredCartItem,
   ToppingAmount,
+  CrustPricing,
   PizzaMenuResponse,
   PizzaPriceCalculationResponse,
-  CrustPricing,
 } from "@/lib/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -116,9 +116,7 @@ export default function PizzaCustomizer({
 
       console.log("🍕 Loading pizza menu data...");
 
-      const response = await fetch(
-        `/api/menu/pizza?restaurant_id=${restaurantId}`
-      );
+      const response = await fetch(`/api/menu?restaurant_id=${restaurantId}`);
       if (!response.ok) {
         throw new Error(`Failed to load pizza menu: ${response.statusText}`);
       }
@@ -294,14 +292,33 @@ export default function PizzaCustomizer({
         toppings: toppingSelections.length,
       });
 
-      const response = await fetch("/api/menu/pizza/calculate-price", {
+      // Add this helper function:
+      const findMatchingVariantId = (
+        crust: CrustSelection,
+        menuData: PizzaMenuResponse | null
+      ): string | null => {
+        if (!menuData) return null;
+
+        const variant = menuData.pizza_items
+          .flatMap((item) => item.variants)
+          .find(
+            (v) =>
+              v.size_code === crust.sizeCode && v.crust_type === crust.crustType
+          );
+
+        return variant?.id || null;
+      };
+
+      const response = await fetch("/api/menu/calculate-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          restaurantId,
-          sizeCode: selectedCrust.sizeCode,
-          crustType: selectedCrust.crustType,
+          // Create a matching variant ID from your pizza data
+          variantId: selectedCrust
+            ? findMatchingVariantId(selectedCrust, pizzaMenuData)
+            : null,
           toppingSelections,
+          restaurantId, // This should be in the body, not as a separate field
         }),
       });
 

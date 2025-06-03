@@ -913,3 +913,31 @@ export interface PizzaUtils {
     errors: string[];
   };
 }
+
+/**
+ * Pizza menu response from enhanced API
+ */
+export interface PizzaMenuResponse {
+  pizza_items: PizzaMenuItem[];
+  crust_pricing: CrustPricing[];
+  pizza_customizations: PizzaCustomization[];
+  pizza_templates: PizzaTemplate[];
+  available_sizes: string[];
+  available_crusts: string[];
+}
+
+/**
+ * Pizza price calculation response
+ */
+export interface PizzaPriceCalculationResponse {
+  basePrice: number;
+  crustUpcharge: number;
+  toppingCost: number;
+  substitutionCredit: number;
+  finalPrice: number;
+  breakdown: PizzaPriceBreakdownItem[];
+  sizeCode: string;
+  crustType: string;
+  estimatedPrepTime?: number;
+  warnings?: string[];
+}
