@@ -21,3 +21,25 @@ LIMIT 10;
 -- 3. How stuffed pizzas are separated
 SELECT * FROM menu_categories;
 SELECT name, category_id FROM menu_items WHERE name ILIKE '%stuffed%';
+
+
+
+
+"failed to load topping data" now.
+
+/api/menu/pizza/calculate-price:1 
+
+            
+
+            
+
+           Failed to load resource: the server responded with a status of 500 ()Understand this error
+
+hook.js:608 Error calculating price: Error: Failed to load topping data
+
+    at page-ffb6893af020c63b.js:1:20539
+
+i selected bbq chicken pizza which has bbq and chicken on it, neither of which show up in editor as selected. price looks to be constantly updating, which you can see visually alternating between calculating and the same price.
+
+different pricing error it seems
+
