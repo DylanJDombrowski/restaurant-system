@@ -294,7 +294,7 @@ export default function PizzaCustomizer({
         toppings: toppingSelections.length,
       });
 
-      // Add this helper function:
+      // Find matching variant ID
       const findMatchingVariantId = (
         crust: CrustSelection,
         menuData: PizzaMenuResponse | null
@@ -311,16 +311,14 @@ export default function PizzaCustomizer({
         return variant?.id || null;
       };
 
+      // Use the EXISTING API endpoint format
       const response = await fetch("/api/menu/calculate-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          // Create a matching variant ID from your pizza data
-          variantId: selectedCrust
-            ? findMatchingVariantId(selectedCrust, pizzaMenuData)
-            : null,
+          variantId: findMatchingVariantId(selectedCrust, pizzaMenuData),
           toppingSelections,
-          restaurantId, // This should be in the body, not as a separate field
+          modifierIds: modifiers.filter((m) => m.selected).map((m) => m.id),
         }),
       });
 
@@ -334,7 +332,24 @@ export default function PizzaCustomizer({
       }
 
       console.log("✅ Price calculated:", result.data);
-      setCurrentPricing(result.data);
+
+      // Transform the response to match expected format
+      const transformedPricing = {
+        basePrice: result.data.basePrice,
+        crustUpcharge: 0, // Add if needed
+        toppingCost: result.data.toppingCost,
+        substitutionCredit: 0,
+        finalPrice: result.data.finalPrice,
+        breakdown: [
+          result.data.breakdown.base,
+          ...result.data.breakdown.toppings,
+          ...result.data.breakdown.modifiers,
+        ],
+        sizeCode: selectedCrust.sizeCode,
+        crustType: selectedCrust.crustType,
+      };
+
+      setCurrentPricing(transformedPricing);
     } catch (error) {
       console.error("Error calculating price:", error);
       setPricingError(
@@ -343,7 +358,7 @@ export default function PizzaCustomizer({
     } finally {
       setIsCalculatingPrice(false);
     }
-  }, [selectedCrust, toppings, restaurantId, pizzaMenuData]);
+  }, [selectedCrust, toppings, modifiers, pizzaMenuData]);
 
   // Debounced price calculation
   useEffect(() => {
@@ -522,6 +537,11 @@ export default function PizzaCustomizer({
   };
 
   const groupToppingsByCategory = useMemo(() => {
+    // Add safety check
+    if (!toppings || toppings.length === 0) {
+      return {};
+    }
+
     return toppings.reduce((acc, topping) => {
       const categoryKey = topping.category.replace("topping_", "");
       const displayCategory = categoryKey === "normal" ? "meats" : categoryKey;
@@ -623,7 +643,7 @@ export default function PizzaCustomizer({
               )}
 
               {/* Topping Selection */}
-              {selectedCrust && (
+              {selectedCrust && toppings.length > 0 && (
                 <ToppingSelectionSection
                   toppingsByCategory={groupToppingsByCategory}
                   onToppingChange={handleToppingChange}
@@ -833,6 +853,18 @@ function ToppingSelectionSection({
   onToppingChange,
   selectedSize,
 }: ToppingSelectionSectionProps) {
+  const hasCategories = Object.keys(toppingsByCategory).length > 0;
+
+  if (!hasCategories) {
+    return (
+      <section>
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">
+          Step 3: Choose Toppings
+        </h3>
+        <div className="text-gray-500">Loading toppings...</div>
+      </section>
+    );
+  }
   const getCategoryIcon = (category: string) => {
     const icons: Record<string, string> = {
       meats: "🥓",
