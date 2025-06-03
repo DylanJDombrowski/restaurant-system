@@ -116,7 +116,9 @@ export default function PizzaCustomizer({
 
       console.log("🍕 Loading pizza menu data...");
 
-      const response = await fetch(`/api/menu?restaurant_id=${restaurantId}`);
+      const response = await fetch(
+        `/api/menu/pizza?restaurant_id=${restaurantId}`
+      );
       if (!response.ok) {
         throw new Error(`Failed to load pizza menu: ${response.statusText}`);
       }
