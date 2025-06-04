@@ -1,4 +1,4 @@
-// src/components/features/orders/EnhancedPizzaCustomizer.tsx - FIXED CATEGORIZATION
+// src/components/features/orders/EnhancedPizzaCustomizer.tsx - FIXED V2
 "use client";
 import type {
   ConfiguredCartItem,
@@ -8,57 +8,10 @@ import type {
   PizzaCustomization,
   CrustPricing,
 } from "@/lib/types";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 
 // ===================================================================
-// FIXED CATEGORIZATION LOGIC
-// ===================================================================
-
-const TOPPING_CATEGORY_CONFIG = {
-  topping_normal: {
-    displayName: "Meats & Proteins",
-    icon: "🥓",
-    items: ["pepperoni", "sausage", "bacon", "canadian bacon", "salami", "ham"],
-  },
-  topping_premium: {
-    displayName: "Premium Toppings",
-    icon: "⭐",
-    items: ["chicken", "meatball", "prosciutto"],
-  },
-  topping_beef: {
-    displayName: "Specialty Beef",
-    icon: "🥩",
-    items: ["italian beef", "ground beef"],
-  },
-  topping_cheese: {
-    displayName: "Cheese",
-    icon: "🧀",
-    items: ["mozzarella", "feta", "parmesan", "goat cheese", "ricotta"],
-  },
-  topping_sauce: {
-    displayName: "Sauces",
-    icon: "🍅",
-    items: ["alfredo", "bbq sauce", "garlic butter", "no sauce", "extra sauce"],
-  },
-  vegetables: {
-    displayName: "Vegetables & Fruits",
-    icon: "🥬",
-    items: [
-      "mushroom",
-      "onion",
-      "pepper",
-      "olive",
-      "tomato",
-      "spinach",
-      "basil",
-      "pineapple",
-      "giardiniera",
-    ],
-  },
-};
-
-// ===================================================================
-// INTERFACES - Updated
+// INTERFACES
 // ===================================================================
 
 interface ToppingState {
@@ -92,7 +45,61 @@ interface EnhancedPizzaCustomizerProps {
 }
 
 // ===================================================================
-// HELPER FUNCTIONS - Updated with better categorization
+// CATEGORIZATION CONFIG - FIXED
+// ===================================================================
+
+const TOPPING_CATEGORIES = {
+  meats: {
+    displayName: "Meats & Proteins",
+    icon: "🥓",
+    keywords: [
+      "pepperoni",
+      "sausage",
+      "bacon",
+      "canadian bacon",
+      "salami",
+      "ham",
+      "chicken",
+      "meatball",
+      "beef",
+    ],
+  },
+  vegetables: {
+    displayName: "Vegetables & Fruits",
+    icon: "🥬",
+    keywords: [
+      "mushroom",
+      "onion",
+      "pepper",
+      "olive",
+      "tomato",
+      "spinach",
+      "basil",
+      "pineapple",
+      "giardiniera",
+    ],
+  },
+  cheese: {
+    displayName: "Cheese",
+    icon: "🧀",
+    keywords: [
+      "mozzarella",
+      "feta",
+      "parmesan",
+      "goat cheese",
+      "ricotta",
+      "cheese",
+    ],
+  },
+  sauces: {
+    displayName: "Sauces",
+    icon: "🍅",
+    keywords: ["alfredo", "bbq", "garlic butter", "sauce", "no sauce"],
+  },
+};
+
+// ===================================================================
+// HELPER FUNCTIONS
 // ===================================================================
 
 const getSizeDisplayName = (sizeCode: string): string => {
@@ -114,42 +121,21 @@ const getCrustDisplayName = (crustType: string): string => {
   return crustNames[crustType] || crustType;
 };
 
-const getTierFromCategory = (
-  category: string
-): "normal" | "premium" | "beef" => {
-  if (category.includes("beef")) return "beef";
-  if (category.includes("premium")) return "premium";
-  return "normal";
-};
-
-// 🆕 FIXED: Smart categorization based on topping name
 const getDisplayCategory = (
   customization: PizzaCustomization
 ): { category: string; icon: string } => {
   const name = customization.name.toLowerCase();
-  const dbCategory = customization.category;
 
-  // Check if it's actually a vegetable/fruit even if categorized as normal
-  const vegetableKeywords = TOPPING_CATEGORY_CONFIG.vegetables.items;
-  const isVegetable = vegetableKeywords.some((keyword) =>
-    name.includes(keyword)
-  );
-
-  if (isVegetable) {
-    return {
-      category: "vegetables",
-      icon: TOPPING_CATEGORY_CONFIG.vegetables.icon,
-    };
-  }
-
-  // Use database category mapping
-  const categoryConfig =
-    TOPPING_CATEGORY_CONFIG[dbCategory as keyof typeof TOPPING_CATEGORY_CONFIG];
-  if (categoryConfig) {
-    return {
-      category: dbCategory,
-      icon: categoryConfig.icon,
-    };
+  // Check each category for keyword matches
+  for (const [categoryKey, categoryConfig] of Object.entries(
+    TOPPING_CATEGORIES
+  )) {
+    if (categoryConfig.keywords.some((keyword) => name.includes(keyword))) {
+      return {
+        category: categoryKey,
+        icon: categoryConfig.icon,
+      };
+    }
   }
 
   // Default fallback
@@ -159,8 +145,16 @@ const getDisplayCategory = (
   };
 };
 
+const getTierFromCategory = (
+  category: string
+): "normal" | "premium" | "beef" => {
+  if (category.includes("beef")) return "beef";
+  if (category.includes("premium")) return "premium";
+  return "normal";
+};
+
 // ===================================================================
-// MAIN COMPONENT - Updated with template support
+// MAIN COMPONENT
 // ===================================================================
 
 export default function EnhancedPizzaCustomizer({
@@ -195,7 +189,33 @@ export default function EnhancedPizzaCustomizer({
   const [pricingError, setPricingError] = useState<string | null>(null);
 
   // ==========================================
-  // LOAD PIZZA MENU DATA WITH TEMPLATE SUPPORT
+  // MEMOIZED VALUES TO PREVENT LOOPS
+  // ==========================================
+
+  // Create stable reference for active toppings
+  const activeToppings = useMemo(
+    () =>
+      toppings
+        .filter((t) => t.amount !== "none")
+        .map((t) => ({
+          customization_id: t.id,
+          amount: t.amount,
+        })),
+    [toppings]
+  );
+
+  // Create pricing request key for memoization
+  const pricingRequestKey = useMemo(() => {
+    if (!selectedCrust) return null;
+    return JSON.stringify({
+      size: selectedCrust.sizeCode,
+      crust: selectedCrust.crustType,
+      toppings: activeToppings,
+    });
+  }, [selectedCrust, activeToppings]);
+
+  // ==========================================
+  // LOAD PIZZA MENU DATA
   // ==========================================
 
   const loadPizzaMenuData = useCallback(async () => {
@@ -247,7 +267,7 @@ export default function EnhancedPizzaCustomizer({
         }
       }
 
-      // 🆕 Initialize toppings with template support
+      // Initialize toppings with template support
       initializeToppingsWithTemplates(result.data);
     } catch (error) {
       console.error("Error loading pizza menu:", error);
@@ -258,110 +278,117 @@ export default function EnhancedPizzaCustomizer({
       setIsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurantId, item.menuItemId]);
+  }, [restaurantId]);
 
   // ==========================================
   // INITIALIZE TOPPINGS WITH TEMPLATE SUPPORT
   // ==========================================
 
-  const initializeToppingsWithTemplates = (menuData: PizzaMenuResponse) => {
-    const toppingConfigs: ToppingState[] = [];
+  const initializeToppingsWithTemplates = useCallback(
+    (menuData: PizzaMenuResponse) => {
+      const toppingConfigs: ToppingState[] = [];
 
-    // Get pizza toppings from customizations
-    const pizzaToppings = menuData.pizza_customizations.filter(
-      (c: PizzaCustomization) => c.category.startsWith("topping_")
-    );
-
-    // 🆕 Check if this menu item has a pizza template
-    const template = menuData.pizza_templates.find(
-      (t) => t.menu_item_id === item.menuItemId
-    );
-    const templateToppings = template?.template_toppings || [];
-
-    console.log(
-      "🍕 Found template:",
-      template?.name,
-      "with",
-      templateToppings.length,
-      "default toppings"
-    );
-
-    pizzaToppings.forEach((customization: PizzaCustomization) => {
-      // Check if this topping is in the template
-      const templateTopping = templateToppings.find(
-        (tt) => tt.customization_id === customization.id
+      // Get pizza toppings from customizations
+      const pizzaToppings = menuData.pizza_customizations.filter(
+        (c: PizzaCustomization) => c.category.startsWith("topping_")
       );
 
-      // Check if this topping was already selected in the cart item (for editing)
-      const existingTopping = item.selectedToppings?.find(
-        (t) => t.id === customization.id
+      // 🆕 FIXED: Find pizza template by menu item ID
+      const template = menuData.pizza_templates.find(
+        (t) => t.menu_item_id === item.menuItemId
       );
+      const templateToppings = template?.template_toppings || [];
 
-      const { category: displayCategory, icon } =
-        getDisplayCategory(customization);
-
-      // Determine default amount: template default > existing selection > none
-      const defaultAmount =
-        (templateTopping?.default_amount as ToppingAmount) ||
-        existingTopping?.amount ||
-        "none";
-
-      const isActive = defaultAmount !== "none";
-      const isSpecialtyDefault = !!templateTopping;
-
-      toppingConfigs.push({
-        id: customization.id,
-        name: customization.name,
-        category: customization.category,
-        displayCategory,
-        amount: defaultAmount,
-        basePrice: customization.base_price,
-        calculatedPrice: 0, // Will be calculated by API
-        isActive,
-        isSpecialtyDefault,
-        tier: getTierFromCategory(customization.category),
-        icon,
+      console.log("🍕 Template lookup:", {
+        menuItemId: item.menuItemId,
+        templateFound: !!template,
+        templateName: template?.name,
+        defaultToppings: templateToppings.length,
       });
-    });
 
-    // 🆕 SORT: Specialty defaults first, then active, then alphabetical
-    toppingConfigs.sort((a, b) => {
-      if (a.isSpecialtyDefault && !b.isSpecialtyDefault) return -1;
-      if (!a.isSpecialtyDefault && b.isSpecialtyDefault) return 1;
-      if (a.isActive && !b.isActive) return -1;
-      if (!a.isActive && b.isActive) return 1;
-      return a.name.localeCompare(b.name);
-    });
+      pizzaToppings.forEach((customization: PizzaCustomization) => {
+        // Check if this topping is in the template
+        const templateTopping = templateToppings.find(
+          (tt) => tt.customization_id === customization.id
+        );
 
-    setToppings(toppingConfigs);
+        // Check if this topping was already selected in the cart item (for editing)
+        const existingTopping = item.selectedToppings?.find(
+          (t) => t.id === customization.id
+        );
 
-    // If this is a specialty pizza, show a notification
-    if (template && templateToppings.length > 0) {
-      console.log(
-        `🍕 Loaded ${template.name} with ${templateToppings.length} default toppings`
-      );
-    }
-  };
+        const { category: displayCategory, icon } =
+          getDisplayCategory(customization);
+
+        // 🆕 FIXED: Determine default amount properly
+        let defaultAmount: ToppingAmount = "none";
+        let isSpecialtyDefault = false;
+
+        if (templateTopping) {
+          defaultAmount = templateTopping.default_amount as ToppingAmount;
+          isSpecialtyDefault = true;
+          console.log(
+            `🎯 Template topping: ${customization.name} = ${defaultAmount}`
+          );
+        } else if (existingTopping) {
+          defaultAmount = existingTopping.amount;
+        }
+
+        const isActive = defaultAmount !== "none";
+
+        toppingConfigs.push({
+          id: customization.id,
+          name: customization.name,
+          category: customization.category,
+          displayCategory,
+          amount: defaultAmount,
+          basePrice: customization.base_price,
+          calculatedPrice: 0, // Will be calculated by API
+          isActive,
+          isSpecialtyDefault,
+          tier: getTierFromCategory(customization.category),
+          icon,
+        });
+      });
+
+      // 🆕 SORT: Specialty defaults first, then active, then alphabetical
+      toppingConfigs.sort((a, b) => {
+        if (a.isSpecialtyDefault && !b.isSpecialtyDefault) return -1;
+        if (!a.isSpecialtyDefault && b.isSpecialtyDefault) return 1;
+        if (a.isActive && !b.isActive) return -1;
+        if (!a.isActive && b.isActive) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      console.log("🍕 Initialized toppings:", {
+        total: toppingConfigs.length,
+        active: toppingConfigs.filter((t) => t.isActive).length,
+        specialtyDefaults: toppingConfigs.filter((t) => t.isSpecialtyDefault)
+          .length,
+      });
+
+      setToppings(toppingConfigs);
+    },
+    [item.menuItemId, item.selectedToppings]
+  );
 
   // ==========================================
-  // REAL-TIME PRICING CALCULATION
+  // REAL-TIME PRICING CALCULATION - FIXED LOOP
   // ==========================================
 
   const calculatePrice = useCallback(async () => {
-    if (!selectedCrust || !pizzaMenuData) {
+    if (
+      !selectedCrust ||
+      !pizzaMenuData ||
+      (activeToppings.length === 0 &&
+        toppings.filter((t) => t.amount !== "none").length === 0)
+    ) {
       return;
     }
 
     try {
       setIsCalculatingPrice(true);
       setPricingError(null);
-
-      const activeToppings = toppings
-        .filter((t) => t.amount !== "none")
-        .map((t) => ({
-          customization_id: t.id,
-          amount: t.amount,
-        }));
 
       console.log("💰 Calculating price for:", {
         size: selectedCrust.sizeCode,
@@ -396,25 +423,19 @@ export default function EnhancedPizzaCustomizer({
 
       // Update topping calculated prices from breakdown
       if (result.data.breakdown) {
-        // Define a type for breakdown items
-        type BreakdownItem = {
-          name: string;
-          type: string;
-          price: number;
-        };
-
-        const updatedToppings = toppings.map((topping) => {
-          const breakdownItem = result.data.breakdown.find(
-            (item: BreakdownItem) =>
-              item.name.toLowerCase().includes(topping.name.toLowerCase()) &&
-              item.type === "topping"
-          );
-          return {
-            ...topping,
-            calculatedPrice: breakdownItem?.price || 0,
-          };
-        });
-        setToppings(updatedToppings);
+        setToppings((prevToppings) =>
+          prevToppings.map((topping) => {
+            const breakdownItem = result.data.breakdown.find(
+              (item: { name: string; type: string; price: number }) =>
+                item.name.toLowerCase().includes(topping.name.toLowerCase()) &&
+                item.type === "topping"
+            );
+            return {
+              ...topping,
+              calculatedPrice: breakdownItem?.price || 0,
+            };
+          })
+        );
       }
     } catch (error) {
       console.error("Error calculating price:", error);
@@ -424,18 +445,18 @@ export default function EnhancedPizzaCustomizer({
     } finally {
       setIsCalculatingPrice(false);
     }
-  }, [selectedCrust, toppings, pizzaMenuData, restaurantId]);
+  }, [selectedCrust, activeToppings, pizzaMenuData, restaurantId, toppings]);
 
-  // Trigger price calculation when selections change
+  // 🆕 FIXED: Use memoized pricing request key to prevent loops
   useEffect(() => {
-    if (selectedCrust && toppings.length > 0) {
+    if (pricingRequestKey) {
       const timeoutId = setTimeout(() => {
         calculatePrice();
       }, 300); // Debounce for 300ms
 
       return () => clearTimeout(timeoutId);
     }
-  }, [selectedCrust, toppings, calculatePrice]);
+  }, [pricingRequestKey, calculatePrice]);
 
   // Load data on mount
   useEffect(() => {
@@ -613,7 +634,7 @@ export default function EnhancedPizzaCustomizer({
                 />
               )}
 
-              {/* 🆕 FIXED TOPPING SELECTION with proper categorization */}
+              {/* FIXED TOPPING SELECTION with proper categorization */}
               {selectedCrust && toppings.length > 0 && (
                 <FixedToppingSelection
                   toppings={toppings}
@@ -757,7 +778,7 @@ function CrustSelection({
   );
 }
 
-// 🆕 FIXED TOPPING SELECTION with proper categorization
+// FIXED TOPPING SELECTION with proper categorization
 function FixedToppingSelection({
   toppings,
   onToppingChange,
@@ -777,7 +798,7 @@ function FixedToppingSelection({
 
   const getCategoryDisplayName = (category: string) => {
     const config =
-      TOPPING_CATEGORY_CONFIG[category as keyof typeof TOPPING_CATEGORY_CONFIG];
+      TOPPING_CATEGORIES[category as keyof typeof TOPPING_CATEGORIES];
     return (
       config?.displayName ||
       category.charAt(0).toUpperCase() + category.slice(1)
@@ -786,7 +807,7 @@ function FixedToppingSelection({
 
   const getCategoryIcon = (category: string) => {
     const config =
-      TOPPING_CATEGORY_CONFIG[category as keyof typeof TOPPING_CATEGORY_CONFIG];
+      TOPPING_CATEGORIES[category as keyof typeof TOPPING_CATEGORIES];
     return config?.icon || "🍕";
   };
 
@@ -809,7 +830,7 @@ function FixedToppingSelection({
             </span>
           </h4>
 
-          {/* 🆕 COMPACT GRID - MORE TOPPINGS VISIBLE */}
+          {/* COMPACT GRID - MORE TOPPINGS VISIBLE */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {categoryToppings.map((topping) => (
               <div

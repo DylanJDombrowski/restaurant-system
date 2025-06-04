@@ -1,4 +1,4 @@
-// src/app/api/menu/pizza/calculate-price/route.ts - FIXED VERSION
+// src/app/api/menu/pizza/calculate-price/route.ts - FIXED VERSION 2
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { ApiResponse } from "@/lib/types";
@@ -56,6 +56,7 @@ export async function POST(
     }
 
     console.log("🍕 Calculating pizza price:", {
+      restaurant_id,
       size_code,
       crust_type,
       toppings: toppings.length,
@@ -74,33 +75,56 @@ export async function POST(
     if (crustError || !crustData) {
       console.error("Crust pricing error:", crustError);
       return NextResponse.json(
-        { error: `No pricing found for ${size_code} ${crust_type}` },
+        {
+          error: `No pricing found for ${size_code} ${crust_type}. Error: ${crustError?.message}`,
+        },
         { status: 400 }
       );
     }
 
-    // Step 2: Calculate topping costs manually (since DB function might not exist)
+    console.log("✅ Crust data found:", crustData);
+
+    // Step 2: Calculate topping costs
     let toppingCost = 0;
     const toppingBreakdown: PriceBreakdownItem[] = [];
     const warnings: string[] = [];
 
     if (toppings.length > 0) {
+      console.log(
+        "🔍 Loading customizations for toppings:",
+        toppings.map((t) => t.customization_id)
+      );
+
       const toppingIds = toppings.map((t) => t.customization_id);
 
+      // FIXED: More flexible query for customizations with array handling
       const { data: customizationsData, error: customizationsError } =
         await supabaseServer
           .from("customizations")
           .select("*")
           .eq("restaurant_id", restaurant_id)
           .in("id", toppingIds)
-          .like("category", "topping_%")
+          .contains("applies_to", ["pizza"]) // Handle PostgreSQL array properly
           .eq("is_available", true);
 
       if (customizationsError) {
-        console.error("Error loading toppings:", customizationsError);
+        console.error("❌ Error loading customizations:", customizationsError);
         return NextResponse.json(
-          { error: "Failed to load topping data" },
+          {
+            error: `Failed to load topping data: ${customizationsError.message}`,
+            details: customizationsError,
+          },
           { status: 500 }
+        );
+      }
+
+      if (!customizationsData || customizationsData.length === 0) {
+        console.warn("⚠️ No customizations found for IDs:", toppingIds);
+        warnings.push("Some toppings could not be found");
+      } else {
+        console.log(
+          "✅ Found customizations:",
+          customizationsData.map((c) => ({ id: c.id, name: c.name }))
         );
       }
 
@@ -129,9 +153,10 @@ export async function POST(
           });
 
           console.log(
-            `🧮 ${customization.name} (${selection.amount}): $${calculatedPrice}`
+            `✅ ${customization.name} (${selection.amount}): $${calculatedPrice}`
           );
         } else {
+          console.warn(`❌ Topping not found: ${selection.customization_id}`);
           warnings.push(`Topping not found: ${selection.customization_id}`);
         }
       });
@@ -166,7 +191,7 @@ export async function POST(
       basePrice,
       crustUpcharge,
       toppingCost,
-      substitutionCredit: 0, // TODO: Implement for specialty pizzas
+      substitutionCredit: 0,
       finalPrice,
       breakdown,
       sizeCode: size_code,
@@ -177,7 +202,8 @@ export async function POST(
 
     console.log("✅ Pizza price calculated successfully:", {
       finalPrice: response.finalPrice,
-      breakdown: response.breakdown.length,
+      breakdownItems: response.breakdown.length,
+      warnings: response.warnings?.length || 0,
     });
 
     return NextResponse.json({
@@ -185,28 +211,30 @@ export async function POST(
       message: "Price calculated successfully",
     });
   } catch (error) {
-    console.error("Error calculating pizza price:", error);
+    console.error("💥 Error calculating pizza price:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
 }
 
 // ===================================================================
-// PRICING CALCULATION FUNCTIONS
+// PRICING CALCULATION FUNCTIONS - ENHANCED ERROR HANDLING
 // ===================================================================
 
 interface Customization {
   id: string;
   name: string;
-  base_price: number;
+  category?: string;
+  base_price?: number;
   pricing_rules?: {
     size_multipliers?: Record<string, number>;
-    tier_multipliers?: Record<string, Record<string, number>>;
+    tier_multipliers?: Record<string, number>;
   };
-  category: string;
-  is_available: boolean;
 }
 
 function calculateToppingPrice(
@@ -214,42 +242,56 @@ function calculateToppingPrice(
   sizeCode: string,
   amount: string
 ): number {
-  const basePrice = customization.base_price;
-  const pricingRules = customization.pricing_rules || {};
+  try {
+    const basePrice = customization.base_price || 0;
+    const pricingRules = customization.pricing_rules || {};
 
-  // Size multipliers for different pizza sizes
-  const sizeMultipliers: Record<string, number> = {
-    "10in": 0.865, // Small
-    "12in": 1.0, // Medium (base)
-    "14in": 1.135, // Large
-    "16in": 1.351, // X-Large
-  };
+    // Size multipliers for different pizza sizes
+    const defaultSizeMultipliers: Record<string, number> = {
+      "10in": 0.865, // Small
+      "12in": 1.0, // Medium (base)
+      "14in": 1.135, // Large
+      "16in": 1.351, // X-Large
+    };
 
-  // Amount multipliers based on topping category
-  const tierMultipliers: Record<string, Record<string, number>> = {
-    topping_normal: { light: 0.5, normal: 1.0, extra: 2.0, xxtra: 3.0 },
-    topping_premium: { light: 0.5, normal: 1.0, extra: 1.5, xxtra: 2.0 },
-    topping_beef: { light: 0.5, normal: 1.0, extra: 1.5, xxtra: 2.0 },
-    topping_cheese: { light: 0.5, normal: 1.0, extra: 2.0, xxtra: 3.0 },
-    topping_sauce: { light: 0.5, normal: 1.0, extra: 2.0, xxtra: 3.0 },
-  };
+    // Amount multipliers based on topping category
+    const defaultTierMultipliers: Record<string, number> = {
+      light: 0.5,
+      normal: 1.0,
+      extra: 2.0,
+      xxtra: 3.0,
+    };
 
-  // Get multipliers from database rules or use defaults
-  const sizeMultiplier =
-    pricingRules.size_multipliers?.[sizeCode] ||
-    sizeMultipliers[sizeCode] ||
-    1.0;
+    // Get size multiplier from database rules or use defaults
+    let sizeMultiplier = 1.0;
+    if (
+      pricingRules.size_multipliers &&
+      pricingRules.size_multipliers[sizeCode]
+    ) {
+      sizeMultiplier = Number(pricingRules.size_multipliers[sizeCode]);
+    } else {
+      sizeMultiplier = defaultSizeMultipliers[sizeCode] || 1.0;
+    }
 
-  const tierMultiplier =
-    pricingRules.tier_multipliers?.[amount] ||
-    tierMultipliers[customization.category]?.[amount] ||
-    1.0;
+    // Get tier multiplier from database rules or use defaults
+    let tierMultiplier = 1.0;
+    if (
+      pricingRules.tier_multipliers &&
+      pricingRules.tier_multipliers[amount]
+    ) {
+      tierMultiplier = Number(pricingRules.tier_multipliers[amount]);
+    } else {
+      tierMultiplier = defaultTierMultipliers[amount] || 1.0;
+    }
 
-  const calculatedPrice =
-    Number(basePrice) * Number(sizeMultiplier) * Number(tierMultiplier);
+    const calculatedPrice = basePrice * sizeMultiplier * tierMultiplier;
 
-  // Round to 2 decimal places
-  return Math.round(calculatedPrice * 100) / 100;
+    // Round to 2 decimal places and ensure it's not negative
+    return Math.max(0, Math.round(calculatedPrice * 100) / 100);
+  } catch (error) {
+    console.error("Error calculating topping price:", error, customization);
+    return 0;
+  }
 }
 
 function calculatePrepTime(toppingCount: number): number {
