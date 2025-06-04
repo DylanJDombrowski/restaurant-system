@@ -377,12 +377,7 @@ export default function EnhancedPizzaCustomizer({
   // ==========================================
 
   const calculatePrice = useCallback(async () => {
-    if (
-      !selectedCrust ||
-      !pizzaMenuData ||
-      (activeToppings.length === 0 &&
-        toppings.filter((t) => t.amount !== "none").length === 0)
-    ) {
+    if (!selectedCrust || !pizzaMenuData) {
       return;
     }
 
@@ -390,13 +385,29 @@ export default function EnhancedPizzaCustomizer({
       setIsCalculatingPrice(true);
       setPricingError(null);
 
+      const activeToppings = toppings
+        .filter((t) => t.amount !== "none")
+        .map((t) => ({
+          customization_id: t.id,
+          amount: t.amount,
+          is_template_default: t.isSpecialtyDefault, // NEW: Pass template info
+        }));
+
+      // 🎯 FIND TEMPLATE ID for this menu item
+      const template = pizzaMenuData.pizza_templates.find(
+        (t) => t.menu_item_id === item.menuItemId
+      );
+      const templateId = template?.id;
+
       console.log("💰 Calculating price for:", {
         size: selectedCrust.sizeCode,
         crust: selectedCrust.crustType,
         toppings: activeToppings.length,
+        templateId,
+        templateName: template?.name,
       });
 
-      // Call the FIXED pricing API
+      // Call the ENHANCED pricing API with template support
       const response = await fetch("/api/menu/pizza/calculate-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -405,6 +416,7 @@ export default function EnhancedPizzaCustomizer({
           size_code: selectedCrust.sizeCode,
           crust_type: selectedCrust.crustType,
           toppings: activeToppings,
+          template_id: templateId, // 🎯 NEW: Pass template ID
         }),
       });
 
@@ -418,17 +430,22 @@ export default function EnhancedPizzaCustomizer({
         throw new Error(result.error);
       }
 
-      console.log("✅ Price calculated:", result.data);
+      console.log("✅ Specialty pizza price calculated:", result.data);
       setCurrentPricing(result.data);
 
       // Update topping calculated prices from breakdown
       if (result.data.breakdown) {
+        interface BreakdownItem {
+          name: string;
+          type: string;
+          price: number;
+        }
         setToppings((prevToppings) =>
           prevToppings.map((topping) => {
             const breakdownItem = result.data.breakdown.find(
-              (item: { name: string; type: string; price: number }) =>
+              (item: BreakdownItem) =>
                 item.name.toLowerCase().includes(topping.name.toLowerCase()) &&
-                item.type === "topping"
+                (item.type === "topping" || item.type === "template_default")
             );
             return {
               ...topping,
@@ -445,7 +462,14 @@ export default function EnhancedPizzaCustomizer({
     } finally {
       setIsCalculatingPrice(false);
     }
-  }, [selectedCrust, activeToppings, pizzaMenuData, restaurantId, toppings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    selectedCrust,
+    activeToppings,
+    pizzaMenuData,
+    restaurantId,
+    item.menuItemId,
+  ]);
 
   // 🆕 FIXED: Use memoized pricing request key to prevent loops
   useEffect(() => {
@@ -825,19 +849,17 @@ function FixedToppingSelection({
           <h4 className="text-sm font-medium text-gray-800 mb-3 flex items-center">
             <span className="mr-2 text-lg">{getCategoryIcon(category)}</span>
             {getCategoryDisplayName(category)}
-            <span className="ml-2 text-xs text-gray-500">
-              ({categoryToppings.length} options)
-            </span>
           </h4>
 
-          {/* COMPACT GRID - MORE TOPPINGS VISIBLE */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {categoryToppings.map((topping) => (
+            {categoryToppings.map((topping: ToppingState) => (
               <div
                 key={topping.id}
                 className={`border rounded-lg p-3 transition-all ${
                   topping.isActive
-                    ? "border-blue-500 bg-blue-50 shadow-sm"
+                    ? topping.isSpecialtyDefault
+                      ? "border-purple-500 bg-purple-50 shadow-sm" // Special styling for template defaults
+                      : "border-blue-500 bg-blue-50 shadow-sm"
                     : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                 }`}
               >
@@ -848,7 +870,7 @@ function FixedToppingSelection({
                   <div className="flex items-center gap-1 ml-2">
                     {topping.isSpecialtyDefault && (
                       <span className="text-xs bg-purple-100 text-purple-800 px-1 py-0.5 rounded font-medium">
-                        DEFAULT
+                        INCLUDED
                       </span>
                     )}
                     {topping.tier !== "normal" && (
@@ -873,9 +895,17 @@ function FixedToppingSelection({
                   <option value="xxtra">XXtra</option>
                 </select>
 
-                {topping.calculatedPrice > 0 && (
-                  <div className="text-sm font-semibold text-green-600 mt-2">
-                    +${topping.calculatedPrice.toFixed(2)}
+                {/* Show pricing with template logic */}
+                {topping.isActive && (
+                  <div className="text-sm font-semibold mt-2">
+                    {topping.isSpecialtyDefault &&
+                    topping.calculatedPrice === 0 ? (
+                      <span className="text-purple-600">INCLUDED</span>
+                    ) : topping.calculatedPrice > 0 ? (
+                      <span className="text-green-600">
+                        +${topping.calculatedPrice.toFixed(2)}
+                      </span>
+                    ) : null}
                   </div>
                 )}
               </div>

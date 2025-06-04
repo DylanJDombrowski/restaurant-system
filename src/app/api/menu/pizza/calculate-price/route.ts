@@ -1,4 +1,6 @@
-// src/app/api/menu/pizza/calculate-price/route.ts - FIXED VERSION 2
+// Enhanced Pricing API with Specialty Pizza Template Logic
+// src/app/api/menu/pizza/calculate-price/route.ts - SPECIALTY PIZZA VERSION
+
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { ApiResponse } from "@/lib/types";
@@ -6,6 +8,7 @@ import { ApiResponse } from "@/lib/types";
 interface ToppingSelection {
   customization_id: string;
   amount: "light" | "normal" | "extra" | "xxtra";
+  is_template_default?: boolean; // NEW: Track if this is a template default
 }
 
 interface PriceCalculationRequest {
@@ -13,13 +16,13 @@ interface PriceCalculationRequest {
   size_code: string;
   crust_type: string;
   toppings?: ToppingSelection[];
-  template_id?: string;
+  template_id?: string; // NEW: For specialty pizza templates
 }
 
 interface PriceBreakdownItem {
   name: string;
   price: number;
-  type: "base" | "crust" | "topping" | "modifier";
+  type: "base" | "crust" | "topping" | "template_default" | "modifier";
   amount?: string;
   category?: string;
   is_default?: boolean;
@@ -29,13 +32,18 @@ interface PriceCalculationResponse {
   basePrice: number;
   crustUpcharge: number;
   toppingCost: number;
-  substitutionCredit: number;
+  substitutionCredit: number; // NEW: Credit for removed template toppings
   finalPrice: number;
   breakdown: PriceBreakdownItem[];
   sizeCode: string;
   crustType: string;
   estimatedPrepTime: number;
   warnings?: string[];
+  template_info?: {
+    name: string;
+    default_toppings: string[];
+    credit_applied: number;
+  };
 }
 
 export async function POST(
@@ -43,7 +51,13 @@ export async function POST(
 ): Promise<NextResponse<ApiResponse<PriceCalculationResponse>>> {
   try {
     const body: PriceCalculationRequest = await request.json();
-    const { restaurant_id, size_code, crust_type, toppings = [] } = body;
+    const {
+      restaurant_id,
+      size_code,
+      crust_type,
+      toppings = [],
+      template_id,
+    } = body;
 
     if (!restaurant_id || !size_code || !crust_type) {
       return NextResponse.json(
@@ -55,11 +69,12 @@ export async function POST(
       );
     }
 
-    console.log("🍕 Calculating pizza price:", {
+    console.log("🍕 Calculating specialty pizza price:", {
       restaurant_id,
       size_code,
       crust_type,
       toppings: toppings.length,
+      template_id,
     });
 
     // Step 1: Get base crust pricing
@@ -75,36 +90,69 @@ export async function POST(
     if (crustError || !crustData) {
       console.error("Crust pricing error:", crustError);
       return NextResponse.json(
-        {
-          error: `No pricing found for ${size_code} ${crust_type}. Error: ${crustError?.message}`,
-        },
+        { error: `No pricing found for ${size_code} ${crust_type}` },
         { status: 400 }
       );
     }
 
-    console.log("✅ Crust data found:", crustData);
+    // Step 2: Load template data if this is a specialty pizza
+    let templateData = null;
+    const templateDefaults: Set<string> = new Set();
 
-    // Step 2: Calculate topping costs
+    if (template_id) {
+      const { data: template, error: templateError } = await supabaseServer
+        .from("pizza_templates")
+        .select(
+          `
+          *,
+          template_toppings:pizza_template_toppings(
+            customization_id,
+            default_amount,
+            substitution_tier
+          )
+        `
+        )
+        .eq("id", template_id)
+        .single();
+
+      if (!templateError && template) {
+        templateData = template;
+        // Build set of template default customization IDs
+        interface TemplateTopping {
+          customization_id: string;
+          default_amount: string;
+          substitution_tier: number;
+        }
+        (template.template_toppings as TemplateTopping[] | undefined)?.forEach(
+          (tt) => {
+            templateDefaults.add(tt.customization_id);
+          }
+        );
+        console.log(
+          "🎯 Template loaded:",
+          template.name,
+          "with defaults:",
+          Array.from(templateDefaults)
+        );
+      }
+    }
+
+    // Step 3: Load customizations for pricing calculations
     let toppingCost = 0;
+    const substitutionCredit = 0;
     const toppingBreakdown: PriceBreakdownItem[] = [];
     const warnings: string[] = [];
 
     if (toppings.length > 0) {
-      console.log(
-        "🔍 Loading customizations for toppings:",
-        toppings.map((t) => t.customization_id)
-      );
-
       const toppingIds = toppings.map((t) => t.customization_id);
 
-      // FIXED: More flexible query for customizations with array handling
       const { data: customizationsData, error: customizationsError } =
         await supabaseServer
           .from("customizations")
           .select("*")
           .eq("restaurant_id", restaurant_id)
           .in("id", toppingIds)
-          .contains("applies_to", ["pizza"]) // Handle PostgreSQL array properly
+          .contains("applies_to", ["pizza"])
           .eq("is_available", true);
 
       if (customizationsError) {
@@ -112,60 +160,69 @@ export async function POST(
         return NextResponse.json(
           {
             error: `Failed to load topping data: ${customizationsError.message}`,
-            details: customizationsError,
           },
           { status: 500 }
         );
       }
 
-      if (!customizationsData || customizationsData.length === 0) {
-        console.warn("⚠️ No customizations found for IDs:", toppingIds);
-        warnings.push("Some toppings could not be found");
-      } else {
-        console.log(
-          "✅ Found customizations:",
-          customizationsData.map((c) => ({ id: c.id, name: c.name }))
-        );
-      }
-
       const customizations = customizationsData || [];
 
-      // Calculate prices using the mathematical formulas
+      // Step 4: Calculate pricing with template logic
       toppings.forEach((selection) => {
         const customization = customizations.find(
           (c) => c.id === selection.customization_id
         );
         if (customization) {
-          const calculatedPrice = calculateToppingPrice(
-            customization,
-            size_code,
-            selection.amount
+          const isTemplateDefault = templateDefaults.has(
+            selection.customization_id
           );
+
+          // 🎯 KEY LOGIC: Template defaults are FREE (included in base price)
+          let calculatedPrice = 0;
+          let itemType: PriceBreakdownItem["type"] = "topping";
+
+          if (isTemplateDefault) {
+            // This is a template default topping - NO CHARGE
+            calculatedPrice = 0;
+            itemType = "template_default";
+            console.log(`🆓 Template default: ${customization.name} = FREE`);
+          } else {
+            // This is an additional topping - FULL CHARGE
+            calculatedPrice = calculateToppingPrice(
+              customization,
+              size_code,
+              selection.amount
+            );
+            itemType = "topping";
+            console.log(
+              `💰 Additional topping: ${customization.name} = $${calculatedPrice}`
+            );
+          }
 
           toppingCost += calculatedPrice;
           toppingBreakdown.push({
             name: customization.name,
             price: calculatedPrice,
-            type: "topping",
+            type: itemType,
             amount: selection.amount,
             category: customization.category,
-            is_default: false,
+            is_default: isTemplateDefault,
           });
-
-          console.log(
-            `✅ ${customization.name} (${selection.amount}): $${calculatedPrice}`
-          );
         } else {
-          console.warn(`❌ Topping not found: ${selection.customization_id}`);
           warnings.push(`Topping not found: ${selection.customization_id}`);
         }
       });
     }
 
-    // Step 3: Calculate final pricing
+    // Step 5: Calculate substitution credits (for future implementation)
+    // TODO: Handle when template toppings are removed/substituted
+    // This would give credit for removed defaults up to template.credit_limit_percentage
+
+    // Step 6: Calculate final pricing
     const basePrice = crustData.base_price;
     const crustUpcharge = crustData.upcharge;
-    const finalPrice = basePrice + crustUpcharge + toppingCost;
+    const finalPrice =
+      basePrice + crustUpcharge + toppingCost - substitutionCredit;
 
     const breakdown: PriceBreakdownItem[] = [
       {
@@ -185,56 +242,68 @@ export async function POST(
       });
     }
 
+    // Add template info if specialty pizza
+    if (templateData) {
+      breakdown.push({
+        name: `${templateData.name} - Includes Default Toppings`,
+        price: 0,
+        type: "template_default",
+      });
+    }
+
     breakdown.push(...toppingBreakdown);
 
     const response: PriceCalculationResponse = {
       basePrice,
       crustUpcharge,
       toppingCost,
-      substitutionCredit: 0,
+      substitutionCredit,
       finalPrice,
       breakdown,
       sizeCode: size_code,
       crustType: crust_type,
       estimatedPrepTime: calculatePrepTime(toppings.length),
       warnings: warnings.length > 0 ? warnings : undefined,
+      template_info: templateData
+        ? {
+            name: templateData.name,
+            default_toppings: Array.from(templateDefaults),
+            credit_applied: substitutionCredit,
+          }
+        : undefined,
     };
 
-    console.log("✅ Pizza price calculated successfully:", {
+    console.log("✅ Specialty pizza price calculated:", {
       finalPrice: response.finalPrice,
-      breakdownItems: response.breakdown.length,
-      warnings: response.warnings?.length || 0,
+      isSpecialty: !!templateData,
+      templateDefaults: Array.from(templateDefaults).length,
+      toppingCost,
+      substitutionCredit,
     });
 
     return NextResponse.json({
       data: response,
-      message: "Price calculated successfully",
+      message: "Specialty pizza price calculated successfully",
     });
   } catch (error) {
-    console.error("💥 Error calculating pizza price:", error);
+    console.error("💥 Error calculating specialty pizza price:", error);
     return NextResponse.json(
-      {
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
 }
 
-// ===================================================================
-// PRICING CALCULATION FUNCTIONS - ENHANCED ERROR HANDLING
-// ===================================================================
-
+// Existing helper functions remain the same
 interface Customization {
   id: string;
   name: string;
-  category?: string;
-  base_price?: number;
+  base_price: number;
   pricing_rules?: {
     size_multipliers?: Record<string, number>;
     tier_multipliers?: Record<string, number>;
   };
+  category?: string;
 }
 
 function calculateToppingPrice(
@@ -246,23 +315,20 @@ function calculateToppingPrice(
     const basePrice = customization.base_price || 0;
     const pricingRules = customization.pricing_rules || {};
 
-    // Size multipliers for different pizza sizes
     const defaultSizeMultipliers: Record<string, number> = {
-      "10in": 0.865, // Small
-      "12in": 1.0, // Medium (base)
-      "14in": 1.135, // Large
-      "16in": 1.351, // X-Large
+      "10in": 0.865,
+      "12in": 1.0,
+      "14in": 1.135,
+      "16in": 1.351,
     };
 
-    // Amount multipliers based on topping category
     const defaultTierMultipliers: Record<string, number> = {
-      light: 0.5,
+      light: 1.0,
       normal: 1.0,
       extra: 2.0,
       xxtra: 3.0,
     };
 
-    // Get size multiplier from database rules or use defaults
     let sizeMultiplier = 1.0;
     if (
       pricingRules.size_multipliers &&
@@ -273,7 +339,6 @@ function calculateToppingPrice(
       sizeMultiplier = defaultSizeMultipliers[sizeCode] || 1.0;
     }
 
-    // Get tier multiplier from database rules or use defaults
     let tierMultiplier = 1.0;
     if (
       pricingRules.tier_multipliers &&
@@ -285,8 +350,6 @@ function calculateToppingPrice(
     }
 
     const calculatedPrice = basePrice * sizeMultiplier * tierMultiplier;
-
-    // Round to 2 decimal places and ensure it's not negative
     return Math.max(0, Math.round(calculatedPrice * 100) / 100);
   } catch (error) {
     console.error("Error calculating topping price:", error, customization);
@@ -295,7 +358,7 @@ function calculateToppingPrice(
 }
 
 function calculatePrepTime(toppingCount: number): number {
-  const basePrepTime = 15; // Base 15 minutes for pizza
-  const complexityBonus = Math.min(toppingCount * 1.5, 10); // Up to 10 extra minutes
+  const basePrepTime = 15;
+  const complexityBonus = Math.min(toppingCount * 1.5, 10);
   return Math.round(basePrepTime + complexityBonus);
 }
