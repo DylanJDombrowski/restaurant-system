@@ -1,45 +1,88 @@
-When adding a pizza to order in PizzaCustomizer.
-    select a size, the thin crust option should be selected by default so that the toppings are immediately shown. 
-    the price is not being updated based on added prices etc as of now, at least on the frontend .
-    the stuffed crust option should not display. we have a stuffed pizza (which is a deepdish. completely different pizza than thin or double dough),
-        the stuffed pizza will be under the stuffed category.
-    toppings should take up less space, see more, and active toppings by default (our special pizzas) will show those active toppings at the top of the toppings list.
-    
-what schemas can i show you for better context. i think we desperately need documentation for the current state of things and where we are and where we are not'
+📋 Enterprise Cleanup Priority List
+Immediate Actions (This Week)
 
--- 1. Exact table structures
-SHOW CREATE TABLE crust_pricing;
-SHOW CREATE TABLE pizza_templates;  
-SHOW CREATE TABLE pizza_template_toppings;
+Type System Reorganization
 
--- 2. Current variant/crust relationships
-SELECT id, menu_item_id, name, crust_type, size_code, price 
-FROM menu_item_variants 
-WHERE menu_item_id IN (SELECT id FROM menu_items WHERE item_type = 'pizza')
-LIMIT 10;
-
--- 3. How stuffed pizzas are separated
-SELECT * FROM menu_categories;
-SELECT name, category_id FROM menu_items WHERE name ILIKE '%stuffed%';
+Split your monolithic types/index.ts into feature-based modules
+Remove legacy type mixing (old topping system + new customization)
+Standardize naming conventions
 
 
+Database Schema Cleanup
+
+Add multi-chain support tables
+Implement proper audit logging
+Add performance indexes
+Set up Row Level Security policies
 
 
-"failed to load topping data" now.
+API Middleware Implementation
 
-/api/menu/pizza/calculate-price:1 
+Tenant resolution middleware
+Rate limiting for enterprise scale
+Audit logging for compliance
+Proper error handling
 
-            
 
-            
 
-           Failed to load resource: the server responded with a status of 500 ()Understand this error
+Medium Priority (Next 2 Weeks)
 
-hook.js:608 Error calculating price: Error: Failed to load topping data
+Feature-Based Architecture
 
-    at page-ffb6893af020c63b.js:1:20539
+Reorganize components into feature modules
+Create shared component library
+Implement proper dependency injection
 
-i selected bbq chicken pizza which has bbq and chicken on it, neither of which show up in editor as selected. price looks to be constantly updating, which you can see visually alternating between calculating and the same price.
 
-different pricing error it seems
+Multi-Tenant Support
 
+Tenant context provider
+Subdomain routing
+Brand customization system
+
+
+
+Longer Term (Next Month)
+
+Performance & Monitoring
+
+Add application monitoring
+Implement caching strategies
+Database query optimization
+Load testing framework
+
+
+
+🚀 Quick Wins You Can Implement Today
+1. Clean Up Your Current Types
+Start by creating the new type structure I showed above. You can gradually migrate your existing code to use the new types.
+2. Add Basic Tenant Context
+Add a simple tenant provider that wraps your app:
+typescript// src/app/layout.tsx
+import { TenantProvider } from '@/lib/tenant/tenant-context'
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <TenantProvider initialTenant={/* resolved from middleware */}>
+          {children}
+        </TenantProvider>
+      </body>
+    </html>
+  )
+}
+3. Implement the Enterprise Homepage
+The homepage I created above would be a great starting point. You can customize it with your actual branding and add real demo links.
+4. Add Basic API Middleware
+Start with the tenant middleware - this will make all your APIs multi-tenant ready immediately.
+🎯 Key Enterprise Considerations
+
+Scalability: Your current pizza customizer is good, but think about handling 100+ restaurants with different menu configurations
+Security: Multi-tenant data isolation is critical
+Performance: Database indexes and query optimization for large datasets
+Compliance: Audit trails, GDPR compliance, PCI DSS for payments
+Monitoring: Application performance monitoring, error tracking
+Documentation: API docs, deployment guides, troubleshooting
+
+The type system reorganization should be your first priority - it will make everything else cleaner and more maintainable. Then focus on the database schema improvements since they'll support all the enterprise features you'll build later.
