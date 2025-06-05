@@ -1,4 +1,4 @@
-// src/components/features/orders/EnhancedPizzaCustomizer.tsx
+// src/components/features/orders/PizzaCustomizer.tsx - FIXED API INTEGRATION
 "use client";
 import type {
   ConfiguredCartItem,
@@ -9,10 +9,6 @@ import type {
   CrustPricing,
 } from "@/lib/types";
 import { useCallback, useEffect, useState, useMemo } from "react";
-
-// ===================================================================
-// INTERFACES
-// ===================================================================
 
 interface ToppingState {
   id: string;
@@ -44,10 +40,7 @@ interface EnhancedPizzaCustomizerProps {
   restaurantId: string;
 }
 
-// ===================================================================
-// CATEGORIZATION CONFIG - FIXED
-// ===================================================================
-
+// CATEGORIZATION CONFIG
 const TOPPING_CATEGORIES = {
   meats: {
     displayName: "Meats & Proteins",
@@ -98,12 +91,14 @@ const TOPPING_CATEGORIES = {
   },
 };
 
-// ===================================================================
 // HELPER FUNCTIONS
-// ===================================================================
-
 const getSizeDisplayName = (sizeCode: string): string => {
   const sizeNames: Record<string, string> = {
+    small: 'Small 10"',
+    medium: 'Medium 12"',
+    large: 'Large 14"',
+    xlarge: 'X-Large 16"',
+    // Handle both formats during transition
     "10in": 'Small 10"',
     "12in": 'Medium 12"',
     "14in": 'Large 14"',
@@ -126,7 +121,6 @@ const getDisplayCategory = (
 ): { category: string; icon: string } => {
   const name = customization.name.toLowerCase();
 
-  // Check each category for keyword matches
   for (const [categoryKey, categoryConfig] of Object.entries(
     TOPPING_CATEGORIES
   )) {
@@ -138,11 +132,7 @@ const getDisplayCategory = (
     }
   }
 
-  // Default fallback
-  return {
-    category: "other",
-    icon: "🍕",
-  };
+  return { category: "other", icon: "🍕" };
 };
 
 const getTierFromCategory = (
@@ -153,10 +143,6 @@ const getTierFromCategory = (
   return "normal";
 };
 
-// ===================================================================
-// MAIN COMPONENT
-// ===================================================================
-
 export default function EnhancedPizzaCustomizer({
   item,
   onComplete,
@@ -164,10 +150,7 @@ export default function EnhancedPizzaCustomizer({
   isOpen,
   restaurantId,
 }: EnhancedPizzaCustomizerProps) {
-  // ==========================================
   // STATE MANAGEMENT
-  // ==========================================
-
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pizzaMenuData, setPizzaMenuData] = useState<PizzaMenuResponse | null>(
@@ -188,11 +171,7 @@ export default function EnhancedPizzaCustomizer({
   const [isCalculatingPrice, setIsCalculatingPrice] = useState(false);
   const [pricingError, setPricingError] = useState<string | null>(null);
 
-  // ==========================================
-  // MEMOIZED VALUES TO PREVENT LOOPS
-  // ==========================================
-
-  // Create stable reference for active toppings
+  // MEMOIZED VALUES
   const activeToppings = useMemo(
     () =>
       toppings
@@ -204,7 +183,6 @@ export default function EnhancedPizzaCustomizer({
     [toppings]
   );
 
-  // Create pricing request key for memoization
   const pricingRequestKey = useMemo(() => {
     if (!selectedCrust) return null;
     return JSON.stringify({
@@ -214,10 +192,7 @@ export default function EnhancedPizzaCustomizer({
     });
   }, [selectedCrust, activeToppings]);
 
-  // ==========================================
   // LOAD PIZZA MENU DATA
-  // ==========================================
-
   const loadPizzaMenuData = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -242,22 +217,31 @@ export default function EnhancedPizzaCustomizer({
 
       // Auto-select default size and crust
       const availableSizes = result.data.available_sizes || [];
-      const defaultSize = availableSizes.includes("12in")
-        ? "12in"
+      const defaultSize = availableSizes.includes("medium")
+        ? "medium"
         : availableSizes[0];
 
       if (defaultSize) {
         setSelectedSize(defaultSize);
 
-        // Auto-select thin crust (excluding stuffed)
+        // Auto-select thin crust
         const thinCrustForSize = result.data.crust_pricing.find(
-          (cp: CrustPricing) =>
-            cp.size_code === defaultSize && cp.crust_type === "thin"
+          (cp: CrustPricing) => {
+            // Handle both size formats
+            const matchesSize =
+              cp.size_code === defaultSize ||
+              (defaultSize === "medium" && cp.size_code === "12in") ||
+              (defaultSize === "small" && cp.size_code === "10in") ||
+              (defaultSize === "large" && cp.size_code === "14in") ||
+              (defaultSize === "xlarge" && cp.size_code === "16in");
+
+            return matchesSize && cp.crust_type === "thin";
+          }
         );
 
         if (thinCrustForSize) {
           const defaultCrust: CrustOption = {
-            sizeCode: thinCrustForSize.size_code,
+            sizeCode: defaultSize, // Use the UI size format
             crustType: thinCrustForSize.crust_type,
             basePrice: thinCrustForSize.base_price,
             upcharge: thinCrustForSize.upcharge,
@@ -267,7 +251,6 @@ export default function EnhancedPizzaCustomizer({
         }
       }
 
-      // Initialize toppings with template support
       initializeToppingsWithTemplates(result.data);
     } catch (error) {
       console.error("Error loading pizza menu:", error);
@@ -280,20 +263,16 @@ export default function EnhancedPizzaCustomizer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurantId]);
 
-  // ==========================================
   // INITIALIZE TOPPINGS WITH TEMPLATE SUPPORT
-  // ==========================================
-
   const initializeToppingsWithTemplates = useCallback(
     (menuData: PizzaMenuResponse) => {
       const toppingConfigs: ToppingState[] = [];
 
-      // Get pizza toppings from customizations
       const pizzaToppings = menuData.pizza_customizations.filter(
         (c: Customization) => c.category.startsWith("topping_")
       );
 
-      // 🆕 FIXED: Find pizza template by menu item ID
+      // 🔧 FIXED: Find pizza template by menu item ID
       const template = menuData.pizza_templates.find(
         (t) => t.menu_item_id === item.menuItemId
       );
@@ -307,12 +286,10 @@ export default function EnhancedPizzaCustomizer({
       });
 
       pizzaToppings.forEach((customization: Customization) => {
-        // Check if this topping is in the template
         const templateTopping = templateToppings.find(
           (tt) => tt.customization_id === customization.id
         );
 
-        // Check if this topping was already selected in the cart item (for editing)
         const existingTopping = item.selectedToppings?.find(
           (t) => t.id === customization.id
         );
@@ -320,7 +297,6 @@ export default function EnhancedPizzaCustomizer({
         const { category: displayCategory, icon } =
           getDisplayCategory(customization);
 
-        // 🆕 FIXED: Determine default amount properly
         let defaultAmount: ToppingAmount = "none";
         let isSpecialtyDefault = false;
 
@@ -343,7 +319,7 @@ export default function EnhancedPizzaCustomizer({
           displayCategory,
           amount: defaultAmount,
           basePrice: customization.base_price,
-          calculatedPrice: 0, // Will be calculated by API
+          calculatedPrice: 0,
           isActive,
           isSpecialtyDefault,
           tier: getTierFromCategory(customization.category),
@@ -351,7 +327,6 @@ export default function EnhancedPizzaCustomizer({
         });
       });
 
-      // 🆕 SORT: Specialty defaults first, then active, then alphabetical
       toppingConfigs.sort((a, b) => {
         if (a.isSpecialtyDefault && !b.isSpecialtyDefault) return -1;
         if (!a.isSpecialtyDefault && b.isSpecialtyDefault) return 1;
@@ -372,10 +347,7 @@ export default function EnhancedPizzaCustomizer({
     [item.menuItemId, item.selectedToppings]
   );
 
-  // ==========================================
-  // REAL-TIME PRICING CALCULATION - FIXED LOOP
-  // ==========================================
-
+  // 🔧 FIXED: REAL-TIME PRICING CALCULATION
   const calculatePrice = useCallback(async () => {
     if (!selectedCrust || !pizzaMenuData) {
       return;
@@ -390,33 +362,25 @@ export default function EnhancedPizzaCustomizer({
         .map((t) => ({
           customization_id: t.id,
           amount: t.amount,
-          is_template_default: t.isSpecialtyDefault, // NEW: Pass template info
         }));
 
-      // 🎯 FIND TEMPLATE ID for this menu item
-      const template = pizzaMenuData.pizza_templates.find(
-        (t) => t.menu_item_id === item.menuItemId
-      );
-      const templateId = template?.id;
-
       console.log("💰 Calculating price for:", {
+        menuItemId: item.menuItemId, // ✅ Using menuItemId from cart item
         size: selectedCrust.sizeCode,
         crust: selectedCrust.crustType,
         toppings: activeToppings.length,
-        templateId,
-        templateName: template?.name,
       });
 
-      // Call the ENHANCED pricing API with template support
+      // 🔧 FIXED: Call enhanced pricing API with correct parameters
       const response = await fetch("/api/menu/pizza/calculate-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           restaurant_id: restaurantId,
-          size_code: selectedCrust.sizeCode,
+          menu_item_id: item.menuItemId, // ✅ FIXED: Use menuItemId
+          size_code: selectedCrust.sizeCode, // ✅ FIXED: Use UI size format
           crust_type: selectedCrust.crustType,
           toppings: activeToppings,
-          template_id: templateId, // 🎯 NEW: Pass template ID
         }),
       });
 
@@ -430,22 +394,19 @@ export default function EnhancedPizzaCustomizer({
         throw new Error(result.error);
       }
 
-      console.log("✅ Specialty pizza price calculated:", result.data);
+      console.log("✅ Pizza price calculated:", result.data);
       setCurrentPricing(result.data);
 
-      // Update topping calculated prices from breakdown
+      // Update topping prices from breakdown
       if (result.data.breakdown) {
-        interface BreakdownItem {
-          name: string;
-          type: string;
-          price: number;
-        }
         setToppings((prevToppings) =>
           prevToppings.map((topping) => {
             const breakdownItem = result.data.breakdown.find(
-              (item: BreakdownItem) =>
+              (item: { name: string; type: string; price: number }) =>
                 item.name.toLowerCase().includes(topping.name.toLowerCase()) &&
-                (item.type === "topping" || item.type === "template_default")
+                (item.type === "topping" ||
+                  item.type === "template_default" ||
+                  item.type === "template_extra")
             );
             return {
               ...topping,
@@ -462,21 +423,14 @@ export default function EnhancedPizzaCustomizer({
     } finally {
       setIsCalculatingPrice(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    selectedCrust,
-    activeToppings,
-    pizzaMenuData,
-    restaurantId,
-    item.menuItemId,
-  ]);
+  }, [selectedCrust, toppings, pizzaMenuData, restaurantId, item.menuItemId]);
 
-  // 🆕 FIXED: Use memoized pricing request key to prevent loops
+  // Use debounced pricing calculation
   useEffect(() => {
     if (pricingRequestKey) {
       const timeoutId = setTimeout(() => {
         calculatePrice();
-      }, 300); // Debounce for 300ms
+      }, 300);
 
       return () => clearTimeout(timeoutId);
     }
@@ -489,23 +443,28 @@ export default function EnhancedPizzaCustomizer({
     }
   }, [isOpen, loadPizzaMenuData]);
 
-  // ==========================================
   // EVENT HANDLERS
-  // ==========================================
-
   const handleSizeSelect = (sizeCode: string) => {
     console.log("📏 Size selected:", sizeCode);
     setSelectedSize(sizeCode);
 
-    // Auto-select thin crust for new size (excluding stuffed)
+    // Auto-select thin crust for new size
     const thinCrustForSize = pizzaMenuData?.crust_pricing.find(
-      (cp: CrustPricing) =>
-        cp.size_code === sizeCode && cp.crust_type === "thin"
+      (cp: CrustPricing) => {
+        const matchesSize =
+          cp.size_code === sizeCode ||
+          (sizeCode === "medium" && cp.size_code === "12in") ||
+          (sizeCode === "small" && cp.size_code === "10in") ||
+          (sizeCode === "large" && cp.size_code === "14in") ||
+          (sizeCode === "xlarge" && cp.size_code === "16in");
+
+        return matchesSize && cp.crust_type === "thin";
+      }
     );
 
     if (thinCrustForSize) {
       const newCrust: CrustOption = {
-        sizeCode: thinCrustForSize.size_code,
+        sizeCode: sizeCode, // Use UI format
         crustType: thinCrustForSize.crust_type,
         basePrice: thinCrustForSize.base_price,
         upcharge: thinCrustForSize.upcharge,
@@ -544,7 +503,7 @@ export default function EnhancedPizzaCustomizer({
       variantName: `${getSizeDisplayName(selectedCrust.sizeCode)} ${
         selectedCrust.displayName
       }`,
-      basePrice: selectedCrust.basePrice,
+      basePrice: currentPricing.basePrice,
       selectedToppings: toppings
         .filter((t) => t.amount !== "none")
         .map((t) => ({
@@ -567,21 +526,25 @@ export default function EnhancedPizzaCustomizer({
     onComplete(updatedItem);
   };
 
-  // ==========================================
   // RENDER CONDITIONS
-  // ==========================================
-
   if (!isOpen) return null;
 
+  // Get available crusts for selected size
   const availableCrusts =
     selectedSize && pizzaMenuData
       ? pizzaMenuData.crust_pricing
-          .filter(
-            (cp: CrustPricing) =>
-              cp.size_code === selectedSize && cp.crust_type !== "stuffed" // Exclude stuffed crust
-          )
+          .filter((cp: CrustPricing) => {
+            const matchesSize =
+              cp.size_code === selectedSize ||
+              (selectedSize === "medium" && cp.size_code === "12in") ||
+              (selectedSize === "small" && cp.size_code === "10in") ||
+              (selectedSize === "large" && cp.size_code === "14in") ||
+              (selectedSize === "xlarge" && cp.size_code === "16in");
+
+            return matchesSize && cp.crust_type !== "stuffed";
+          })
           .map((cp: CrustPricing) => ({
-            sizeCode: cp.size_code,
+            sizeCode: selectedSize, // Use UI format consistently
             crustType: cp.crust_type,
             basePrice: cp.base_price,
             upcharge: cp.upcharge,
@@ -593,10 +556,7 @@ export default function EnhancedPizzaCustomizer({
     currentPricing?.finalPrice || selectedCrust?.basePrice || 0;
   const canSave = selectedCrust && !isCalculatingPrice;
 
-  // ==========================================
   // RENDER
-  // ==========================================
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">
@@ -622,7 +582,7 @@ export default function EnhancedPizzaCustomizer({
               {isCalculatingPrice ? (
                 <span className="text-gray-400">Calculating...</span>
               ) : (
-                `${finalPrice.toFixed(2)}`
+                `$${finalPrice.toFixed(2)}`
               )}
             </div>
             <div className="text-sm text-gray-500">Current total</div>
@@ -658,9 +618,9 @@ export default function EnhancedPizzaCustomizer({
                 />
               )}
 
-              {/* FIXED TOPPING SELECTION with proper categorization */}
+              {/* Topping Selection */}
               {selectedCrust && toppings.length > 0 && (
-                <FixedToppingSelection
+                <ToppingSelection
                   toppings={toppings}
                   onToppingChange={handleToppingChange}
                   selectedSize={selectedCrust.sizeCode}
@@ -708,10 +668,7 @@ export default function EnhancedPizzaCustomizer({
   );
 }
 
-// ==========================================
 // SUB-COMPONENTS
-// ==========================================
-
 function SizeSelection({
   availableSizes,
   selectedSize,
@@ -725,7 +682,16 @@ function SizeSelection({
 }) {
   const getMinPriceForSize = (sizeCode: string): number => {
     const sizePrices = crustPricing
-      .filter((cp) => cp.size_code === sizeCode && cp.crust_type !== "stuffed")
+      .filter((cp) => {
+        const matchesSize =
+          cp.size_code === sizeCode ||
+          (sizeCode === "medium" && cp.size_code === "12in") ||
+          (sizeCode === "small" && cp.size_code === "10in") ||
+          (sizeCode === "large" && cp.size_code === "14in") ||
+          (sizeCode === "xlarge" && cp.size_code === "16in");
+
+        return matchesSize && cp.crust_type !== "stuffed";
+      })
       .map((cp) => cp.base_price);
     return sizePrices.length > 0 ? Math.min(...sizePrices) : 0;
   };
@@ -802,8 +768,7 @@ function CrustSelection({
   );
 }
 
-// FIXED TOPPING SELECTION with proper categorization
-function FixedToppingSelection({
+function ToppingSelection({
   toppings,
   onToppingChange,
   selectedSize,
@@ -812,7 +777,6 @@ function FixedToppingSelection({
   onToppingChange: (toppingId: string, amount: ToppingAmount) => void;
   selectedSize: string;
 }) {
-  // Group toppings by display category (fixed categorization)
   const groupedToppings = toppings.reduce((acc, topping) => {
     const category = topping.displayCategory;
     if (!acc[category]) acc[category] = [];
@@ -858,7 +822,7 @@ function FixedToppingSelection({
                 className={`border rounded-lg p-3 transition-all ${
                   topping.isActive
                     ? topping.isSpecialtyDefault
-                      ? "border-purple-500 bg-purple-50 shadow-sm" // Special styling for template defaults
+                      ? "border-purple-500 bg-purple-50 shadow-sm"
                       : "border-blue-500 bg-blue-50 shadow-sm"
                     : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                 }`}

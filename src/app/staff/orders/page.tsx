@@ -1,4 +1,4 @@
-// src/app/staff/orders/page.tsx - REORGANIZED with Tab Layout
+// src/app/staff/orders/page.tsx - FIXED: Removed customizations prop
 "use client";
 import CustomerDetails from "@/components/features/orders/CustomerDetails";
 import MenuNavigator from "@/components/features/orders/MenuNavigator";
@@ -9,7 +9,6 @@ import OrderSuccessMessage from "@/components/features/orders/OrderSuccessMessag
 import {
   ConfiguredCartItem,
   Customer,
-  Customization,
   MenuItemWithVariants,
   OrderWithItems,
   Restaurant,
@@ -20,16 +19,16 @@ type ActiveTab = "new-order" | "pickup";
 
 export default function StaffOrdersPage() {
   // ==========================================
-  // UI STATE - NEW TAB SYSTEM
+  // UI STATE - TAB SYSTEM
   // ==========================================
   const [activeTab, setActiveTab] = useState<ActiveTab>("new-order");
 
   // ==========================================
-  // CORE DATA STATES
+  // CORE DATA STATES - FIXED: Removed customizations
   // ==========================================
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItemWithVariants[]>([]);
-  const [customizations, setCustomizations] = useState<Customization[]>([]);
+  // ❌ REMOVED: const [customizations, setCustomizations] = useState<Customization[]>([]);
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [cartItems, setCartItems] = useState<ConfiguredCartItem[]>([]);
 
@@ -88,7 +87,7 @@ export default function StaffOrdersPage() {
   };
 
   // ==========================================
-  // DATA LOADING
+  // DATA LOADING - SIMPLIFIED
   // ==========================================
 
   const loadOrders = useCallback(async (restaurantId: string) => {
@@ -110,20 +109,23 @@ export default function StaffOrdersPage() {
       setError(null);
       setLoading(true);
 
+      // Load restaurant data
       const restaurantResponse = await fetch("/api/restaurants");
       if (!restaurantResponse.ok)
         throw new Error("Failed to load restaurant data");
       const restaurantData = await restaurantResponse.json();
       setRestaurant(restaurantData.data);
 
+      // Load menu data (customizations not needed - components load their own)
       const menuResponse = await fetch(
         `/api/menu/full?restaurant_id=${restaurantData.data.id}`
       );
       if (!menuResponse.ok) throw new Error("Failed to load menu data");
       const menuData = await menuResponse.json();
       setMenuItems(menuData.data.menu_items || []);
-      setCustomizations(menuData.data.customizations || []);
+      // ❌ REMOVED: setCustomizations(menuData.data.customizations || []);
 
+      // Load orders
       await loadOrders(restaurantData.data.id);
     } catch (error) {
       console.error("Error loading initial data:", error);
@@ -358,7 +360,7 @@ export default function StaffOrdersPage() {
       if (!response.ok)
         throw new Error(responseData.error || "Failed to create order");
 
-      // Show success message instead of alert
+      // Show success message
       setCompletedOrder({
         orderNumber: responseData.data.order_number,
         total: orderSummary.total,
@@ -384,7 +386,6 @@ export default function StaffOrdersPage() {
 
   // Handle order success completion
   const handleOrderSuccessComplete = () => {
-    // Reset everything for next order
     setCartItems([]);
     setCustomerInfo({ name: "", phone: "", email: "" });
     setOrderType("pickup");
@@ -434,7 +435,7 @@ export default function StaffOrdersPage() {
   return (
     <>
       <div className="min-h-screen bg-gray-50">
-        {/* 🆕 NEW: TAB-BASED HEADER */}
+        {/* TAB-BASED HEADER */}
         <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
           <div className="px-4 md:px-6 py-4">
             <div className="flex justify-between items-center mb-4">
@@ -459,7 +460,7 @@ export default function StaffOrdersPage() {
                 </div>
               </div>
 
-              {/* Complete Order Button - Only show on New Order tab */}
+              {/* Complete Order Button */}
               {activeTab === "new-order" && cartItems.length > 0 && (
                 <button
                   onClick={handleCompleteOrder}
@@ -468,7 +469,7 @@ export default function StaffOrdersPage() {
                 >
                   {isSubmitting
                     ? "Processing..."
-                    : `Complete Order - ${orderSummary.total.toFixed(2)}`}
+                    : `Complete Order - $${orderSummary.total.toFixed(2)}`}
                 </button>
               )}
             </div>
@@ -510,22 +511,22 @@ export default function StaffOrdersPage() {
           </div>
         </div>
 
-        {/* 🆕 NEW: TAB CONTENT */}
+        {/* TAB CONTENT */}
         <div className="p-4 md:p-6">
           {activeTab === "new-order" ? (
             // NEW ORDER TAB - Clean Two-Column Layout
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
-              {/* LEFT: Menu Navigation - Takes more space */}
+              {/* LEFT: Menu Navigation */}
               <div className="lg:col-span-2">
+                {/* ✅ FIXED: Removed customizations prop */}
                 <MenuNavigator
                   menuItems={menuItems}
-                  customizations={customizations}
                   onAddToCart={handleAddToCart}
                   restaurantId={restaurant?.id || ""}
                 />
               </div>
 
-              {/* RIGHT: Cart & Customer Info - Compact */}
+              {/* RIGHT: Cart & Customer Info */}
               <div className="space-y-4">
                 {/* Customer Details */}
                 <CustomerDetails
@@ -586,7 +587,7 @@ export default function StaffOrdersPage() {
               </div>
             </div>
           ) : (
-            // PICKUP TAB - Full Width for Better Order Management
+            // PICKUP TAB
             <div className="max-w-6xl mx-auto">
               <PickupOrdersView
                 orders={readyOrders}
@@ -613,7 +614,7 @@ export default function StaffOrdersPage() {
 }
 
 // ==========================================
-// 🆕 ENHANCED PICKUP ORDERS VIEW
+// PICKUP ORDERS VIEW
 // ==========================================
 
 interface PickupOrdersViewProps {

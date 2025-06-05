@@ -1,145 +1,21 @@
-// src/lib/types/index.ts - UPDATED WITH PROPER EXPORTS
+// src/lib/types/index.ts - CLEAN VERSION WITHOUT DUPLICATES
 
 // ===================================================================
 // CORE PRIMITIVES & ENUMS
 // ===================================================================
-export type {
-  ID,
-  Timestamp,
-  OrderStatus,
-  StaffRole,
-  OrderType,
-  ToppingAmount,
-} from "./core";
+export * from "./core";
 
 // ===================================================================
-// RESTAURANT MANAGEMENT
+// BUSINESS DOMAIN TYPES
 // ===================================================================
-export type { Restaurant, Staff } from "./restaurant";
+export * from "./restaurant";
+export * from "./menu";
+export * from "./customization";
+export * from "./pizza";
+export * from "./cart";
+export * from "./orders";
 
 // ===================================================================
-// MENU SYSTEM
+// API & SYSTEM TYPES
 // ===================================================================
-export type {
-  MenuCategory,
-  MenuItem,
-  MenuItemVariant,
-  MenuItemWithCategory,
-  MenuItemWithVariants,
-} from "./menu";
-
-// ===================================================================
-// NEW UNIFIED CUSTOMIZATION SYSTEM
-// ===================================================================
-export type {
-  CustomizationCategory,
-  PricingType,
-  CustomizationPricingRules,
-  Customization,
-} from "./customization";
-
-// ===================================================================
-// PIZZA-SPECIFIC TYPES
-// ===================================================================
-export type {
-  CrustPricing,
-  PizzaTemplate,
-  PizzaTemplateTopping,
-  PizzaMenuItem,
-  PizzaMenuResponse,
-  PizzaPriceCalculationRequest,
-  PizzaPriceBreakdownItem,
-  PizzaPriceCalculationResponse,
-} from "./pizza";
-
-// ===================================================================
-// CART & ORDER ITEMS
-// ===================================================================
-export type {
-  ConfiguredTopping,
-  ConfiguredModifier,
-  ConfiguredCartItem,
-} from "./cart";
-
-// ===================================================================
-// ORDER MANAGEMENT
-// ===================================================================
-export type {
-  Customer,
-  CustomerAddress,
-  Order,
-  OrderItem,
-  OrderItemWithDetails,
-  OrderWithItems,
-  CustomerWithStats,
-} from "./orders";
-
-// ===================================================================
-// API TYPES
-// ===================================================================
-export type { ApiResponse, ApiMetadata, PaginatedResponse } from "./api";
-
-// ===================================================================
-// CUSTOMIZER COMPONENT TYPES
-// ===================================================================
-export type {
-  BaseCustomizerProps,
-  PizzaCustomizerProps,
-  ChickenCustomizerProps,
-} from "./customizers";
-
-// ===================================================================
-// FORM DATA TYPES
-// ===================================================================
-export type {
-  InsertOrder,
-  InsertOrderItem,
-  InsertCustomer,
-  InsertCustomerAddress,
-  InsertStaff,
-  InsertMenuItem,
-  InsertMenuItemVariant,
-  InsertCustomization,
-} from "./forms";
-
-// ===================================================================
-// CONSTANTS
-// ===================================================================
-export {
-  DEFAULT_PREP_TIME,
-  DEFAULT_TAX_RATE,
-  DEFAULT_DELIVERY_FEE,
-  PIZZA_SIZE_MULTIPLIERS,
-  PIZZA_TIER_MULTIPLIERS,
-} from "./constants";
-
-// ===================================================================
-// UTILITY FUNCTIONS
-// ===================================================================
-export {
-  type SafeString,
-  safeString,
-  safeOptionalString,
-  isPizzaItem,
-  isCustomizableItem,
-  shouldShowCustomizer,
-  needsVariantSelection,
-  getSizeDisplayName,
-  getCrustDisplayName,
-} from "./utils";
-
-// ===================================================================
-// LEGACY TYPES - TEMPORARY DURING MIGRATION
-// ===================================================================
-// 🚨 These will be removed once all components use Customization
-export type { Topping, Modifier } from "./legacy";
-
-export {
-  customizationToLegacyTopping,
-  customizationToLegacyModifier,
-} from "./legacy";
-
-// ===================================================================
-// RE-EXPORT DATABASE TYPES (if needed for compatibility)
-// ===================================================================
-export type { Database } from "./database.types";
+export * from "./api";
