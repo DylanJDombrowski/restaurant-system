@@ -6,7 +6,6 @@ import {
   MenuItemVariant,
   ApiResponse,
   Customization,
-  CustomizationCategory,
 } from "@/lib/types";
 
 // Database response types
@@ -190,41 +189,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
-
-// 🚀 MIGRATION HELPER: Convert customizations by item type
-export function getCustomizationsForItemType(
-  customizations: Customization[],
-  itemType: string
-): {
-  toppings: Customization[];
-  modifiers: Customization[];
-  all: Customization[];
-} {
-  const filtered = customizations.filter((c) =>
-    c.applies_to.includes(itemType)
-  );
-
-  return {
-    toppings: filtered.filter((c) => c.category.startsWith("topping_")),
-    modifiers: filtered.filter((c) => !c.category.startsWith("topping_")),
-    all: filtered,
-  };
-}
-
-// 🚀 MIGRATION HELPER: Group customizations by category
-export function groupCustomizationsByCategory(
-  customizations: Customization[]
-): Record<CustomizationCategory, Customization[]> {
-  const groups: Partial<Record<CustomizationCategory, Customization[]>> = {};
-
-  customizations.forEach((c) => {
-    const category = c.category as CustomizationCategory;
-    if (!groups[category]) {
-      groups[category] = [];
-    }
-    groups[category]!.push(c);
-  });
-
-  return groups as Record<CustomizationCategory, Customization[]>;
 }
