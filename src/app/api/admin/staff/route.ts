@@ -1,8 +1,8 @@
 // src/app/api/admin/staff/route.ts - Staff Management API
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { ApiResponse, Staff, InsertStaff } from "@/lib/types";
-
+import { ApiResponse, Staff } from "@/lib/types";
+import { InsertStaff } from "@/lib/types/forms";
 /**
  * Staff Management API Endpoints
  *
