@@ -3,9 +3,10 @@ import {
   ConfiguredCartItem,
   ConfiguredTopping,
   ConfiguredModifier,
-  InsertOrderItem,
   OrderItemWithDetails,
 } from "@/lib/types";
+
+import { InsertOrderItem } from "@/lib/types/forms";
 
 interface SerializedTopping {
   id: string;
