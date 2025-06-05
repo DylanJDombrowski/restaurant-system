@@ -1,4 +1,4 @@
-// src/components/features/orders/OrderCart.tsx
+// src/components/features/orders/OrderCart.tsx - FIXED STATE PRESERVATION
 "use client";
 import {
   ConfiguredCartItem,
@@ -13,13 +13,6 @@ import AppetizerCustomizer from "./AppetizerCustomizer";
 import PizzaCustomizer from "./PizzaCustomizer";
 import SandwichCustomizer from "./SandwichCustomizer";
 import ChickenCustomizer from "./ChickenCustomizer";
-
-/**
- * 🔄 RENAMED: OrderCart (formerly EnhancedCartSystem)
- *
- * SIMPLIFIED: Customer details and order type moved to main page
- * FOCUSED: This component now only handles cart items and customization
- */
 
 interface OrderCartProps {
   items: ConfiguredCartItem[];
@@ -43,11 +36,7 @@ export default function OrderCart({
   orderSummary,
   onCompleteOrder,
 }: OrderCartProps) {
-  // ==========================================
   // STATE MANAGEMENT - SIMPLIFIED
-  // ==========================================
-
-  // Pizza customizer states
   const [customizingItem, setCustomizingItem] =
     useState<ConfiguredCartItem | null>(null);
   const [showCustomizer, setShowCustomizer] = useState(false);
@@ -89,10 +78,7 @@ export default function OrderCart({
     return { totalItems, uniqueItems, totalPrice };
   }, [items]);
 
-  // ==========================================
   // CUSTOMIZER DATA LOADING
-  // ==========================================
-
   const loadCustomizerData = async () => {
     if (loadingCustomizerData) return;
 
@@ -120,10 +106,7 @@ export default function OrderCart({
     }
   };
 
-  // ==========================================
   // CART ITEM MANAGEMENT
-  // ==========================================
-
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
       onRemoveItem(itemId);
@@ -132,13 +115,20 @@ export default function OrderCart({
     }
   };
 
+  // 🔧 FIXED: Enhanced customization handler with proper state preservation
   const handleCustomizeItem = async (item: ConfiguredCartItem) => {
     if (!item || !item.id) {
       console.error("Invalid item passed to handleCustomizeItem:", item);
       return;
     }
 
-    console.log("🔧 Cart customize for item:", item.menuItemName);
+    console.log("🔧 Cart customize for item:", {
+      name: item.menuItemName,
+      menuItemId: item.menuItemId,
+      variantName: item.variantName,
+      toppingsCount: item.selectedToppings?.length || 0,
+      totalPrice: item.totalPrice,
+    });
 
     try {
       const menuResponse = await fetch(
@@ -166,13 +156,14 @@ export default function OrderCart({
         allows_custom_toppings: fullMenuItem.allows_custom_toppings,
       });
 
-      // 🎯 ROUTING LOGIC WITH CHICKEN SUPPORT
+      // ROUTING LOGIC WITH ENHANCED STATE PRESERVATION
 
-      // 🍗 NEW: Check if it's chicken (using category name)
+      // 🍗 Chicken customizer
       if (fullMenuItem.category?.name === "Chicken") {
-        console.log("🍗 Opening ENHANCED chicken customizer from cart");
+        console.log(
+          "🍗 Opening chicken customizer from cart with state preservation"
+        );
 
-        // Find the variant if this cart item has one
         let selectedVariant = null;
         if (item.variantId && fullMenuItem.variants) {
           selectedVariant =
@@ -183,15 +174,17 @@ export default function OrderCart({
 
         setCustomizingChickenItem(fullMenuItem);
         setCustomizingChickenVariant(selectedVariant);
-        setCustomizingItem(item); // Store existing cart item for state preservation
+        setCustomizingItem(item); // 🔧 Store full cart item state
         setShowChickenCustomizer(true);
         return;
       }
 
-      // Existing routing logic for other categories...
+      // 🍗 Appetizer customizer
       if (fullMenuItem.category?.name === "Appetizers") {
-        console.log("🍗 Opening appetizer customizer from cart");
-        // ... existing appetizer logic
+        console.log(
+          "🍗 Opening appetizer customizer from cart with state preservation"
+        );
+
         let selectedVariant = null;
         if (item.variantId && fullMenuItem.variants) {
           selectedVariant =
@@ -202,26 +195,39 @@ export default function OrderCart({
 
         setCustomizingAppetizerItem(fullMenuItem);
         setCustomizingAppetizerVariant(selectedVariant);
-        setCustomizingItem(item);
+        setCustomizingItem(item); // 🔧 Store full cart item state
         setShowAppetizerCustomizer(true);
         return;
       }
 
+      // 🥪 Sandwich customizer
       if (fullMenuItem.category?.name === "Sandwiches") {
-        console.log("🥪 Opening sandwich customizer from cart");
-        // ... existing sandwich logic
+        console.log(
+          "🥪 Opening sandwich customizer from cart with state preservation"
+        );
+
         setCustomizingSandwichItem(fullMenuItem);
-        setCustomizingItem(item);
+        setCustomizingItem(item); // 🔧 Store full cart item state
         setShowSandwichCustomizer(true);
         return;
       }
 
+      // 🍕 Pizza customizer
       if (
         fullMenuItem.item_type === "pizza" ||
         fullMenuItem.allows_custom_toppings
       ) {
-        console.log("🍕 Opening pizza customizer with existing state");
-        // ... existing pizza logic
+        console.log("🍕 Opening pizza customizer with preserved cart state:", {
+          itemId: item.id,
+          menuItemId: item.menuItemId,
+          variantName: item.variantName,
+          basePrice: item.basePrice,
+          totalPrice: item.totalPrice,
+          toppingsPreserved: item.selectedToppings?.length || 0,
+          specialInstructions: item.specialInstructions || "none",
+        });
+
+        // 🔧 FIXED: Ensure all cart item state is preserved
         const safeItem: ConfiguredCartItem = {
           ...item,
           selectedToppings: item.selectedToppings || [],
@@ -242,21 +248,23 @@ export default function OrderCart({
       alert("This item doesn't have customization options.");
     } catch (error) {
       console.error("Error determining customization type:", error);
-      // ... existing fallback logic
+      alert("Unable to customize this item. Please try again.");
     }
   };
 
-  // ==========================================
-  // CUSTOMIZATION HANDLERS
-  // ==========================================
+  // CUSTOMIZATION COMPLETION HANDLERS
 
   // Sandwich customization handlers
   const handleSandwichCustomizationComplete = (
     updatedItem: ConfiguredCartItem
   ) => {
-    console.log("🥪 Sandwich customization completed:", updatedItem);
+    console.log("🥪 Sandwich customization completed:", {
+      originalId: customizingItem?.id,
+      updatedPrice: updatedItem.totalPrice,
+      preservedQuantity: customizingItem?.quantity,
+    });
 
-    // Update the SAME cart item (preserve ID and other properties)
+    // 🔧 FIXED: Preserve original cart item properties
     const finalItem: ConfiguredCartItem = {
       ...updatedItem,
       id: customizingItem?.id || updatedItem.id, // Keep original cart item ID
@@ -266,7 +274,7 @@ export default function OrderCart({
     onUpdateItem(finalItem.id, finalItem);
     setShowSandwichCustomizer(false);
     setCustomizingSandwichItem(null);
-    setCustomizingItem(null); // Clear the stored state
+    setCustomizingItem(null);
   };
 
   const handleSandwichCustomizationCancel = () => {
@@ -277,10 +285,20 @@ export default function OrderCart({
 
   // Pizza customization handlers
   const handleCustomizationComplete = (updatedItem: ConfiguredCartItem) => {
-    console.log("🍕 Pizza customization completed:", updatedItem);
+    console.log("🍕 Pizza customization completed:", {
+      originalId: customizingItem?.id,
+      updatedPrice: updatedItem.totalPrice,
+      preservedQuantity: customizingItem?.quantity,
+      variantName: updatedItem.variantName,
+    });
 
-    // The pizza customizer already preserves the item ID correctly
-    onUpdateItem(updatedItem.id, updatedItem);
+    // 🔧 FIXED: The pizza customizer preserves cart item ID, but ensure quantity is maintained
+    const finalItem: ConfiguredCartItem = {
+      ...updatedItem,
+      quantity: customizingItem?.quantity || updatedItem.quantity,
+    };
+
+    onUpdateItem(finalItem.id, finalItem);
     setShowCustomizer(false);
     setCustomizingItem(null);
   };
@@ -294,8 +312,20 @@ export default function OrderCart({
   const handleAppetizerCustomizationComplete = (
     updatedItem: ConfiguredCartItem
   ) => {
-    console.log("🍗 Appetizer customization completed:", updatedItem);
-    onUpdateItem(updatedItem.id, updatedItem);
+    console.log("🍗 Appetizer customization completed:", {
+      originalId: customizingItem?.id,
+      updatedPrice: updatedItem.totalPrice,
+      preservedQuantity: customizingItem?.quantity,
+    });
+
+    // 🔧 FIXED: Preserve original cart item properties
+    const finalItem: ConfiguredCartItem = {
+      ...updatedItem,
+      id: customizingItem?.id || updatedItem.id,
+      quantity: customizingItem?.quantity || updatedItem.quantity,
+    };
+
+    onUpdateItem(finalItem.id, finalItem);
     setShowAppetizerCustomizer(false);
     setCustomizingAppetizerItem(null);
     setCustomizingAppetizerVariant(null);
@@ -305,13 +335,17 @@ export default function OrderCart({
   const handleChickenCustomizationComplete = (
     updatedItem: ConfiguredCartItem
   ) => {
-    console.log("🍗 Enhanced chicken customization completed:", updatedItem);
+    console.log("🍗 Chicken customization completed:", {
+      originalId: customizingItem?.id,
+      updatedPrice: updatedItem.totalPrice,
+      preservedQuantity: customizingItem?.quantity,
+    });
 
-    // Update the SAME cart item (preserve ID and other properties)
+    // 🔧 FIXED: Preserve original cart item properties
     const finalItem: ConfiguredCartItem = {
       ...updatedItem,
-      id: customizingItem?.id || updatedItem.id, // Keep original cart item ID
-      quantity: customizingItem?.quantity || updatedItem.quantity, // Keep original quantity if not changed
+      id: customizingItem?.id || updatedItem.id,
+      quantity: customizingItem?.quantity || updatedItem.quantity,
     };
 
     onUpdateItem(finalItem.id, finalItem);
@@ -335,10 +369,7 @@ export default function OrderCart({
     setCustomizingItem(null);
   };
 
-  // ==========================================
   // ORDER COMPLETION LOGIC
-  // ==========================================
-
   const canCompleteOrder = () => {
     return items.length > 0;
   };
@@ -348,10 +379,7 @@ export default function OrderCart({
     return `Complete Order - $${orderSummary.total.toFixed(2)}`;
   };
 
-  // ==========================================
   // RENDER
-  // ==========================================
-
   return (
     <>
       <div className="bg-white border border-gray-300 rounded-lg">
@@ -425,10 +453,10 @@ export default function OrderCart({
         )}
       </div>
 
-      {/* PIZZA MODAL CUSTOMIZER */}
+      {/* 🍕 PIZZA MODAL CUSTOMIZER - Enhanced state preservation */}
       {showCustomizer && customizingItem && (
         <PizzaCustomizer
-          item={customizingItem}
+          item={customizingItem} // 🔧 Pass complete cart item with all state
           onComplete={handleCustomizationComplete}
           onCancel={handleCustomizationCancel}
           isOpen={showCustomizer}
@@ -436,23 +464,23 @@ export default function OrderCart({
         />
       )}
 
-      {/* SANDWICH MODAL CUSTOMIZER */}
+      {/* 🥪 SANDWICH MODAL CUSTOMIZER */}
       {showSandwichCustomizer && customizingSandwichItem && (
         <SandwichCustomizer
           item={customizingSandwichItem}
-          existingCartItem={customizingItem || undefined}
+          existingCartItem={customizingItem || undefined} // 🔧 Pass existing cart state
           onComplete={handleSandwichCustomizationComplete}
           onCancel={handleSandwichCustomizationCancel}
           isOpen={showSandwichCustomizer}
         />
       )}
 
-      {/* APPETIZER MODAL CUSTOMIZER */}
+      {/* 🍗 APPETIZER MODAL CUSTOMIZER */}
       {showAppetizerCustomizer && customizingAppetizerItem && (
         <AppetizerCustomizer
           item={customizingAppetizerItem}
           selectedVariant={customizingAppetizerVariant || undefined}
-          existingCartItem={customizingItem || undefined}
+          existingCartItem={customizingItem || undefined} // 🔧 Pass existing cart state
           onComplete={handleAppetizerCustomizationComplete}
           onCancel={handleAppetizerCustomizationCancel}
           isOpen={showAppetizerCustomizer}
@@ -460,12 +488,12 @@ export default function OrderCart({
         />
       )}
 
-      {/* ENHANCED CHICKEN MODAL CUSTOMIZER */}
+      {/* 🍗 CHICKEN MODAL CUSTOMIZER */}
       {showChickenCustomizer && customizingChickenItem && (
         <ChickenCustomizer
           item={customizingChickenItem}
           selectedVariant={customizingChickenVariant || undefined}
-          existingCartItem={customizingItem || undefined} // Pass existing state for preservation
+          existingCartItem={customizingItem || undefined} // 🔧 Pass existing cart state
           onComplete={handleChickenCustomizationComplete}
           onCancel={handleChickenCustomizationCancel}
           isOpen={showChickenCustomizer}
@@ -476,10 +504,7 @@ export default function OrderCart({
   );
 }
 
-// ==========================================
-// HELPER COMPONENTS
-// ==========================================
-
+// HELPER COMPONENTS (same as before)
 function CartEmptyState() {
   return (
     <div className="p-8 text-center text-gray-500">

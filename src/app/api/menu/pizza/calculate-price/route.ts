@@ -1,4 +1,4 @@
-// src/app/api/menu/pizza/calculate-price/route.ts - CLEAN VERSION WITH PROPER TYPES
+// src/app/api/menu/pizza/calculate-price/route.ts - FIXED TO PREVENT LOOPS
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import {
@@ -23,6 +23,17 @@ interface TemplateTopping {
   substitution_tier: string;
 }
 
+// 🔧 CACHE to prevent duplicate calculations in rapid succession
+const calculationCache = new Map<
+  string,
+  {
+    result: PizzaPriceCalculationResponse;
+    timestamp: number;
+  }
+>();
+
+const CACHE_TTL = 5000; // 5 seconds cache TTL
+
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse<ApiResponse<PizzaPriceCalculationResponse>>> {
@@ -44,6 +55,28 @@ export async function POST(
         },
         { status: 400 }
       );
+    }
+
+    // 🔧 FIX: Create cache key and check for recent calculation
+    const cacheKey = JSON.stringify({
+      restaurant_id,
+      menu_item_id,
+      size_code,
+      crust_type,
+      toppings: toppings.sort((a, b) =>
+        a.customization_id.localeCompare(b.customization_id)
+      ),
+    });
+
+    const now = Date.now();
+    const cached = calculationCache.get(cacheKey);
+
+    if (cached && now - cached.timestamp < CACHE_TTL) {
+      console.log("🔄 Returning cached pricing result");
+      return NextResponse.json({
+        data: cached.result,
+        message: "Pizza price calculated successfully (cached)",
+      });
     }
 
     console.log("🍕 Pizza pricing calculation:", {
@@ -76,40 +109,64 @@ export async function POST(
     let basePrice = 0;
     let basePriceSource: "specialty" | "regular" = "regular";
 
-    // Step 2: Get base price
+    // Step 2: Get base price with better error handling
     if (isSpecialtyPizza) {
-      // Specialty pizza: Use variant price (includes all default toppings)
-      const { data: variantData, error: variantError } = await supabaseServer
-        .from("menu_item_variants")
-        .select("price, size_code, crust_type")
-        .eq("menu_item_id", menu_item_id)
-        .eq("size_code", size_code)
-        .eq("crust_type", "thin")
-        .single();
+      // 🔧 FIX: Try multiple size formats for specialty pizzas
+      const possibleSizeCodes = [
+        size_code,
+        SIZE_TO_INCH_MAPPING[size_code],
+      ].filter(Boolean);
 
-      if (variantError || !variantData) {
-        console.error("❌ Specialty pizza variant not found:", variantError);
+      let variantData = null;
 
-        // Debug helper
-        const { data: debugVariants } = await supabaseServer
+      for (const trySize of possibleSizeCodes) {
+        const { data, error } = await supabaseServer
           .from("menu_item_variants")
-          .select("size_code, crust_type, price")
-          .eq("menu_item_id", menu_item_id);
+          .select("price, size_code, crust_type")
+          .eq("menu_item_id", menu_item_id)
+          .eq("size_code", trySize)
+          .eq("crust_type", "thin")
+          .maybeSingle();
 
-        return NextResponse.json(
-          {
-            error: `No specialty pizza variant found for ${size_code} ${crust_type}`,
-            debug: {
-              requested: { size_code, crust_type },
-              available_variants: debugVariants,
-            },
-          },
-          { status: 400 }
-        );
+        if (!error && data) {
+          variantData = data;
+          break;
+        }
       }
 
-      basePrice = variantData.price;
-      basePriceSource = "specialty";
+      if (!variantData) {
+        console.error(
+          "❌ No specialty pizza variant found for any size format"
+        );
+
+        // 🔧 FIX: Fallback to crust pricing if no variant exists
+        console.log("🔄 Falling back to crust pricing for specialty pizza");
+        const crustSizeCode = SIZE_TO_INCH_MAPPING[size_code] || size_code;
+
+        const { data: crustData, error: crustError } = await supabaseServer
+          .from("crust_pricing")
+          .select("base_price")
+          .eq("restaurant_id", restaurant_id)
+          .eq("size_code", crustSizeCode)
+          .eq("crust_type", crust_type)
+          .eq("is_available", true)
+          .single();
+
+        if (crustError || !crustData) {
+          return NextResponse.json(
+            { error: `No pricing found for ${size_code} ${crust_type}` },
+            { status: 400 }
+          );
+        }
+
+        // Use crust pricing + specialty markup
+        basePrice = crustData.base_price + 6.0; // Default specialty markup
+        basePriceSource = "regular"; // Treat as regular for calculation purposes
+      } else {
+        basePrice = variantData.price;
+        basePriceSource = "specialty";
+      }
+
       console.log("✅ Specialty pizza base price:", basePrice);
     } else {
       // Regular pizza: Use crust pricing
@@ -170,7 +227,7 @@ export async function POST(
       console.log("📋 Template defaults loaded:", templateDefaults.size);
     }
 
-    // Step 5: Calculate topping costs
+    // Step 5: Calculate topping costs (only if toppings provided)
     let toppingCost = 0;
     const toppingBreakdown: PizzaPriceBreakdownItem[] = [];
     const warnings: string[] = [];
@@ -262,10 +319,6 @@ export async function POST(
           is_default: isTemplateDefault,
           calculation_note: calculationNote,
         });
-
-        console.log(
-          `💰 ${customization.name} (${selection.amount}): $${calculatedPrice} - ${calculationNote}`
-        );
       });
     }
 
@@ -323,6 +376,19 @@ export async function POST(
         : undefined,
     };
 
+    // 🔧 FIX: Cache the result to prevent duplicate calculations
+    calculationCache.set(cacheKey, {
+      result: response,
+      timestamp: now,
+    });
+
+    // Clean old cache entries
+    for (const [key, value] of calculationCache.entries()) {
+      if (now - value.timestamp > CACHE_TTL * 2) {
+        calculationCache.delete(key);
+      }
+    }
+
     console.log("✅ Pizza pricing calculation finished:", {
       finalPrice: response.finalPrice,
       basePriceSource,
@@ -371,18 +437,18 @@ function calculateToppingPrice(
       xlarge: 1.351, // 16"
     };
 
-    // Template context pricing: Template toppings use normal base price
+    // 🔧 FIX: Template context pricing - simplified logic
     let effectiveBasePrice = basePrice;
     let tierMultipliers: Record<string, number>;
 
     if (isTemplateContext && customization.category === "topping_premium") {
-      // Chicken in templates: Use normal base price ($1.85), not premium ($3.70)
+      // Template chicken: Use normal base price ($1.85), not premium ($3.70)
       effectiveBasePrice = 1.85;
       tierMultipliers = {
         light: 0.5,
         normal: 1.0,
-        extra: 1.0, // Extra chicken = $1.85
-        xxtra: 2.0, // XXtra chicken = $3.70
+        extra: 1.0, // Extra = $1.85 flat
+        xxtra: 2.0, // XXtra = $3.70 ($1.85 * 2)
       };
     } else {
       // Standard pricing
