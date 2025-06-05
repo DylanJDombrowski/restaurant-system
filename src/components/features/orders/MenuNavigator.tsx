@@ -1,11 +1,10 @@
-// src/components/features/orders/MenuNavigator.tsx - UPDATED
+// src/components/features/orders/MenuNavigator.tsx
 "use client";
 import {
   ConfiguredCartItem,
+  Customization,
   MenuCategory,
   MenuItemWithVariants,
-  Modifier,
-  Topping,
 } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
 import AppetizerCustomizer from "./AppetizerCustomizer";
@@ -25,8 +24,7 @@ import ChickenCustomizer from "./ChickenCustomizer";
 
 interface MenuNavigatorProps {
   menuItems: MenuItemWithVariants[];
-  toppings: Topping[];
-  modifiers: Modifier[];
+  customizations: Customization[];
   onAddToCart: (configuredItem: ConfiguredCartItem) => void;
   restaurantId: string;
 }

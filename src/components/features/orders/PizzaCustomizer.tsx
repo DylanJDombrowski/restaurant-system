@@ -1,11 +1,11 @@
-// src/components/features/orders/EnhancedPizzaCustomizer.tsx - FIXED V2
+// src/components/features/orders/EnhancedPizzaCustomizer.tsx
 "use client";
 import type {
   ConfiguredCartItem,
   ToppingAmount,
   PizzaMenuResponse,
   PizzaPriceCalculationResponse,
-  PizzaCustomization,
+  Customization,
   CrustPricing,
 } from "@/lib/types";
 import { useCallback, useEffect, useState, useMemo } from "react";
@@ -122,7 +122,7 @@ const getCrustDisplayName = (crustType: string): string => {
 };
 
 const getDisplayCategory = (
-  customization: PizzaCustomization
+  customization: Customization
 ): { category: string; icon: string } => {
   const name = customization.name.toLowerCase();
 
@@ -290,7 +290,7 @@ export default function EnhancedPizzaCustomizer({
 
       // Get pizza toppings from customizations
       const pizzaToppings = menuData.pizza_customizations.filter(
-        (c: PizzaCustomization) => c.category.startsWith("topping_")
+        (c: Customization) => c.category.startsWith("topping_")
       );
 
       // 🆕 FIXED: Find pizza template by menu item ID
@@ -306,7 +306,7 @@ export default function EnhancedPizzaCustomizer({
         defaultToppings: templateToppings.length,
       });
 
-      pizzaToppings.forEach((customization: PizzaCustomization) => {
+      pizzaToppings.forEach((customization: Customization) => {
         // Check if this topping is in the template
         const templateTopping = templateToppings.find(
           (tt) => tt.customization_id === customization.id

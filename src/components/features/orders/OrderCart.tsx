@@ -1,13 +1,12 @@
-// src/components/features/orders/OrderCart.tsx - FIXED VERSION
+// src/components/features/orders/OrderCart.tsx
 "use client";
 import {
   ConfiguredCartItem,
   ConfiguredModifier,
   ConfiguredTopping,
+  Customization,
   MenuItemVariant,
   MenuItemWithVariants,
-  Modifier,
-  Topping,
 } from "@/lib/types";
 import { useMemo, useState } from "react";
 import AppetizerCustomizer from "./AppetizerCustomizer";
@@ -52,8 +51,8 @@ export default function OrderCart({
   const [customizingItem, setCustomizingItem] =
     useState<ConfiguredCartItem | null>(null);
   const [showCustomizer, setShowCustomizer] = useState(false);
-  const [, setAvailableToppings] = useState<Topping[]>([]);
-  const [, setAvailableModifiers] = useState<Modifier[]>([]);
+  const [, setAvailableToppings] = useState<Customization[]>([]);
+  const [, setAvailableModifiers] = useState<Customization[]>([]);
   const [loadingCustomizerData, setLoadingCustomizerData] = useState(false);
 
   // Sandwich customizer states

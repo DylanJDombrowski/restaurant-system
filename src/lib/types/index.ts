@@ -1,3 +1,5 @@
+// src/lib/types/index.ts - UPDATED WITH PROPER EXPORTS
+
 // ===================================================================
 // CORE PRIMITIVES & ENUMS
 // ===================================================================
@@ -125,3 +127,19 @@ export {
   getSizeDisplayName,
   getCrustDisplayName,
 } from "./utils";
+
+// ===================================================================
+// LEGACY TYPES - TEMPORARY DURING MIGRATION
+// ===================================================================
+// 🚨 These will be removed once all components use Customization
+export type { Topping, Modifier } from "./legacy";
+
+export {
+  customizationToLegacyTopping,
+  customizationToLegacyModifier,
+} from "./legacy";
+
+// ===================================================================
+// RE-EXPORT DATABASE TYPES (if needed for compatibility)
+// ===================================================================
+export type { Database } from "./database.types";

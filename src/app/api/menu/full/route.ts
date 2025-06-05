@@ -1,11 +1,12 @@
+// src/app/api/menu/full/route.ts - UPDATED WITH NEW TYPES
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import {
   MenuItemWithVariants,
   MenuItemVariant,
-  Topping,
-  Modifier,
   ApiResponse,
+  Customization,
+  CustomizationCategory,
 } from "@/lib/types";
 
 // Database response types
@@ -34,26 +35,36 @@ interface MenuItemFromDB {
   variants?: MenuItemVariant[];
 }
 
-// NEW: Customization type for the unified table
-interface Customization {
+// NEW: Legacy compatibility types (temporary during migration)
+interface LegacyTopping {
   id: string;
   restaurant_id: string;
   name: string;
   category: string;
-  base_price: number;
-  price_type: "fixed" | "multiplied" | "tiered";
-  pricing_rules: Record<string, unknown>; // Fixed: was any
-  applies_to: string[];
   sort_order: number;
   is_available: boolean;
-  description?: string;
+  created_at: string;
+  is_premium: boolean;
+  base_price: number;
+}
+
+interface LegacyModifier {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  price_adjustment: number;
+  category: string;
+  is_available: boolean;
+  created_at: string;
+  selected: boolean;
 }
 
 interface FullMenuResponse {
   menu_items: MenuItemWithVariants[];
-  toppings: Topping[];
-  modifiers: Modifier[];
-  customizations: Customization[];
+  customizations: Customization[]; // NEW: Primary data format
+  // Legacy compatibility (will be removed)
+  toppings: LegacyTopping[];
+  modifiers: LegacyModifier[];
 }
 
 export async function GET(
@@ -126,8 +137,10 @@ export async function GET(
       ),
     }));
 
-    // Transform customizations into legacy format for backward compatibility
-    const toppings: Topping[] = (customizations || [])
+    const customizationData = (customizations as Customization[]) || [];
+
+    // 🔄 LEGACY COMPATIBILITY: Transform customizations into old format for backwards compatibility
+    const legacyToppings: LegacyTopping[] = customizationData
       .filter((c) => c.category.startsWith("topping_"))
       .map((c) => ({
         id: c.id,
@@ -136,13 +149,13 @@ export async function GET(
         category: c.category.replace("topping_", ""), // Convert topping_normal -> normal
         sort_order: c.sort_order,
         is_available: c.is_available,
-        created_at: new Date().toISOString(),
+        created_at: c.created_at,
         is_premium:
           c.category === "topping_premium" || c.category === "topping_beef",
         base_price: c.base_price,
       }));
 
-    const modifiers: Modifier[] = (customizations || [])
+    const legacyModifiers: LegacyModifier[] = customizationData
       .filter((c) => !c.category.startsWith("topping_"))
       .map((c) => ({
         id: c.id,
@@ -151,16 +164,23 @@ export async function GET(
         price_adjustment: c.base_price,
         category: c.category,
         is_available: c.is_available,
-        created_at: new Date().toISOString(),
-        selected: false, // Fixed: Added missing required property
+        created_at: c.created_at,
+        selected: false, // UI state
       }));
+
+    console.log("📊 Full menu loaded:", {
+      menu_items: transformedMenuItems.length,
+      customizations: customizationData.length,
+      legacy_toppings: legacyToppings.length,
+      legacy_modifiers: legacyModifiers.length,
+    });
 
     return NextResponse.json({
       data: {
         menu_items: transformedMenuItems,
-        toppings,
-        modifiers,
-        customizations: customizations as Customization[],
+        customizations: customizationData, // 🆕 NEW: Primary format
+        toppings: legacyToppings, // 🔄 LEGACY: For backwards compatibility
+        modifiers: legacyModifiers, // 🔄 LEGACY: For backwards compatibility
       },
     });
   } catch (error) {
@@ -170,4 +190,41 @@ export async function GET(
       { status: 500 }
     );
   }
+}
+
+// 🚀 MIGRATION HELPER: Convert customizations by item type
+export function getCustomizationsForItemType(
+  customizations: Customization[],
+  itemType: string
+): {
+  toppings: Customization[];
+  modifiers: Customization[];
+  all: Customization[];
+} {
+  const filtered = customizations.filter((c) =>
+    c.applies_to.includes(itemType)
+  );
+
+  return {
+    toppings: filtered.filter((c) => c.category.startsWith("topping_")),
+    modifiers: filtered.filter((c) => !c.category.startsWith("topping_")),
+    all: filtered,
+  };
+}
+
+// 🚀 MIGRATION HELPER: Group customizations by category
+export function groupCustomizationsByCategory(
+  customizations: Customization[]
+): Record<CustomizationCategory, Customization[]> {
+  const groups: Partial<Record<CustomizationCategory, Customization[]>> = {};
+
+  customizations.forEach((c) => {
+    const category = c.category as CustomizationCategory;
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category]!.push(c);
+  });
+
+  return groups as Record<CustomizationCategory, Customization[]>;
 }
