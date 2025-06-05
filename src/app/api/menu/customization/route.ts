@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { ApiResponse, CustomizationFromDB } from "@/lib/types";
+import { ApiResponse, Customization } from "@/lib/types";
 
 export async function GET(
   request: NextRequest
-): Promise<NextResponse<ApiResponse<CustomizationFromDB[]>>> {
+): Promise<NextResponse<ApiResponse<Customization[]>>> {
   try {
     const searchParams = request.nextUrl.searchParams;
     const restaurantId = searchParams.get("restaurant_id");
@@ -42,7 +42,7 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ data: (data as CustomizationFromDB[]) || [] });
+    return NextResponse.json({ data: (data as Customization[]) || [] });
   } catch (error) {
     console.error("Error fetching customizations:", error);
     return NextResponse.json(
