@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { InsertOrder, InsertCustomer, OrderWithItems, ApiResponse, MenuItem, MenuItemVariant, OrderType, OrderStatus } from "@/lib/types";
+import {
+  OrderWithItems,
+  ApiResponse,
+  MenuItem,
+  MenuItemVariant,
+  OrderType,
+  OrderStatus,
+} from "@/lib/types";
+import { InsertOrder, InsertCustomer } from "@/lib/types/forms";
 
 interface EnhancedOrderItem {
   menuItemId: string;
@@ -75,7 +83,9 @@ interface OrderRequestBody {
   orderItems: EnhancedOrderItem[];
 }
 
-export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<OrderWithItems[]>>> {
+export async function GET(
+  request: NextRequest
+): Promise<NextResponse<ApiResponse<OrderWithItems[]>>> {
   try {
     const { searchParams } = new URL(request.url);
     const restaurantId = searchParams.get("restaurant_id");
@@ -84,7 +94,10 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
 
     // Validate required parameters
     if (!restaurantId) {
-      return NextResponse.json({ error: "restaurant_id is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "restaurant_id is required" },
+        { status: 400 }
+      );
     }
 
     console.log("Fetching orders for restaurant:", restaurantId);
@@ -121,11 +134,16 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
 
     if (error) {
       console.error("Database error fetching orders:", error);
-      return NextResponse.json({ error: `Failed to fetch orders: ${error.message}` }, { status: 500 });
+      return NextResponse.json(
+        { error: `Failed to fetch orders: ${error.message}` },
+        { status: 500 }
+      );
     }
 
     // Transform the orders with proper typing
-    const transformedOrders: OrderWithItems[] = ((orders as OrderFromDB[]) || []).map((order) => ({
+    const transformedOrders: OrderWithItems[] = (
+      (orders as OrderFromDB[]) || []
+    ).map((order) => ({
       ...order,
       status: order.status as OrderStatus,
       order_type: order.order_type as OrderType | undefined,
@@ -189,7 +207,10 @@ export async function POST(request: NextRequest) {
 
     // Validate that we have the required data
     if (!orderData || !orderItems || !Array.isArray(orderItems)) {
-      return NextResponse.json({ error: "Missing orderData or orderItems" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing orderData or orderItems" },
+        { status: 400 }
+      );
     }
 
     console.log("Processing order with", orderItems.length, "items");
@@ -210,7 +231,11 @@ export async function POST(request: NextRequest) {
       customer_id: customerId || undefined,
     };
 
-    const { data: order, error: orderError } = await supabaseServer.from("orders").insert(orderInsert).select().single();
+    const { data: order, error: orderError } = await supabaseServer
+      .from("orders")
+      .insert(orderInsert)
+      .select()
+      .single();
 
     if (orderError) {
       console.error("Error creating order:", orderError);
@@ -232,7 +257,9 @@ export async function POST(request: NextRequest) {
       special_instructions: item.specialInstructions || null,
     }));
 
-    const { data: createdOrderItems, error: itemsError } = await supabaseServer.from("order_items").insert(orderItemsToInsert).select(`
+    const { data: createdOrderItems, error: itemsError } = await supabaseServer
+      .from("order_items")
+      .insert(orderItemsToInsert).select(`
         *,
         menu_items(id, name, description),
         menu_item_variants(id, name, price)
@@ -266,11 +293,16 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error creating order:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
-async function handleCustomerCreation(orderData: InsertOrder): Promise<string | null> {
+async function handleCustomerCreation(
+  orderData: InsertOrder
+): Promise<string | null> {
   try {
     console.log("🔍 Customer lookup for:", orderData.customer_phone);
 
@@ -282,7 +314,9 @@ async function handleCustomerCreation(orderData: InsertOrder): Promise<string | 
       .from("customers")
       .select("*")
       .eq("restaurant_id", orderData.restaurant_id)
-      .or(`phone.eq.${orderData.customer_phone},phone.eq.${cleanPhone},phone.eq.+1${cleanPhone}`)
+      .or(
+        `phone.eq.${orderData.customer_phone},phone.eq.${cleanPhone},phone.eq.+1${cleanPhone}`
+      )
       .maybeSingle();
 
     if (lookupError) {
@@ -308,7 +342,11 @@ async function handleCustomerCreation(orderData: InsertOrder): Promise<string | 
         total_spent: 0,
       };
 
-      const { data: customer, error: createError } = await supabaseServer.from("customers").insert(newCustomer).select().single();
+      const { data: customer, error: createError } = await supabaseServer
+        .from("customers")
+        .insert(newCustomer)
+        .select()
+        .single();
 
       if (createError) {
         console.error("❌ Error creating customer:", createError);
@@ -327,7 +365,10 @@ async function handleCustomerCreation(orderData: InsertOrder): Promise<string | 
   }
 }
 
-async function updateCustomerStats(customerId: string, orderTotal: number): Promise<void> {
+async function updateCustomerStats(
+  customerId: string,
+  orderTotal: number
+): Promise<void> {
   try {
     console.log("📊 Updating customer stats for:", customerId);
 
