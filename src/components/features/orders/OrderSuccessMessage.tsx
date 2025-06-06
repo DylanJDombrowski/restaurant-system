@@ -10,7 +10,13 @@ interface OrderSuccessMessageProps {
   onComplete: () => void; // Called when animation completes
 }
 
-export default function OrderSuccessMessage({ orderNumber, orderTotal, orderType, estimatedTime, onComplete }: OrderSuccessMessageProps) {
+export default function OrderSuccessMessage({
+  orderNumber,
+  orderTotal,
+  orderType,
+  estimatedTime,
+  onComplete,
+}: OrderSuccessMessageProps) {
   const [progress, setProgress] = useState(0);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -28,7 +34,7 @@ export default function OrderSuccessMessage({ orderNumber, orderTotal, orderType
     // Auto-complete after 4 seconds
     const completeTimer = setTimeout(() => {
       onComplete();
-    }, 4000);
+    }, 3000);
 
     return () => {
       clearTimeout(detailsTimer);
@@ -62,7 +68,10 @@ export default function OrderSuccessMessage({ orderNumber, orderTotal, orderType
         <div className="p-6 space-y-4">
           {/* Progress Bar */}
           <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
-            <div className="bg-green-500 h-full transition-all duration-2000 ease-out" style={{ width: `${progress}%` }}></div>
+            <div
+              className="bg-green-500 h-full transition-all duration-2000 ease-out"
+              style={{ width: `${progress}%` }}
+            ></div>
           </div>
 
           {/* Order Summary */}
@@ -70,7 +79,9 @@ export default function OrderSuccessMessage({ orderNumber, orderTotal, orderType
             <div className="space-y-3 animate-fade-in">
               <div className="flex justify-between items-center py-2 border-b border-gray-200">
                 <span className="font-medium text-gray-900">Order Total:</span>
-                <span className="text-xl font-bold text-green-600">${orderTotal.toFixed(2)}</span>
+                <span className="text-xl font-bold text-green-600">
+                  ${orderTotal.toFixed(2)}
+                </span>
               </div>
 
               <div className="flex justify-between items-center py-2 border-b border-gray-200">
@@ -81,14 +92,20 @@ export default function OrderSuccessMessage({ orderNumber, orderTotal, orderType
               </div>
 
               <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                <span className="font-medium text-gray-900">Estimated Time:</span>
-                <span className="font-medium text-blue-600">{formatTime()}</span>
+                <span className="font-medium text-gray-900">
+                  Estimated Time:
+                </span>
+                <span className="font-medium text-blue-600">
+                  {formatTime()}
+                </span>
               </div>
 
               {/* Action Items */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
                 <h4 className="font-medium text-blue-900 mb-2">
-                  {orderType === "pickup" ? "Pickup Instructions:" : "Delivery Information:"}
+                  {orderType === "pickup"
+                    ? "Pickup Instructions:"
+                    : "Delivery Information:"}
                 </h4>
                 <ul className="text-sm text-blue-800 space-y-1">
                   {orderType === "pickup" ? (
@@ -109,7 +126,9 @@ export default function OrderSuccessMessage({ orderNumber, orderTotal, orderType
 
               {/* Next Steps */}
               <div className="text-center pt-4">
-                <div className="text-sm text-gray-600 mb-3">Starting next order in a few seconds...</div>
+                <div className="text-sm text-gray-600 mb-3">
+                  Starting next order in a few seconds...
+                </div>
                 <button
                   onClick={onComplete}
                   className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"

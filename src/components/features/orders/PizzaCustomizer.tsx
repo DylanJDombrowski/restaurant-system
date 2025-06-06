@@ -977,7 +977,7 @@ function ToppingSelection({
                   onChange={(e) =>
                     onToppingChange(topping.id, e.target.value as ToppingAmount)
                   }
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full text-gray-900 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="none">None</option>
                   <option value="light">Light</option>
