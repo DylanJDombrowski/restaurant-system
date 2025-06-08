@@ -1,4 +1,4 @@
-// src/lib/utils/chicken-customization.ts - OPTION B: Works with existing categories
+// src/lib/utils/chicken-customization.ts - FIXED: Type errors resolved
 import { ChickenVariant, Customization, MenuItemVariant } from "@/lib/types";
 import { ConfiguredModifier } from "@/lib/types/cart";
 import {
@@ -21,22 +21,27 @@ export function useChickenCustomization(
   });
 
   // ==========================================
-  // VARIANT TYPE DETECTION (Based on CSV analysis)
+  // VARIANT TYPE DETECTION
   // ==========================================
   const variantName = variant.name.toLowerCase();
 
-  // Family packs have "family" in name or are 10+ pc with special sides
+  // Family packs: "family" in name or 12+ pieces
   const isFamily =
     variantName.includes("family") ||
     variantName.includes("fam") ||
-    (variantName.includes("10") && variantName.includes("pc")) ||
-    (parseInt(variantName.match(/(\d+)/)?.[1] || "0") >= 12 && variantName.includes("family"));
+    (parseInt(variantName.match(/(\d+)/)?.[1] || "0") >= 12 && variantName.includes("piece"));
 
-  // Bulk orders are 25+ pieces
+  // Bulk orders: 25+ pieces
   const isBulk = variantName.includes("bulk") || parseInt(variantName.match(/(\d+)/)?.[1] || "0") >= 25;
 
-  // Regular dinners are 8-20 pc without "family"
-  const isDinner = !isFamily && !isBulk && (variantName.includes("pc") || variantName.includes("piece") || variantName.includes("wing"));
+  // Regular dinners: Individual pieces (8-20 pc) without "family" or "bulk"
+  const isDinner =
+    !isFamily &&
+    !isBulk &&
+    (variantName.includes("pc") ||
+      variantName.includes("piece") ||
+      variantName.includes("wing") ||
+      (parseInt(variantName.match(/(\d+)/)?.[1] || "0") >= 8 && parseInt(variantName.match(/(\d+)/)?.[1] || "0") <= 20));
 
   console.log("🍗 Variant classification:", {
     isDinner,
@@ -46,7 +51,7 @@ export function useChickenCustomization(
   });
 
   // ==========================================
-  // SMART CUSTOMIZATION FILTERING
+  // SMART CUSTOMIZATION FILTERING - FIXED: Type-safe category checking
   // ==========================================
   const availableCustomizations: ChickenCustomizationsByCategory = {
     sides: allCustomizations.filter((c) => {
@@ -55,7 +60,6 @@ export function useChickenCustomization(
       const itemName = c.name.toLowerCase();
 
       if (isDinner) {
-        // Regular dinners: Broasted potatoes (included), French fries, extras
         return (
           itemName.includes("broasted potatoes (included)") ||
           itemName.includes("french fries") ||
@@ -66,7 +70,6 @@ export function useChickenCustomization(
       }
 
       if (isFamily) {
-        // Family packs: All included sides plus extras and garlic bread options
         return (
           itemName.includes("broasted potatoes (included)") ||
           itemName.includes("french fries") ||
@@ -79,16 +82,29 @@ export function useChickenCustomization(
       }
 
       if (isBulk) {
-        // Bulk orders: Only extra/additional sides
         return itemName.includes("extra") || itemName.includes("potato wedges") || itemName.includes("additional");
       }
 
-      return false; // Safety fallback
+      return false;
     }),
 
-    preparation: allCustomizations.filter((c) => c.applies_to.includes("chicken") && c.category === "white_meat"),
+    // ✅ FIXED: Type-safe category checking for preparation
+    preparation: allCustomizations.filter((c) => {
+      if (!c.applies_to.includes("chicken")) return false;
 
-    condiments: allCustomizations.filter((c) => c.applies_to.includes("chicken") && c.category === "condiments"),
+      // Use string comparison instead of strict enum comparison
+      const categoryStr = c.category as string;
+      return categoryStr === "preparation" || categoryStr === "preparation_chicken";
+    }),
+
+    // ✅ FIXED: Type-safe category checking for condiments
+    condiments: allCustomizations.filter((c) => {
+      if (!c.applies_to.includes("chicken")) return false;
+
+      // Use string comparison instead of strict enum comparison
+      const categoryStr = c.category as string;
+      return categoryStr === "condiments" || categoryStr === "condiments_chicken";
+    }),
   };
 
   console.log("🔧 Filtered customizations:", {
@@ -96,6 +112,8 @@ export function useChickenCustomization(
     preparation: availableCustomizations.preparation.length,
     condiments: availableCustomizations.condiments.length,
     sideNames: availableCustomizations.sides.map((s) => s.name),
+    preparationNames: availableCustomizations.preparation.map((p) => p.name),
+    condimentNames: availableCustomizations.condiments.map((c) => c.name),
   });
 
   // ==========================================
@@ -113,21 +131,21 @@ export function useChickenCustomization(
     },
     {
       id: "normal",
-      name: `White Meat (+$${whiteMeatUpcharge.toFixed(2)})`,
+      name: `White Meat (+${whiteMeatUpcharge.toFixed(2)})`,
       level: "normal",
       multiplier: 1,
       price: whiteMeatUpcharge,
     },
     {
       id: "extra",
-      name: `Extra White Meat (+$${(whiteMeatUpcharge * 2).toFixed(2)})`,
+      name: `Extra White Meat (+${(whiteMeatUpcharge * 2).toFixed(2)})`,
       level: "extra",
       multiplier: 2,
       price: whiteMeatUpcharge * 2,
     },
     {
       id: "xxtra",
-      name: `XXtra White Meat (+$${(whiteMeatUpcharge * 3).toFixed(2)})`,
+      name: `XXtra White Meat (+${(whiteMeatUpcharge * 3).toFixed(2)})`,
       level: "xxtra",
       multiplier: 3,
       price: whiteMeatUpcharge * 3,
@@ -169,7 +187,10 @@ export function useChickenCustomization(
 
   // Add default preparation (Regular Crispy)
   const defaultPrep = availableCustomizations.preparation.find(
-    (p) => p.name.toLowerCase().includes("regular crispy") || p.name.toLowerCase().includes("crispy")
+    (p) =>
+      p.name.toLowerCase().includes("regular crispy") ||
+      p.name.toLowerCase().includes("regular") ||
+      p.name.toLowerCase() === "regular crispy"
   );
   if (defaultPrep) {
     defaultSelections.push({

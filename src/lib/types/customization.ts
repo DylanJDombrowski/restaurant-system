@@ -1,4 +1,4 @@
-// src/lib/types/customization.ts - NEW unified customization system
+// src/lib/types/customization.ts - UPDATED: Support for mixed categories
 
 import { ID, Timestamp } from "./core";
 
@@ -11,7 +11,9 @@ export type CustomizationCategory =
   | "white_meat" // Chicken white meat upgrades
   | "sides" // Included/optional sides
   | "preparation" // Well Done, Cut in Half
-  | "condiments"; // Hot Sauce, Ranch
+  | "preparation_chicken" // ✅ ADDED: Chicken-specific preparation
+  | "condiments" // Hot Sauce, Ranch
+  | "condiments_chicken"; // ✅ ADDED: Chicken-specific condiments
 
 export type PricingType = "fixed" | "multiplied" | "tiered";
 
