@@ -1,4 +1,4 @@
-// src/lib/utils/chicken-customization.ts - COMPLETELY FIXED VERSION
+// src/lib/utils/chicken-customization.ts - QUICK FIX VERSION
 import { ChickenVariant, Customization, MenuItemVariant } from "@/lib/types";
 import { ConfiguredModifier } from "@/lib/types/cart";
 import {
@@ -21,10 +21,10 @@ export function useChickenCustomization(
     condiments: allCustomizations.filter((c) => c.category === "condiments" && c.applies_to.includes("chicken")),
   };
 
-  // Get white meat upcharge safely using type guard - FIXED
+  // Get white meat upcharge safely - with better fallback
   const whiteMeatUpcharge = getWhiteMeatUpcharge(variant as ChickenVariant);
 
-  // Build white meat tiers with actual calculated prices - FIXED
+  // Build white meat tiers with actual calculated prices
   const whiteMeatTiers: WhiteMeatTier[] = [
     {
       id: "none",
@@ -59,9 +59,10 @@ export function useChickenCustomization(
   // Get default selections based on variant type
   const defaultSelections: ConfiguredModifier[] = getDefaultSelectionsForVariant(variant, availableCustomizations);
 
-  // Price calculation function that calls the API
+  // FIXED: Use fallback pricing calculation until API is deployed
   const calculatePrice = async (whiteMeatTier: WhiteMeatTier | null, selectedCustomizations: string[]): Promise<number> => {
     try {
+      // Try the new API first
       const response = await fetch("/api/menu/chicken/calculate-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -73,15 +74,15 @@ export function useChickenCustomization(
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to calculate price");
+      if (response.ok) {
+        const result = await response.json();
+        return result.data?.final_price || calculateFallbackPrice(variant, whiteMeatTier, selectedCustomizations, availableCustomizations);
+      } else {
+        throw new Error("API not available");
       }
-
-      const result = await response.json();
-      return result.data?.final_price || variant.price;
     } catch (error) {
-      console.error("Error calculating chicken price:", error);
-      return variant.price; // Fallback to base price
+      console.warn("Chicken pricing API not available, using fallback calculation:", error);
+      return calculateFallbackPrice(variant, whiteMeatTier, selectedCustomizations, availableCustomizations);
     }
   };
 
@@ -123,6 +124,37 @@ export function useChickenCustomization(
     calculatePrice,
     validate,
   };
+}
+
+// FALLBACK PRICING CALCULATION
+function calculateFallbackPrice(
+  variant: MenuItemVariant,
+  whiteMeatTier: WhiteMeatTier | null,
+  selectedCustomizations: string[],
+  availableCustomizations: ChickenCustomizationsByCategory
+): number {
+  let totalPrice = variant.price;
+
+  // Add white meat cost
+  if (whiteMeatTier && whiteMeatTier.price > 0) {
+    totalPrice += whiteMeatTier.price;
+  }
+
+  // Add customization costs
+  const allCustomizations = [
+    ...availableCustomizations.sides,
+    ...availableCustomizations.preparation,
+    ...availableCustomizations.condiments,
+  ];
+
+  selectedCustomizations.forEach((id) => {
+    const customization = allCustomizations.find((c) => c.id === id);
+    if (customization) {
+      totalPrice += customization.base_price;
+    }
+  });
+
+  return totalPrice;
 }
 
 function getDefaultSelectionsForVariant(
