@@ -1,4 +1,4 @@
-// src/components/features/orders/ChickenCustomizer.tsx - FIXED RESOURCE LOOPING
+// src/components/features/orders/ChickenCustomizer.tsx - FIXED v2: Better UX & pricing
 "use client";
 
 import { ConfiguredCartItem, Customization, MenuItemVariant, MenuItemWithVariants } from "@/lib/types";
@@ -23,6 +23,13 @@ interface WhiteMeatTier {
   price: number;
 }
 
+interface SideWithExtra {
+  base: Customization;
+  extra?: Customization;
+  selected: boolean;
+  extraSelected: boolean;
+}
+
 export default function ChickenCustomizer({
   item,
   selectedVariant,
@@ -33,7 +40,7 @@ export default function ChickenCustomizer({
   restaurantId,
 }: ChickenCustomizerProps) {
   // ==========================================
-  // STATE MANAGEMENT - SIMPLIFIED
+  // STATE MANAGEMENT
   // ==========================================
 
   const [currentVariant, setCurrentVariant] = useState<MenuItemVariant | null>(
@@ -41,7 +48,7 @@ export default function ChickenCustomizer({
   );
   const [allCustomizations, setAllCustomizations] = useState<Customization[]>([]);
   const [selectedCustomizations, setSelectedCustomizations] = useState<string[]>([]);
-  const [selectedWhiteMeatTier, setSelectedWhiteMeatTier] = useState<WhiteMeatTier | null>(null);
+  const [selectedWhiteMeatTier, setSelectedWhiteMeatTier] = useState<WhiteMeatTier | null>(null); // NO DEFAULT
   const [quantity, setQuantity] = useState(1);
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [loading, setLoading] = useState(true);
@@ -68,7 +75,7 @@ export default function ChickenCustomizer({
   }, [currentVariant]);
 
   // ==========================================
-  // DATA LOADING - FIXED ONCE PER OPEN
+  // DATA LOADING
   // ==========================================
 
   useEffect(() => {
@@ -79,7 +86,7 @@ export default function ChickenCustomizer({
 
       try {
         setLoading(true);
-        console.log("🐔 Loading chicken customizations...");
+        console.log("🐔 Loading chicken customizations v2...");
 
         const response = await fetch(`/api/menu/customization?restaurant_id=${restaurantId}&applies_to=chicken`);
 
@@ -108,7 +115,7 @@ export default function ChickenCustomizer({
     return () => {
       mounted = false;
     };
-  }, [isOpen, restaurantId]); // ONLY DEPENDS ON isOpen AND restaurantId
+  }, [isOpen, restaurantId]);
 
   // ==========================================
   // ENHANCED CHICKEN CUSTOMIZATION HOOK
@@ -121,7 +128,47 @@ export default function ChickenCustomizer({
   );
 
   // ==========================================
-  // PRICE CALCULATION - DEBOUNCED
+  // SMART SIDES GROUPING
+  // ==========================================
+
+  const sidesWithExtras = useMemo((): SideWithExtra[] => {
+    const baseItems: SideWithExtra[] = [];
+    const extraItems = new Map<string, Customization>();
+
+    // Separate base and extra items
+    availableCustomizations.sides.forEach((side) => {
+      if (side.name.startsWith("Extra ")) {
+        const baseName = side.name.replace("Extra ", "");
+        extraItems.set(baseName.toLowerCase(), side);
+      } else {
+        baseItems.push({
+          base: side,
+          extra: undefined,
+          selected: selectedCustomizations.includes(side.id),
+          extraSelected: false,
+        });
+      }
+    });
+
+    // Link extras to their base items
+    baseItems.forEach((item) => {
+      const baseName = item.base.name
+        .replace(/\s*\([^)]*\)\s*/g, "") // Remove parentheses
+        .trim()
+        .toLowerCase();
+
+      const extra = extraItems.get(baseName);
+      if (extra) {
+        item.extra = extra;
+        item.extraSelected = selectedCustomizations.includes(extra.id);
+      }
+    });
+
+    return baseItems;
+  }, [availableCustomizations.sides, selectedCustomizations]);
+
+  // ==========================================
+  // PRICE CALCULATION
   // ==========================================
 
   const updatePrice = useCallback(async () => {
@@ -147,22 +194,21 @@ export default function ChickenCustomizer({
   }, [updatePrice]);
 
   // ==========================================
-  // INITIALIZATION - SINGLE EFFECT
+  // INITIALIZATION - MINIMAL DEFAULTS
   // ==========================================
 
   useEffect(() => {
     if (!isOpen || !currentVariant || loading) return;
 
-    // Only set defaults if we don't have existing cart item AND we have default selections
+    // Only set minimal defaults if we don't have existing cart item
     if (!existingCartItem && defaultSelections.length > 0) {
-      console.log("🐔 Setting default selections for", currentVariant.name);
-      setSelectedCustomizations(defaultSelections.map((d) => d.id));
+      console.log("🐔 Setting minimal defaults for", currentVariant.name);
+      // Only set preparation default, no sides or white meat
+      const preparationDefaults = defaultSelections.filter((d) => availableCustomizations.preparation.some((p) => p.id === d.id));
+      setSelectedCustomizations(preparationDefaults.map((d) => d.id));
 
-      // Set default white meat tier to "none" (all dark meat)
-      const noneTier = whiteMeatTiers.find((t) => t.level === "none");
-      if (noneTier && !selectedWhiteMeatTier) {
-        setSelectedWhiteMeatTier(noneTier);
-      }
+      // NO white meat default - user must choose
+      setSelectedWhiteMeatTier(null);
     }
 
     // Restore existing cart item state
@@ -175,13 +221,22 @@ export default function ChickenCustomizer({
       const customizationIds = existingCartItem.selectedModifiers?.map((m) => m.id) || [];
       setSelectedCustomizations(customizationIds);
 
-      // Try to determine white meat tier from existing data
-      const noneTier = whiteMeatTiers.find((t) => t.level === "none");
-      if (noneTier) {
-        setSelectedWhiteMeatTier(noneTier);
+      // Try to restore white meat tier from modifiers
+      const whiteMeatModifier = existingCartItem.selectedModifiers?.find((m) => m.name.toLowerCase().includes("white meat"));
+
+      if (whiteMeatModifier) {
+        if (whiteMeatModifier.name.includes("XXtra")) {
+          setSelectedWhiteMeatTier(whiteMeatTiers.find((t) => t.level === "xxtra") || null);
+        } else if (whiteMeatModifier.name.includes("Extra")) {
+          setSelectedWhiteMeatTier(whiteMeatTiers.find((t) => t.level === "extra") || null);
+        } else {
+          setSelectedWhiteMeatTier(whiteMeatTiers.find((t) => t.level === "normal") || null);
+        }
+      } else {
+        setSelectedWhiteMeatTier(whiteMeatTiers.find((t) => t.level === "none") || null);
       }
     }
-  }, [isOpen, currentVariant, loading, existingCartItem, defaultSelections, whiteMeatTiers, selectedWhiteMeatTier]);
+  }, [isOpen, currentVariant, loading, existingCartItem, defaultSelections, whiteMeatTiers, availableCustomizations.preparation]);
 
   // ==========================================
   // EVENT HANDLERS
@@ -206,8 +261,18 @@ export default function ChickenCustomizer({
     setSelectedWhiteMeatTier(tier);
   }, []);
 
+  const handleSideToggle = useCallback((sideId: string) => {
+    setSelectedCustomizations((prev) => {
+      if (prev.includes(sideId)) {
+        return prev.filter((id) => id !== sideId);
+      } else {
+        return [...prev, sideId];
+      }
+    });
+  }, []);
+
   const handleCustomizationToggle = useCallback(
-    (customizationId: string, category: "sides" | "preparation" | "condiments") => {
+    (customizationId: string, category: "preparation" | "condiments") => {
       setSelectedCustomizations((prev) => {
         // For preparation, allow only one selection (radio behavior)
         if (category === "preparation") {
@@ -216,7 +281,7 @@ export default function ChickenCustomizer({
           return [...withoutPreparation, customizationId];
         }
 
-        // For sides and condiments, allow multiple selections (checkbox behavior)
+        // For condiments, allow multiple selections (checkbox behavior)
         if (prev.includes(customizationId)) {
           return prev.filter((id) => id !== customizationId);
         } else {
@@ -381,24 +446,45 @@ export default function ChickenCustomizer({
             </div>
           )}
 
-          {/* Sides Selection */}
-          {availableCustomizations.sides.length > 0 && (
+          {/* Sides Selection - Enhanced with Extras */}
+          {sidesWithExtras.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">🥔 Sides</h3>
-              <div className="space-y-2">
-                {availableCustomizations.sides.map((customization) => (
-                  <label key={customization.id} className="flex items-center space-x-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedCustomizations.includes(customization.id)}
-                      onChange={() => handleCustomizationToggle(customization.id, "sides")}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <span className="flex-1">{customization.name}</span>
-                    {customization.base_price > 0 && (
-                      <span className="text-green-600 font-semibold">+${customization.base_price.toFixed(2)}</span>
+              <div className="space-y-3">
+                {sidesWithExtras.map((sideGroup) => (
+                  <div key={sideGroup.base.id} className="border rounded-lg p-3">
+                    {/* Base side */}
+                    <label className="flex items-center space-x-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sideGroup.selected}
+                        onChange={() => handleSideToggle(sideGroup.base.id)}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="flex-1">{sideGroup.base.name}</span>
+                      {sideGroup.base.base_price > 0 && (
+                        <span className="text-green-600 font-semibold">+${sideGroup.base.base_price.toFixed(2)}</span>
+                      )}
+                    </label>
+
+                    {/* Extra option if available and base is selected */}
+                    {sideGroup.extra && sideGroup.selected && (
+                      <div className="ml-7 mt-2 pl-3 border-l-2 border-gray-200">
+                        <label className="flex items-center space-x-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={sideGroup.extraSelected}
+                            onChange={() => handleSideToggle(sideGroup.extra!.id)}
+                            className="w-4 h-4 text-blue-600"
+                          />
+                          <span className="flex-1 text-sm text-gray-600">{sideGroup.extra.name}</span>
+                          {sideGroup.extra.base_price > 0 && (
+                            <span className="text-green-600 font-semibold text-sm">+${sideGroup.extra.base_price.toFixed(2)}</span>
+                          )}
+                        </label>
+                      </div>
                     )}
-                  </label>
+                  </div>
                 ))}
               </div>
             </div>
@@ -492,7 +578,7 @@ export default function ChickenCustomizer({
               disabled={isCalculatingPrice}
               className="px-8 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold disabled:bg-gray-400"
             >
-              {isCalculatingPrice ? "Calculating..." : `Add to Cart - $${totalPrice.toFixed(2)}`}
+              {isCalculatingPrice ? "Calculating..." : `Add to Cart - ${totalPrice.toFixed(2)}`}
             </button>
           </div>
         </div>
