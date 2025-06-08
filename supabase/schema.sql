@@ -67,7 +67,12 @@ CREATE TYPE "public"."customization_category" AS ENUM (
     'white_meat',
     'sides',
     'preparation',
-    'condiments'
+    'condiments',
+    'preparation_pizza',
+    'preparation_chicken',
+    'sides_chicken_dinner',
+    'sides_chicken_family',
+    'condiments_chicken'
 );
 
 
