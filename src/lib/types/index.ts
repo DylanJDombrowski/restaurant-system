@@ -1,22 +1,31 @@
-// src/lib/types/index.ts - UPDATED WITH CHICKEN TYPES
+// src/lib/types/index.ts - FIXED EXPORTS
 
-// ===================================================================
-// CORE PRIMITIVES & ENUMS
-// ===================================================================
+// Core types
+export * from "./api";
 export * from "./core";
 
-// ===================================================================
-// BUSINESS DOMAIN TYPES
-// ===================================================================
-export * from "./cart";
-export * from "./chicken";
+// Menu system
 export * from "./customization";
 export * from "./menu";
-export * from "./orders";
+
+// Cart system
+export * from "./cart";
+
+// Item-specific types
+export * from "./chicken";
 export * from "./pizza";
+
+// Component types
+export * from "./customizers";
+
+// Form types
+export * from "./forms";
+
+// Order types
+export * from "./orders";
+
+// Restaurant types
 export * from "./restaurant";
 
-// ===================================================================
-// API & SYSTEM TYPES
-// ===================================================================
-export * from "./api";
+// Utility types
+export * from "./utils";

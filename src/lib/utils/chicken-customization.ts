@@ -1,4 +1,4 @@
-// src/lib/utils/chicken-customization.ts - QUICK FIX VERSION
+// src/lib/utils/chicken-customization.ts - FIXED CATEGORIES AND LOGIC
 import { ChickenVariant, Customization, MenuItemVariant } from "@/lib/types";
 import { ConfiguredModifier } from "@/lib/types/cart";
 import {
@@ -14,17 +14,57 @@ export function useChickenCustomization(
   allCustomizations: Customization[],
   restaurantId: string
 ): ChickenCustomizationResult {
-  // Filter customizations by category for chicken items
+  console.log("🐔 useChickenCustomization called with:", {
+    variantName: variant.name,
+    sizeCode: variant.size_code,
+    customizationCount: allCustomizations.length,
+  });
+
+  // ==========================================
+  // VARIANT-AWARE FILTERING
+  // ==========================================
+
+  const sizeCode = variant.size_code || "";
+  const isDinner = sizeCode.includes("din") || (!sizeCode.includes("fam") && !sizeCode.includes("bulk"));
+  const isFamily = sizeCode.includes("fam");
+  const isBulk = sizeCode.includes("bulk");
+
+  // Filter customizations by category and variant type
   const availableCustomizations: ChickenCustomizationsByCategory = {
-    sides: allCustomizations.filter((c) => c.category === "sides" && c.applies_to.includes("chicken")),
+    sides: allCustomizations.filter((c) => {
+      if (!c.applies_to.includes("chicken") || c.category !== "sides") return false;
+
+      // Filter sides based on variant type
+      if (isDinner && c.name.includes("(8 PC")) return true;
+      if (isFamily && c.name.includes("(Included)")) return true;
+      if (isBulk && c.name.includes("Bulk")) return true;
+
+      // Include additional sides that can be added
+      if (c.name.includes("Extra") || c.name.includes("Add")) return true;
+
+      return false;
+    }),
+
     preparation: allCustomizations.filter((c) => c.category === "preparation" && c.applies_to.includes("chicken")),
+
     condiments: allCustomizations.filter((c) => c.category === "condiments" && c.applies_to.includes("chicken")),
   };
 
-  // Get white meat upcharge safely - with better fallback
+  console.log("🍗 Filtered customizations:", {
+    sides: availableCustomizations.sides.length,
+    preparation: availableCustomizations.preparation.length,
+    condiments: availableCustomizations.condiments.length,
+    isDinner,
+    isFamily,
+    isBulk,
+  });
+
+  // ==========================================
+  // WHITE MEAT TIER GENERATION
+  // ==========================================
+
   const whiteMeatUpcharge = getWhiteMeatUpcharge(variant as ChickenVariant);
 
-  // Build white meat tiers with actual calculated prices
   const whiteMeatTiers: WhiteMeatTier[] = [
     {
       id: "none",
@@ -56,10 +96,57 @@ export function useChickenCustomization(
     },
   ];
 
-  // Get default selections based on variant type
-  const defaultSelections: ConfiguredModifier[] = getDefaultSelectionsForVariant(variant, availableCustomizations);
+  // ==========================================
+  // VARIANT-SPECIFIC DEFAULT SELECTIONS
+  // ==========================================
 
-  // FIXED: Use fallback pricing calculation until API is deployed
+  const defaultSelections: ConfiguredModifier[] = [];
+
+  if (isFamily) {
+    // Family packs get default included sides
+    const familySides = ["Coleslaw (Included)", "Broasted Potatoes (Included)", "Garlic Bread (Included)"];
+
+    familySides.forEach((sideName) => {
+      const side = availableCustomizations.sides.find((s) => s.name === sideName);
+      if (side) {
+        defaultSelections.push({
+          id: side.id,
+          name: side.name,
+          priceAdjustment: side.base_price,
+        });
+      }
+    });
+  } else if (isDinner) {
+    // Regular chicken gets default broasted potatoes
+    const defaultSide = availableCustomizations.sides.find((s) => s.name.includes("Broasted Potatoes") && s.name.includes("8 PC"));
+    if (defaultSide) {
+      defaultSelections.push({
+        id: defaultSide.id,
+        name: defaultSide.name,
+        priceAdjustment: defaultSide.base_price,
+      });
+    }
+  }
+
+  // Default preparation: Regular Cooking
+  const regularCooking = availableCustomizations.preparation.find((p) => p.name.includes("Regular") || p.name.includes("Normal"));
+  if (regularCooking) {
+    defaultSelections.push({
+      id: regularCooking.id,
+      name: regularCooking.name,
+      priceAdjustment: regularCooking.base_price,
+    });
+  }
+
+  console.log(
+    "🥔 Default selections:",
+    defaultSelections.map((d) => d.name)
+  );
+
+  // ==========================================
+  // PRICING CALCULATION FUNCTION
+  // ==========================================
+
   const calculatePrice = async (whiteMeatTier: WhiteMeatTier | null, selectedCustomizations: string[]): Promise<number> => {
     try {
       // Try the new API first
@@ -76,30 +163,37 @@ export function useChickenCustomization(
 
       if (response.ok) {
         const result = await response.json();
-        return result.data?.final_price || calculateFallbackPrice(variant, whiteMeatTier, selectedCustomizations, availableCustomizations);
-      } else {
-        throw new Error("API not available");
+        if (result.data?.final_price) {
+          console.log("✅ API pricing:", result.data.final_price);
+          return result.data.final_price;
+        }
       }
+
+      console.warn("⚠️ API pricing failed, using fallback");
     } catch (error) {
-      console.warn("Chicken pricing API not available, using fallback calculation:", error);
-      return calculateFallbackPrice(variant, whiteMeatTier, selectedCustomizations, availableCustomizations);
+      console.warn("⚠️ API pricing error, using fallback:", error);
     }
+
+    // Fallback calculation
+    return calculateFallbackPrice(variant, whiteMeatTier, selectedCustomizations, availableCustomizations);
   };
 
-  // Validation function with strict typing
+  // ==========================================
+  // VALIDATION FUNCTION
+  // ==========================================
+
   const validate = (whiteMeatTier: WhiteMeatTier | null, selectedCustomizations: string[]): ChickenValidationResult => {
     const errors: string[] = [];
     const warnings: string[] = [];
 
     // Check for sides in family packs
-    const sizeCode = variant.size_code;
-    if (sizeCode?.includes("fam")) {
+    if (isFamily) {
       const hasSides = selectedCustomizations.some((id) =>
         availableCustomizations.sides.find((s) => s.id === id && s.name.includes("Included"))
       );
 
       if (!hasSides) {
-        warnings.push("Family packs include sides at no extra charge");
+        warnings.push("Family packs include sides at no extra charge - consider selecting included sides");
       }
     }
 
@@ -107,7 +201,14 @@ export function useChickenCustomization(
     const hasPreparation = selectedCustomizations.some((id) => availableCustomizations.preparation.find((p) => p.id === id));
 
     if (!hasPreparation) {
-      warnings.push("Consider selecting a preparation style");
+      warnings.push("Consider selecting a preparation style (Regular, Well Done, etc.)");
+    }
+
+    // Check for multiple preparation selections
+    const preparationCount = selectedCustomizations.filter((id) => availableCustomizations.preparation.find((p) => p.id === id)).length;
+
+    if (preparationCount > 1) {
+      errors.push("Please select only one preparation style");
     }
 
     return {
@@ -126,7 +227,10 @@ export function useChickenCustomization(
   };
 }
 
+// ==========================================
 // FALLBACK PRICING CALCULATION
+// ==========================================
+
 function calculateFallbackPrice(
   variant: MenuItemVariant,
   whiteMeatTier: WhiteMeatTier | null,
@@ -154,52 +258,12 @@ function calculateFallbackPrice(
     }
   });
 
+  console.log("💰 Fallback price calculation:", {
+    basePrice: variant.price,
+    whiteMeatCost: whiteMeatTier?.price || 0,
+    customizationsCost: totalPrice - variant.price - (whiteMeatTier?.price || 0),
+    totalPrice,
+  });
+
   return totalPrice;
-}
-
-function getDefaultSelectionsForVariant(
-  variant: MenuItemVariant,
-  availableCustomizations: ChickenCustomizationsByCategory
-): ConfiguredModifier[] {
-  const defaults: ConfiguredModifier[] = [];
-  const sizeCode = variant.size_code;
-
-  // Family packs get default sides
-  if (sizeCode?.includes("fam")) {
-    // Find included sides for family packs
-    const familySides = ["Coleslaw (Included)", "Broasted Potatoes (Included)", "Garlic Bread (Included)"];
-
-    familySides.forEach((sideName) => {
-      const side = availableCustomizations.sides.find((s) => s.name === sideName);
-      if (side) {
-        defaults.push({
-          id: side.id,
-          name: side.name,
-          priceAdjustment: side.base_price,
-        });
-      }
-    });
-  } else {
-    // Regular chicken gets default broasted potatoes
-    const defaultSide = availableCustomizations.sides.find((s) => s.name === "Broasted Potatoes (8 PC Default)");
-    if (defaultSide) {
-      defaults.push({
-        id: defaultSide.id,
-        name: defaultSide.name,
-        priceAdjustment: defaultSide.base_price,
-      });
-    }
-  }
-
-  // Default preparation: Regular Cooking
-  const regularCooking = availableCustomizations.preparation.find((p) => p.name === "Regular Cooking");
-  if (regularCooking) {
-    defaults.push({
-      id: regularCooking.id,
-      name: regularCooking.name,
-      priceAdjustment: regularCooking.base_price,
-    });
-  }
-
-  return defaults;
 }

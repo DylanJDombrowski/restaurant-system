@@ -1,9 +1,9 @@
-// src/components/features/orders/ChickenCustomizer.tsx - FIXED API ENDPOINT
+// src/components/features/orders/ChickenCustomizer.tsx - FIXED RESOURCE LOOPING
 "use client";
 
 import { ConfiguredCartItem, Customization, MenuItemVariant, MenuItemWithVariants } from "@/lib/types";
 import { useChickenCustomization } from "@/lib/utils/chicken-customization";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface ChickenCustomizerProps {
   item: MenuItemWithVariants;
@@ -33,7 +33,7 @@ export default function ChickenCustomizer({
   restaurantId,
 }: ChickenCustomizerProps) {
   // ==========================================
-  // STATE MANAGEMENT
+  // STATE MANAGEMENT - SIMPLIFIED
   // ==========================================
 
   const [currentVariant, setCurrentVariant] = useState<MenuItemVariant | null>(
@@ -49,63 +49,83 @@ export default function ChickenCustomizer({
   const [isCalculatingPrice, setIsCalculatingPrice] = useState(false);
 
   // ==========================================
-  // DATA LOADING - FIXED API ENDPOINT
+  // MEMOIZED VARIANT - PREVENTS LOOPS
   // ==========================================
 
-  const loadCustomizations = useCallback(async () => {
-    try {
-      setLoading(true);
-
-      // FIXED: Use the correct customization endpoint
-      const response = await fetch(`/api/menu/customization?restaurant_id=${restaurantId}&applies_to=chicken`);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log("🐔 Loaded chicken customizations:", data.data?.length || 0);
-        setAllCustomizations(data.data || []);
-      } else {
-        console.error("Failed to load customizations:", response.status);
-        setAllCustomizations([]);
+  const stableVariant = useMemo(() => {
+    return (
+      currentVariant || {
+        id: "",
+        menu_item_id: "",
+        name: "",
+        price: 0,
+        size_code: "",
+        sort_order: 0,
+        is_available: true,
+        prep_time_minutes: 0,
       }
-    } catch (error) {
-      console.error("Failed to load customizations:", error);
-      setAllCustomizations([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [restaurantId]);
+    );
+  }, [currentVariant]);
+
+  // ==========================================
+  // DATA LOADING - FIXED ONCE PER OPEN
+  // ==========================================
 
   useEffect(() => {
-    if (isOpen) {
-      loadCustomizations();
-    }
-  }, [isOpen, loadCustomizations]);
+    let mounted = true;
+
+    const loadCustomizations = async () => {
+      if (!isOpen) return;
+
+      try {
+        setLoading(true);
+        console.log("🐔 Loading chicken customizations...");
+
+        const response = await fetch(`/api/menu/customization?restaurant_id=${restaurantId}&applies_to=chicken`);
+
+        if (response.ok && mounted) {
+          const data = await response.json();
+          console.log("🐔 Loaded chicken customizations:", data.data?.length || 0);
+          setAllCustomizations(data.data || []);
+        } else if (mounted) {
+          console.error("Failed to load customizations:", response.status);
+          setAllCustomizations([]);
+        }
+      } catch (error) {
+        if (mounted) {
+          console.error("Failed to load customizations:", error);
+          setAllCustomizations([]);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadCustomizations();
+
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen, restaurantId]); // ONLY DEPENDS ON isOpen AND restaurantId
 
   // ==========================================
   // ENHANCED CHICKEN CUSTOMIZATION HOOK
   // ==========================================
 
   const { availableCustomizations, whiteMeatTiers, defaultSelections, calculatePrice, validate } = useChickenCustomization(
-    currentVariant || {
-      id: "",
-      menu_item_id: "",
-      name: "",
-      price: 0,
-      size_code: "",
-      sort_order: 0,
-      is_available: true,
-      prep_time_minutes: 0,
-    },
+    stableVariant,
     allCustomizations,
     restaurantId
   );
 
   // ==========================================
-  // PRICE CALCULATION
+  // PRICE CALCULATION - DEBOUNCED
   // ==========================================
 
   const updatePrice = useCallback(async () => {
-    if (!currentVariant) return;
+    if (!currentVariant || isCalculatingPrice) return;
 
     try {
       setIsCalculatingPrice(true);
@@ -118,33 +138,35 @@ export default function ChickenCustomizer({
     } finally {
       setIsCalculatingPrice(false);
     }
-  }, [currentVariant, selectedWhiteMeatTier, selectedCustomizations, calculatePrice]);
+  }, [currentVariant, selectedWhiteMeatTier, selectedCustomizations, calculatePrice, isCalculatingPrice]);
 
+  // DEBOUNCED PRICE UPDATE
   useEffect(() => {
-    updatePrice();
+    const timeoutId = setTimeout(updatePrice, 300);
+    return () => clearTimeout(timeoutId);
   }, [updatePrice]);
 
   // ==========================================
-  // INITIALIZATION EFFECTS
+  // INITIALIZATION - SINGLE EFFECT
   // ==========================================
 
   useEffect(() => {
-    // Set defaults when variant changes or customizations load
-    if (currentVariant && defaultSelections.length > 0 && !existingCartItem) {
+    if (!isOpen || !currentVariant || loading) return;
+
+    // Only set defaults if we don't have existing cart item AND we have default selections
+    if (!existingCartItem && defaultSelections.length > 0) {
       console.log("🐔 Setting default selections for", currentVariant.name);
       setSelectedCustomizations(defaultSelections.map((d) => d.id));
 
       // Set default white meat tier to "none" (all dark meat)
       const noneTier = whiteMeatTiers.find((t) => t.level === "none");
-      if (noneTier) {
+      if (noneTier && !selectedWhiteMeatTier) {
         setSelectedWhiteMeatTier(noneTier);
       }
     }
-  }, [currentVariant, defaultSelections, whiteMeatTiers, existingCartItem]);
 
-  useEffect(() => {
     // Restore existing cart item state
-    if (existingCartItem && currentVariant) {
+    if (existingCartItem) {
       console.log("🔄 Restoring existing cart item state");
       setQuantity(existingCartItem.quantity);
       setSpecialInstructions(existingCartItem.specialInstructions || "");
@@ -154,13 +176,12 @@ export default function ChickenCustomizer({
       setSelectedCustomizations(customizationIds);
 
       // Try to determine white meat tier from existing data
-      // This is simplified - you might want more complex logic
       const noneTier = whiteMeatTiers.find((t) => t.level === "none");
       if (noneTier) {
         setSelectedWhiteMeatTier(noneTier);
       }
     }
-  }, [existingCartItem, currentVariant, whiteMeatTiers]);
+  }, [isOpen, currentVariant, loading, existingCartItem, defaultSelections, whiteMeatTiers, selectedWhiteMeatTier]);
 
   // ==========================================
   // EVENT HANDLERS
@@ -185,15 +206,26 @@ export default function ChickenCustomizer({
     setSelectedWhiteMeatTier(tier);
   }, []);
 
-  const handleCustomizationToggle = useCallback((customizationId: string) => {
-    setSelectedCustomizations((prev) => {
-      if (prev.includes(customizationId)) {
-        return prev.filter((id) => id !== customizationId);
-      } else {
-        return [...prev, customizationId];
-      }
-    });
-  }, []);
+  const handleCustomizationToggle = useCallback(
+    (customizationId: string, category: "sides" | "preparation" | "condiments") => {
+      setSelectedCustomizations((prev) => {
+        // For preparation, allow only one selection (radio behavior)
+        if (category === "preparation") {
+          const preparationIds = availableCustomizations.preparation.map((p) => p.id);
+          const withoutPreparation = prev.filter((id) => !preparationIds.includes(id));
+          return [...withoutPreparation, customizationId];
+        }
+
+        // For sides and condiments, allow multiple selections (checkbox behavior)
+        if (prev.includes(customizationId)) {
+          return prev.filter((id) => id !== customizationId);
+        } else {
+          return [...prev, customizationId];
+        }
+      });
+    },
+    [availableCustomizations.preparation]
+  );
 
   const handleComplete = useCallback(() => {
     if (!currentVariant) return;
@@ -217,6 +249,15 @@ export default function ChickenCustomizer({
           : null;
       })
       .filter(Boolean);
+
+    // Add white meat tier as a modifier if not "none"
+    if (selectedWhiteMeatTier && selectedWhiteMeatTier.level !== "none") {
+      configuredModifiers.push({
+        id: `white_meat_${selectedWhiteMeatTier.level}`,
+        name: selectedWhiteMeatTier.name,
+        priceAdjustment: selectedWhiteMeatTier.price,
+      });
+    }
 
     const configuredItem: ConfiguredCartItem = {
       id: existingCartItem?.id || `${item.id}-${currentVariant.id}-${Date.now()}`,
@@ -325,7 +366,7 @@ export default function ChickenCustomizer({
               <h3 className="text-lg font-semibold text-gray-900 mb-3">🍗 White Meat Options</h3>
               <div className="space-y-2">
                 {whiteMeatTiers.map((tier) => (
-                  <label key={tier.id} className="flex items-center space-x-3">
+                  <label key={tier.id} className="flex items-center space-x-3 cursor-pointer">
                     <input
                       type="radio"
                       name="whiteMeatTier"
@@ -346,11 +387,11 @@ export default function ChickenCustomizer({
               <h3 className="text-lg font-semibold text-gray-900 mb-3">🥔 Sides</h3>
               <div className="space-y-2">
                 {availableCustomizations.sides.map((customization) => (
-                  <label key={customization.id} className="flex items-center space-x-3">
+                  <label key={customization.id} className="flex items-center space-x-3 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={selectedCustomizations.includes(customization.id)}
-                      onChange={() => handleCustomizationToggle(customization.id)}
+                      onChange={() => handleCustomizationToggle(customization.id, "sides")}
                       className="w-4 h-4 text-blue-600"
                     />
                     <span className="flex-1">{customization.name}</span>
@@ -369,12 +410,12 @@ export default function ChickenCustomizer({
               <h3 className="text-lg font-semibold text-gray-900 mb-3">👨‍🍳 Preparation</h3>
               <div className="space-y-2">
                 {availableCustomizations.preparation.map((customization) => (
-                  <label key={customization.id} className="flex items-center space-x-3">
+                  <label key={customization.id} className="flex items-center space-x-3 cursor-pointer">
                     <input
                       type="radio"
                       name="preparation"
                       checked={selectedCustomizations.includes(customization.id)}
-                      onChange={() => handleCustomizationToggle(customization.id)}
+                      onChange={() => handleCustomizationToggle(customization.id, "preparation")}
                       className="w-4 h-4 text-blue-600"
                     />
                     <span className="flex-1">{customization.name}</span>
@@ -393,11 +434,11 @@ export default function ChickenCustomizer({
               <h3 className="text-lg font-semibold text-gray-900 mb-3">🧄 Condiments</h3>
               <div className="grid grid-cols-2 gap-2">
                 {availableCustomizations.condiments.map((customization) => (
-                  <label key={customization.id} className="flex items-center space-x-3">
+                  <label key={customization.id} className="flex items-center space-x-3 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={selectedCustomizations.includes(customization.id)}
-                      onChange={() => handleCustomizationToggle(customization.id)}
+                      onChange={() => handleCustomizationToggle(customization.id, "condiments")}
                       className="w-4 h-4 text-blue-600"
                     />
                     <span className="flex-1">{customization.name}</span>

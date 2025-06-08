@@ -890,7 +890,8 @@ CREATE TABLE IF NOT EXISTS "public"."menu_item_variants" (
     "prep_time_minutes" integer,
     "created_at" timestamp with time zone DEFAULT "now"(),
     "crust_type" character varying(50),
-    "updated_at" timestamp with time zone DEFAULT "now"()
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "white_meat_upcharge" numeric(10,2) DEFAULT 0.00
 );
 
 
@@ -1265,6 +1266,10 @@ CREATE INDEX "idx_pizza_templates_menu_item" ON "public"."pizza_templates" USING
 
 
 CREATE INDEX "idx_variants_menu_item" ON "public"."menu_item_variants" USING "btree" ("menu_item_id", "sort_order");
+
+
+
+CREATE INDEX "idx_variants_white_meat_upcharge" ON "public"."menu_item_variants" USING "btree" ("white_meat_upcharge") WHERE ("white_meat_upcharge" > (0)::numeric);
 
 
 
