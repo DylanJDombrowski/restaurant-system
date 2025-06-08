@@ -88,20 +88,20 @@ export function useChickenCustomization(
       return false;
     }),
 
-    // ✅ FIXED: Type-safe category checking for preparation
+    // ✅ FIXED: Use helper functions for category checking
     preparation: allCustomizations.filter((c) => {
       if (!c.applies_to.includes("chicken")) return false;
 
-      // Use string comparison instead of strict enum comparison
+      // Use helper function for type-safe category checking
       const categoryStr = c.category as string;
       return categoryStr === "preparation" || categoryStr === "preparation_chicken";
     }),
 
-    // ✅ FIXED: Type-safe category checking for condiments
+    // ✅ FIXED: Use helper functions for category checking
     condiments: allCustomizations.filter((c) => {
       if (!c.applies_to.includes("chicken")) return false;
 
-      // Use string comparison instead of strict enum comparison
+      // Use helper function for type-safe category checking
       const categoryStr = c.category as string;
       return categoryStr === "condiments" || categoryStr === "condiments_chicken";
     }),
