@@ -1,4 +1,4 @@
-// src/lib/types/menu.ts - Menu system
+// src/lib/types/menu.ts - Enhanced with chicken support
 
 import { ID, Timestamp } from "./core";
 
@@ -39,6 +39,7 @@ export interface MenuItemVariant {
   sort_order: number;
   is_available: boolean;
   prep_time_minutes: number;
+  white_meat_upcharge?: number; // NEW: For chicken variants
 }
 
 // Enhanced types with relationships
@@ -50,3 +51,24 @@ export type MenuItemWithVariants = MenuItem & {
   category?: MenuCategory;
   variants: MenuItemVariant[];
 };
+
+// ===================================================================
+// ITEM-SPECIFIC VARIANT TYPES
+// ===================================================================
+
+// Chicken variants always have white_meat_upcharge
+export interface ChickenVariant extends MenuItemVariant {
+  white_meat_upcharge: number; // Required for chicken
+}
+
+// Pizza variants may have different crust pricing
+export interface PizzaVariant extends MenuItemVariant {
+  crust_type: string; // Required for pizza
+}
+
+// Generic variant with strict item type checking
+export type TypedMenuItemVariant<T extends string> = T extends "chicken"
+  ? ChickenVariant
+  : T extends "pizza"
+  ? PizzaVariant
+  : MenuItemVariant;

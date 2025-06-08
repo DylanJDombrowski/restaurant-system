@@ -1207,6 +1207,11 @@ ALTER TABLE ONLY "public"."menu_categories"
 
 
 
+ALTER TABLE ONLY "public"."menu_item_variants"
+    ADD CONSTRAINT "unique_menu_item_variant" UNIQUE ("menu_item_id", "size_code", "crust_type");
+
+
+
 CREATE INDEX "idx_crust_pricing_lookup" ON "public"."crust_pricing" USING "btree" ("restaurant_id", "size_code", "crust_type");
 
 

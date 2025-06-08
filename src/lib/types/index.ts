@@ -1,4 +1,4 @@
-// src/lib/types/index.ts - CLEAN VERSION WITHOUT DUPLICATES
+// src/lib/types/index.ts - UPDATED WITH CHICKEN TYPES
 
 // ===================================================================
 // CORE PRIMITIVES & ENUMS
@@ -8,12 +8,13 @@ export * from "./core";
 // ===================================================================
 // BUSINESS DOMAIN TYPES
 // ===================================================================
-export * from "./restaurant";
-export * from "./menu";
-export * from "./customization";
-export * from "./pizza";
 export * from "./cart";
+export * from "./chicken";
+export * from "./customization";
+export * from "./menu";
 export * from "./orders";
+export * from "./pizza";
+export * from "./restaurant";
 
 // ===================================================================
 // API & SYSTEM TYPES

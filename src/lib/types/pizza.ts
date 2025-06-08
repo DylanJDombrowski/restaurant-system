@@ -1,8 +1,9 @@
-// src/lib/types/pizza.ts - Pizza-specific types
+// src/lib/types/pizza.ts - Enhanced pizza types (NO ANY TYPES)
 
+import { ConfiguredModifier } from "./cart";
 import { ID, ToppingAmount } from "./core";
-import { MenuItemWithVariants } from "./menu";
 import { Customization } from "./customization";
+import { MenuItemWithVariants } from "./menu";
 
 export interface CrustPricing {
   id: ID;
@@ -56,22 +57,19 @@ export interface PizzaPriceCalculationRequest {
   menu_item_id: ID;
   size_code: string;
   crust_type: string;
-  toppings?: {
-    customization_id: ID;
-    amount: ToppingAmount;
-  }[];
+  toppings?: PizzaToppingSelection[];
+}
+
+// FIXED: Specific pizza topping selection type (no any)
+export interface PizzaToppingSelection {
+  customization_id: ID;
+  amount: ToppingAmount;
 }
 
 export interface PizzaPriceBreakdownItem {
   name: string;
   price: number;
-  type:
-    | "specialty_base"
-    | "regular_base"
-    | "crust"
-    | "topping"
-    | "template_default"
-    | "template_extra";
+  type: "specialty_base" | "regular_base" | "crust" | "topping" | "template_default" | "template_extra";
   amount?: string;
   category?: string;
   is_default?: boolean;
@@ -95,4 +93,25 @@ export interface PizzaPriceCalculationResponse {
     included_toppings: string[];
     pricing_note: string;
   };
+}
+
+// Pizza-specific customization types
+export interface PizzaCustomizationsByCategory {
+  toppings: Customization[];
+  sauces: Customization[];
+  preparation: Customization[];
+}
+
+export interface PizzaValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface PizzaCustomizationResult {
+  availableCustomizations: PizzaCustomizationsByCategory;
+  templateDefaults: Map<string, { amount: string; tier: string }>;
+  defaultSelections: ConfiguredModifier[];
+  calculatePrice: (selectedToppings: PizzaToppingSelection[]) => Promise<number>;
+  validate: (selectedToppings: PizzaToppingSelection[]) => PizzaValidationResult;
 }
