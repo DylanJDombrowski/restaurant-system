@@ -1,4 +1,4 @@
-// src/components/features/orders/ChickenCustomizer.tsx - REFACTORED AND FIXED
+// src/components/features/orders/ChickenCustomizer.tsx - FIXED VERSION
 "use client";
 
 import {
@@ -11,7 +11,6 @@ import {
 import { useChickenCustomization } from "@/lib/utils/chicken-customization";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-// Interfaces can remain the same
 interface ChickenCustomizerProps {
   item: MenuItemWithVariants;
   selectedVariant?: MenuItemVariant;
@@ -39,9 +38,9 @@ export default function ChickenCustomizer({
   isOpen,
   restaurantId,
 }: ChickenCustomizerProps) {
-  // --- 1. STATE MANAGEMENT (Simplified) ---
+  // --- 1. STATE MANAGEMENT ---
   const [currentVariant, setCurrentVariant] = useState<MenuItemVariant | null>(
-    selectedVariant || item.variants?.[0] || null
+    selectedVariant || (item.variants && item.variants[0]) || null
   );
   const [allCustomizations, setAllCustomizations] = useState<Customization[]>(
     []
@@ -56,9 +55,9 @@ export default function ChickenCustomizer({
   const [loading, setLoading] = useState(true);
   const [currentPrice, setCurrentPrice] = useState(0);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [isCalculatingPrice, setIsCalculatingPrice] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // --- 2. HOOKS (No change) ---
+  // --- 2. MEMOIZED VALUES & HOOKS ---
   const stableVariant = useMemo(() => currentVariant, [currentVariant]);
   const {
     availableCustomizations,
@@ -67,136 +66,177 @@ export default function ChickenCustomizer({
     validate,
   } = useChickenCustomization(stableVariant!, allCustomizations, restaurantId);
 
-  // --- 3. REFACTORED: Price Calculation ---
-  // This function will now be our single source of truth for price updates.
-  const recalculatePrice = useCallback(
-    (
-      variant: MenuItemVariant,
-      tier: WhiteMeatTier | null,
-      customizationIds: string[]
-    ) => {
-      setIsCalculatingPrice(true);
-      let newPrice = variant.price;
+  // --- 3. PRICE CALCULATION FUNCTION (DIRECT, NOT IN useEffect) ---
+  const recalculatePrice = useCallback(() => {
+    if (!currentVariant || !isInitialized) {
+      console.log(
+        "❌ Cannot calculate price - missing variant or not initialized"
+      );
+      return;
+    }
 
-      if (tier) {
-        // Ensure you're adding the price from the hook's generated tiers
-        const tierDetails = whiteMeatTiers.find((t) => t.id === tier.id);
-        if (tierDetails) {
-          newPrice += tierDetails.price;
-        }
-      }
+    console.log("💰 Recalculating chicken price...", {
+      variantName: currentVariant.name,
+      variantPrice: currentVariant.price,
+      whiteMeatTier: selectedWhiteMeatTier?.name,
+      customizations: selectedCustomizations.length,
+    });
 
-      customizationIds.forEach((id) => {
-        const custom = allCustomizations.find((c) => c.id === id);
-        const isWhiteMeatCustomization = custom?.name
+    let newPrice = currentVariant.price;
+
+    // Add white meat tier price
+    if (selectedWhiteMeatTier && selectedWhiteMeatTier.level !== "none") {
+      newPrice += selectedWhiteMeatTier.price;
+      console.log(
+        `+ White meat (${selectedWhiteMeatTier.name}): +$${selectedWhiteMeatTier.price}`
+      );
+    }
+
+    // Add customizations price
+    selectedCustomizations.forEach((id) => {
+      const custom = allCustomizations.find((c) => c.id === id);
+      if (custom) {
+        // Don't double-count white meat if it's also in customizations
+        const isWhiteMeatCustomization = custom.name
           .toLowerCase()
           .includes("white meat");
-        if (custom && !isWhiteMeatCustomization) {
+        if (!isWhiteMeatCustomization) {
           newPrice += custom.base_price;
+          console.log(`+ ${custom.name}: +$${custom.base_price}`);
         }
-      });
+      }
+    });
 
-      setCurrentPrice(newPrice);
-      setIsCalculatingPrice(false);
-    },
-    [allCustomizations, whiteMeatTiers]
-  );
+    console.log("✅ Final calculated price:", newPrice);
+    setCurrentPrice(newPrice);
+  }, [
+    currentVariant,
+    isInitialized,
+    selectedWhiteMeatTier,
+    selectedCustomizations,
+    allCustomizations,
+  ]);
 
-  // --- 4. REFACTORED: Single Initialization and Data Loading Effect ---
+  // --- 4. DATA LOADING EFFECT (SIMPLIFIED) ---
   useEffect(() => {
     if (!isOpen) return;
 
-    let isMounted = true;
-
-    // This resets the state when the modal is opened for a new item
-    setCurrentVariant(selectedVariant || item.variants?.[0] || null);
+    console.log("🔄 Loading chicken customization data...");
     setLoading(true);
+    setIsInitialized(false);
 
-    const initialize = async () => {
+    const loadData = async () => {
       try {
         const response = await fetch(
           `/api/menu/customization?restaurant_id=${restaurantId}&applies_to=chicken`
         );
         if (response.ok) {
           const data = await response.json();
-          if (isMounted) {
-            setAllCustomizations(data.data || []);
-          }
+          setAllCustomizations(data.data || []);
+          console.log("✅ Loaded customizations:", data.data?.length || 0);
+        } else {
+          console.error("❌ Failed to load customizations:", response.status);
         }
       } catch (error) {
-        console.error("Error loading customizations:", error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        console.error("❌ Error loading customizations:", error);
       }
+      setLoading(false);
     };
 
-    initialize();
+    loadData();
+  }, [isOpen, restaurantId]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, item, selectedVariant, restaurantId]);
-
-  // --- 5. NEW: Effect to set defaults and initial price after data loads ---
+  // --- 5. INITIALIZATION EFFECT (RUNS AFTER DATA LOADS) ---
   useEffect(() => {
-    if (loading || !currentVariant) return;
+    if (loading || !isOpen || isInitialized || whiteMeatTiers.length === 0) {
+      return;
+    }
 
-    let initialTier: WhiteMeatTier | null = null;
-    let initialCustomizations: string[] = [];
+    console.log("🚀 Initializing chicken customizer...", {
+      hasExistingItem: !!existingCartItem,
+      whiteMeatTiersCount: whiteMeatTiers.length,
+      defaultSelectionsCount: defaultSelections.length,
+    });
 
     if (existingCartItem) {
+      // Restore existing cart item state
       setQuantity(existingCartItem.quantity);
       setSpecialInstructions(existingCartItem.specialInstructions || "");
 
-      initialCustomizations =
+      const modifierIds =
         existingCartItem.selectedModifiers?.map((m) => m.id) || [];
+      setSelectedCustomizations(modifierIds);
 
+      // Find white meat tier from existing modifiers
       const whiteMeatModifier = existingCartItem.selectedModifiers?.find((m) =>
         m.name.toLowerCase().includes("white meat")
       );
+
       let tierLevel: WhiteMeatTier["level"] = "none";
       if (whiteMeatModifier) {
         if (whiteMeatModifier.name.includes("XXtra")) tierLevel = "xxtra";
         else if (whiteMeatModifier.name.includes("Extra")) tierLevel = "extra";
         else tierLevel = "normal";
       }
-      initialTier =
+
+      const restoredTier =
         whiteMeatTiers.find((t) => t.level === tierLevel) || whiteMeatTiers[0];
+      setSelectedWhiteMeatTier(restoredTier);
+
+      console.log("🔄 Restored existing item:", {
+        quantity: existingCartItem.quantity,
+        modifiers: modifierIds.length,
+        whiteMeatTier: restoredTier.name,
+      });
     } else {
-      initialCustomizations = defaultSelections.map((d) => d.id);
-      initialTier =
+      // Set defaults for new item
+      const defaultCustomizationIds = defaultSelections.map((d) => d.id);
+      setSelectedCustomizations(defaultCustomizationIds);
+
+      const defaultWhiteMeatTier =
         whiteMeatTiers.find((t) => t.level === "none") || whiteMeatTiers[0];
+      setSelectedWhiteMeatTier(defaultWhiteMeatTier);
+
+      console.log("🆕 Set defaults for new item:", {
+        defaultCustomizations: defaultCustomizationIds.length,
+        whiteMeatTier: defaultWhiteMeatTier.name,
+      });
     }
 
-    setSelectedCustomizations(initialCustomizations);
-    setSelectedWhiteMeatTier(initialTier);
+    setIsInitialized(true);
 
-    // Initial price calculation
-    recalculatePrice(currentVariant, initialTier, initialCustomizations);
+    // Calculate initial price immediately after initialization
+    setTimeout(() => {
+      recalculatePrice();
+    }, 0);
   }, [
     loading,
-    currentVariant,
+    isOpen,
+    isInitialized,
     existingCartItem,
     whiteMeatTiers,
     defaultSelections,
     recalculatePrice,
   ]);
 
+  // --- 6. VALIDATION EFFECT ---
   useEffect(() => {
-    if (loading) return; // Don't validate while loading customizations
+    if (!isInitialized) return;
+
     const validation = validate(selectedWhiteMeatTier, selectedCustomizations);
     setValidationErrors(validation.errors);
-  }, [selectedWhiteMeatTier, selectedCustomizations, validate, loading]);
+  }, [selectedWhiteMeatTier, selectedCustomizations, validate, isInitialized]);
 
-  // --- 6. EVENT HANDLERS (Now trigger price recalculation directly) ---
+  // --- 7. EVENT HANDLERS (WITH DIRECT PRICE UPDATES) ---
   const handleVariantChange = useCallback(
     (variantId: string) => {
       const variant = item.variants?.find((v) => v.id === variantId);
       if (variant && variant.id !== currentVariant?.id) {
-        // Set the new variant, which will trigger the initialization effect
+        console.log("🔄 Changing variant:", variant.name);
         setCurrentVariant(variant);
+        setSelectedCustomizations([]);
+        setSelectedWhiteMeatTier(null);
+        setIsInitialized(false); // Will trigger re-initialization
       }
     },
     [item.variants, currentVariant?.id]
@@ -204,10 +244,12 @@ export default function ChickenCustomizer({
 
   const handleWhiteMeatTierChange = useCallback(
     (tier: WhiteMeatTier) => {
+      console.log("🍗 Changing white meat tier:", tier.name);
       setSelectedWhiteMeatTier(tier);
-      recalculatePrice(currentVariant!, tier, selectedCustomizations);
+      // Calculate price immediately after state update
+      setTimeout(() => recalculatePrice(), 0);
     },
-    [currentVariant, selectedCustomizations, recalculatePrice]
+    [recalculatePrice]
   );
 
   const handleCustomizationToggle = useCallback(
@@ -215,38 +257,58 @@ export default function ChickenCustomizer({
       customizationId: string,
       category: "sides" | "preparation" | "condiments"
     ) => {
-      const newCustomizations =
-        category === "preparation"
-          ? [
-              ...selectedCustomizations.filter(
-                (id) =>
-                  !availableCustomizations.preparation.some((p) => p.id === id)
-              ),
-              customizationId,
-            ]
-          : selectedCustomizations.includes(customizationId)
-          ? selectedCustomizations.filter((id) => id !== customizationId)
-          : [...selectedCustomizations, customizationId];
+      console.log("🔧 Toggling customization:", customizationId, category);
 
-      setSelectedCustomizations(newCustomizations);
-      recalculatePrice(
-        currentVariant!,
-        selectedWhiteMeatTier,
-        newCustomizations
-      );
+      setSelectedCustomizations((prev) => {
+        let newSelections: string[];
+
+        if (category === "preparation") {
+          // Radio button behavior for preparation
+          const preparationIds = availableCustomizations.preparation.map(
+            (p) => p.id
+          );
+          const withoutPreparation = prev.filter(
+            (id) => !preparationIds.includes(id)
+          );
+          newSelections = [...withoutPreparation, customizationId];
+        } else {
+          // Checkbox behavior for sides and condiments
+          newSelections = prev.includes(customizationId)
+            ? prev.filter((id) => id !== customizationId)
+            : [...prev, customizationId];
+        }
+
+        // Calculate price immediately after state update
+        setTimeout(() => recalculatePrice(), 0);
+
+        return newSelections;
+      });
     },
-    [
-      availableCustomizations.preparation,
-      currentVariant,
-      selectedCustomizations,
-      selectedWhiteMeatTier,
-      recalculatePrice,
-    ]
+    [availableCustomizations.preparation, recalculatePrice]
   );
 
   const handleComplete = useCallback(() => {
     if (!currentVariant) return;
 
+    // Final price calculation for the cart item
+    let finalPrice = currentVariant.price;
+    if (selectedWhiteMeatTier && selectedWhiteMeatTier.level !== "none") {
+      finalPrice += selectedWhiteMeatTier.price;
+    }
+
+    selectedCustomizations.forEach((id) => {
+      const custom = allCustomizations.find((c) => c.id === id);
+      if (custom) {
+        const isWhiteMeatCustomization = custom.name
+          .toLowerCase()
+          .includes("white meat");
+        if (!isWhiteMeatCustomization) {
+          finalPrice += custom.base_price;
+        }
+      }
+    });
+
+    // Validate before completing
     const validation = validate(selectedWhiteMeatTier, selectedCustomizations);
     if (!validation.isValid) {
       alert(
@@ -255,6 +317,7 @@ export default function ChickenCustomizer({
       return;
     }
 
+    // Build configured modifiers
     const configuredModifiers: ConfiguredModifier[] = selectedCustomizations
       .map((id) => {
         const custom = allCustomizations.find((c) => c.id === id);
@@ -268,6 +331,7 @@ export default function ChickenCustomizer({
       })
       .filter((m): m is ConfiguredModifier => m !== null);
 
+    // Add white meat tier as modifier if not "none"
     if (selectedWhiteMeatTier && selectedWhiteMeatTier.level !== "none") {
       configuredModifiers.push({
         id: `white_meat_${selectedWhiteMeatTier.level}`,
@@ -288,9 +352,16 @@ export default function ChickenCustomizer({
       selectedToppings: [],
       selectedModifiers: configuredModifiers,
       specialInstructions,
-      totalPrice: currentPrice * quantity, // Use the live-calculated price
+      totalPrice: finalPrice,
       displayName: `${item.name} (${currentVariant.name})`,
     };
+
+    console.log("✅ Completing chicken customization:", {
+      finalPrice,
+      modifiers: configuredModifiers.length,
+      quantity,
+    });
+
     onComplete(configuredItem);
   }, [
     currentVariant,
@@ -303,12 +374,9 @@ export default function ChickenCustomizer({
     existingCartItem,
     item,
     onComplete,
-    currentPrice,
   ]);
 
-  // --- RENDER LOGIC (No changes needed) ---
-  if (!isOpen) return null;
-
+  // --- 8. RENDER LOGIC ---
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -322,7 +390,7 @@ export default function ChickenCustomizer({
     );
   }
 
-  if (!currentVariant) return null; // Guard against null variant after loading
+  if (!isOpen || !currentVariant) return null;
 
   const totalPrice = currentPrice * quantity;
   const hasValidationErrors = validationErrors.length > 0;
@@ -336,15 +404,8 @@ export default function ChickenCustomizer({
             <div>
               <h2 className="text-2xl font-bold text-gray-900">{item.name}</h2>
               <p className="text-lg text-green-600 font-semibold">
-                {isCalculatingPrice ? (
-                  <span className="flex items-center gap-2">
-                    <div className="animate-spin h-4 w-4 border-2 border-green-600 border-t-transparent rounded-full"></div>
-                    Calculating...
-                  </span>
-                ) : (
-                  `$${totalPrice.toFixed(2)}`
-                )}
-                {quantity > 1 && !isCalculatingPrice && (
+                ${totalPrice.toFixed(2)}
+                {quantity > 1 && (
                   <span className="text-sm text-gray-500 ml-2">
                     ({quantity} × ${currentPrice.toFixed(2)})
                   </span>
@@ -423,6 +484,11 @@ export default function ChickenCustomizer({
                       className="w-4 h-4 text-blue-600"
                     />
                     <span className="flex-1 font-medium">{tier.name}</span>
+                    {tier.price > 0 && (
+                      <span className="text-green-600 font-semibold">
+                        +${tier.price.toFixed(2)}
+                      </span>
+                    )}
                   </label>
                 ))}
               </div>
@@ -577,6 +643,7 @@ export default function ChickenCustomizer({
             </div>
           </div>
         </div>
+
         {/* Footer */}
         <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6">
           <div className="flex justify-between items-center">
@@ -588,17 +655,12 @@ export default function ChickenCustomizer({
             </button>
             <button
               onClick={handleComplete}
-              disabled={hasValidationErrors || isCalculatingPrice}
+              disabled={hasValidationErrors || !isInitialized}
               className="px-8 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
-              {isCalculatingPrice ? (
-                <span className="flex items-center gap-2">
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                  Calculating...
-                </span>
-              ) : (
-                `Add to Cart - $${totalPrice.toFixed(2)}`
-              )}
+              {!isInitialized
+                ? "Loading..."
+                : `Add to Cart - $${totalPrice.toFixed(2)}`}
             </button>
           </div>
         </div>
