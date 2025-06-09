@@ -1,7 +1,13 @@
 // src/components/features/orders/ChickenCustomizer.tsx - FINAL CLEANED VERSION
 "use client";
 
-import { ConfiguredCartItem, ConfiguredModifier, Customization, MenuItemVariant, MenuItemWithVariants } from "@/lib/types";
+import {
+  ConfiguredCartItem,
+  ConfiguredModifier,
+  Customization,
+  MenuItemVariant,
+  MenuItemWithVariants,
+} from "@/lib/types";
 import { useChickenCustomization } from "@/lib/utils/chicken-customization";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -36,9 +42,14 @@ export default function ChickenCustomizer({
   const [currentVariant, setCurrentVariant] = useState<MenuItemVariant | null>(
     selectedVariant || (item.variants && item.variants[0]) || null
   );
-  const [allCustomizations, setAllCustomizations] = useState<Customization[]>([]);
-  const [selectedCustomizations, setSelectedCustomizations] = useState<string[]>([]);
-  const [selectedWhiteMeatTier, setSelectedWhiteMeatTier] = useState<WhiteMeatTier | null>(null);
+  const [allCustomizations, setAllCustomizations] = useState<Customization[]>(
+    []
+  );
+  const [selectedCustomizations, setSelectedCustomizations] = useState<
+    string[]
+  >([]);
+  const [selectedWhiteMeatTier, setSelectedWhiteMeatTier] =
+    useState<WhiteMeatTier | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [loading, setLoading] = useState(true);
@@ -51,11 +62,12 @@ export default function ChickenCustomizer({
 
   // --- 2. MEMOIZED VALUES & HOOKS ---
   const stableVariant = useMemo(() => currentVariant, [currentVariant]);
-  const { availableCustomizations, whiteMeatTiers, defaultSelections, calculatePrice, validate } = useChickenCustomization(
-    stableVariant!,
-    allCustomizations,
-    restaurantId
-  );
+  const {
+    availableCustomizations,
+    whiteMeatTiers,
+    defaultSelections,
+    validate,
+  } = useChickenCustomization(stableVariant!, allCustomizations, restaurantId);
 
   // --- 3. DATA FETCHING & INITIALIZATION EFFECTS ---
   useEffect(() => {
@@ -65,7 +77,9 @@ export default function ChickenCustomizer({
     const loadData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/menu/customization?restaurant_id=${restaurantId}&applies_to=chicken`);
+        const response = await fetch(
+          `/api/menu/customization?restaurant_id=${restaurantId}&applies_to=chicken`
+        );
         if (response.ok) {
           const data = await response.json();
           setAllCustomizations(data.data || []);
@@ -79,50 +93,89 @@ export default function ChickenCustomizer({
   }, [isOpen, restaurantId]);
 
   useEffect(() => {
-    if (loading || !isOpen || initializationRef.current || whiteMeatTiers.length === 0) return;
+    if (
+      loading ||
+      !isOpen ||
+      initializationRef.current ||
+      whiteMeatTiers.length === 0
+    )
+      return;
     initializationRef.current = true;
 
     if (existingCartItem) {
       setQuantity(existingCartItem.quantity);
       setSpecialInstructions(existingCartItem.specialInstructions || "");
-      const modifierIds = existingCartItem.selectedModifiers?.map((m) => m.id) || [];
+      const modifierIds =
+        existingCartItem.selectedModifiers?.map((m) => m.id) || [];
       setSelectedCustomizations(modifierIds);
-      const whiteMeatModifier = existingCartItem.selectedModifiers?.find((m) => m.name.toLowerCase().includes("white meat"));
+      const whiteMeatModifier = existingCartItem.selectedModifiers?.find((m) =>
+        m.name.toLowerCase().includes("white meat")
+      );
       let tierLevel: WhiteMeatTier["level"] = "none";
       if (whiteMeatModifier) {
         if (whiteMeatModifier.name.includes("XXtra")) tierLevel = "xxtra";
         else if (whiteMeatModifier.name.includes("Extra")) tierLevel = "extra";
         else tierLevel = "normal";
       }
-      setSelectedWhiteMeatTier(whiteMeatTiers.find((t) => t.level === tierLevel) || whiteMeatTiers[0]);
+      setSelectedWhiteMeatTier(
+        whiteMeatTiers.find((t) => t.level === tierLevel) || whiteMeatTiers[0]
+      );
     } else {
       setSelectedCustomizations(defaultSelections.map((d) => d.id));
-      setSelectedWhiteMeatTier(whiteMeatTiers.find((t) => t.level === "none") || whiteMeatTiers[0]);
+      setSelectedWhiteMeatTier(
+        whiteMeatTiers.find((t) => t.level === "none") || whiteMeatTiers[0]
+      );
     }
     setIsInitialized(true);
   }, [isOpen, loading, existingCartItem, whiteMeatTiers, defaultSelections]);
 
   // --- 4. CALCULATION & VALIDATION EFFECTS ---
-  const updatePrice = useCallback(async () => {
-    if (!stableVariant || !isInitialized) return;
-    setIsCalculatingPrice(true);
-    try {
-      const price = await calculatePrice(selectedWhiteMeatTier, selectedCustomizations);
-      setCurrentPrice(price);
-    } catch {
-      setCurrentPrice(stableVariant.price);
-    } finally {
-      setIsCalculatingPrice(false);
-    }
-  }, [stableVariant, isInitialized, calculatePrice, selectedWhiteMeatTier, selectedCustomizations]);
+  const updatePrice = useCallback(() => {
+    if (!currentVariant || !isInitialized) return;
 
+    setIsCalculatingPrice(true);
+
+    let newPrice = currentVariant.price;
+
+    // Add white meat tier price
+    const whiteMeatTierInHook = whiteMeatTiers.find(
+      (t) => t.id === selectedWhiteMeatTier?.id
+    );
+    if (whiteMeatTierInHook) {
+      newPrice += whiteMeatTierInHook.price;
+    }
+
+    // Add customizations price
+    selectedCustomizations.forEach((id) => {
+      const custom = allCustomizations.find((c) => c.id === id);
+      // Ensure we don't double-add the white meat cost if it's also a "customization"
+      const isWhiteMeatCustomization = custom?.name
+        .toLowerCase()
+        .includes("white meat");
+      if (custom && !isWhiteMeatCustomization) {
+        newPrice += custom.base_price;
+      }
+    });
+
+    setCurrentPrice(newPrice);
+    setIsCalculatingPrice(false);
+  }, [
+    currentVariant,
+    isInitialized,
+    selectedWhiteMeatTier,
+    selectedCustomizations,
+    allCustomizations,
+    whiteMeatTiers,
+  ]);
   useEffect(() => {
     if (isInitialized) {
-      if (priceUpdateTimeoutRef.current) clearTimeout(priceUpdateTimeoutRef.current);
+      if (priceUpdateTimeoutRef.current)
+        clearTimeout(priceUpdateTimeoutRef.current);
       priceUpdateTimeoutRef.current = setTimeout(updatePrice, 250);
     }
     return () => {
-      if (priceUpdateTimeoutRef.current) clearTimeout(priceUpdateTimeoutRef.current);
+      if (priceUpdateTimeoutRef.current)
+        clearTimeout(priceUpdateTimeoutRef.current);
     };
   }, [updatePrice, isInitialized]);
 
@@ -152,14 +205,23 @@ export default function ChickenCustomizer({
   }, []);
 
   const handleCustomizationToggle = useCallback(
-    (customizationId: string, category: "sides" | "preparation" | "condiments") => {
+    (
+      customizationId: string,
+      category: "sides" | "preparation" | "condiments"
+    ) => {
       setSelectedCustomizations((prev) => {
         if (category === "preparation") {
-          const preparationIds = availableCustomizations.preparation.map((p) => p.id);
-          const withoutPreparation = prev.filter((id) => !preparationIds.includes(id));
+          const preparationIds = availableCustomizations.preparation.map(
+            (p) => p.id
+          );
+          const withoutPreparation = prev.filter(
+            (id) => !preparationIds.includes(id)
+          );
           return [...withoutPreparation, customizationId];
         }
-        return prev.includes(customizationId) ? prev.filter((id) => id !== customizationId) : [...prev, customizationId];
+        return prev.includes(customizationId)
+          ? prev.filter((id) => id !== customizationId)
+          : [...prev, customizationId];
       });
     },
     [availableCustomizations.preparation]
@@ -177,14 +239,22 @@ export default function ChickenCustomizer({
 
     const validation = validate(selectedWhiteMeatTier, selectedCustomizations);
     if (!validation.isValid) {
-      alert("Please fix the following issues:\n" + validation.errors.join("\n"));
+      alert(
+        "Please fix the following issues:\n" + validation.errors.join("\n")
+      );
       return;
     }
 
     const configuredModifiers: ConfiguredModifier[] = selectedCustomizations
       .map((id) => {
         const custom = allCustomizations.find((c) => c.id === id);
-        return custom ? { id: custom.id, name: custom.name, priceAdjustment: custom.base_price } : null;
+        return custom
+          ? {
+              id: custom.id,
+              name: custom.name,
+              priceAdjustment: custom.base_price,
+            }
+          : null;
       })
       .filter((m): m is ConfiguredModifier => m !== null);
 
@@ -197,7 +267,8 @@ export default function ChickenCustomizer({
     }
 
     const configuredItem: ConfiguredCartItem = {
-      id: existingCartItem?.id || `${item.id}-${currentVariant.id}-${Date.now()}`,
+      id:
+        existingCartItem?.id || `${item.id}-${currentVariant.id}-${Date.now()}`,
       menuItemId: item.id,
       menuItemName: item.name,
       variantId: currentVariant.id,
@@ -226,7 +297,8 @@ export default function ChickenCustomizer({
 
   useEffect(() => {
     return () => {
-      if (priceUpdateTimeoutRef.current) clearTimeout(priceUpdateTimeoutRef.current);
+      if (priceUpdateTimeoutRef.current)
+        clearTimeout(priceUpdateTimeoutRef.current);
       initializationRef.current = false;
     };
   }, []);
@@ -273,9 +345,16 @@ export default function ChickenCustomizer({
                   </span>
                 )}
               </p>
-              {hasValidationErrors && <div className="mt-2 text-sm text-red-600">{validationErrors.join(", ")}</div>}
+              {hasValidationErrors && (
+                <div className="mt-2 text-sm text-red-600">
+                  {validationErrors.join(", ")}
+                </div>
+              )}
             </div>
-            <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 text-2xl font-bold transition-colors">
+            <button
+              onClick={onCancel}
+              className="text-gray-400 hover:text-gray-600 text-2xl font-bold transition-colors"
+            >
               ×
             </button>
           </div>
@@ -286,7 +365,9 @@ export default function ChickenCustomizer({
           {/* Variant Selection */}
           {item.variants && item.variants.length > 1 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Choose Size</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Choose Size
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {item.variants.map((variant) => (
                   <button
@@ -299,8 +380,14 @@ export default function ChickenCustomizer({
                     }`}
                   >
                     <div className="font-semibold">{variant.name}</div>
-                    {variant.serves && <div className="text-sm text-gray-600">{variant.serves}</div>}
-                    <div className="text-lg font-bold text-green-600 mt-1">${variant.price.toFixed(2)}</div>
+                    {variant.serves && (
+                      <div className="text-sm text-gray-600">
+                        {variant.serves}
+                      </div>
+                    )}
+                    <div className="text-lg font-bold text-green-600 mt-1">
+                      ${variant.price.toFixed(2)}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -310,7 +397,9 @@ export default function ChickenCustomizer({
           {/* White Meat Selection */}
           {whiteMeatTiers.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">🍗 White Meat Options *</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                🍗 White Meat Options *
+              </h3>
               <div className="space-y-3">
                 {whiteMeatTiers.map((tier) => (
                   <label
@@ -338,7 +427,9 @@ export default function ChickenCustomizer({
           {/* Sides Selection */}
           {availableCustomizations.sides.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">🥔 Sides</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                🥔 Sides
+              </h3>
               <div className="space-y-3">
                 {availableCustomizations.sides.map((side) => (
                   <label
@@ -352,14 +443,23 @@ export default function ChickenCustomizer({
                     <input
                       type="checkbox"
                       checked={selectedCustomizations.includes(side.id)}
-                      onChange={() => handleCustomizationToggle(side.id, "sides")}
+                      onChange={() =>
+                        handleCustomizationToggle(side.id, "sides")
+                      }
                       className="w-4 h-4 text-blue-600"
                     />
                     <span className="flex-1">{side.name}</span>
-                    {side.base_price > 0 && <span className="text-green-600 font-semibold">+${side.base_price.toFixed(2)}</span>}
-                    {side.base_price === 0 && side.name.toLowerCase().includes("included") && (
-                      <span className="text-blue-600 font-semibold text-sm">INCLUDED</span>
+                    {side.base_price > 0 && (
+                      <span className="text-green-600 font-semibold">
+                        +${side.base_price.toFixed(2)}
+                      </span>
                     )}
+                    {side.base_price === 0 &&
+                      side.name.toLowerCase().includes("included") && (
+                        <span className="text-blue-600 font-semibold text-sm">
+                          INCLUDED
+                        </span>
+                      )}
                   </label>
                 ))}
               </div>
@@ -369,7 +469,9 @@ export default function ChickenCustomizer({
           {/* Preparation Options */}
           {availableCustomizations.preparation.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">👨‍🍳 Preparation</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                👨‍🍳 Preparation
+              </h3>
               <div className="space-y-3">
                 {availableCustomizations.preparation.map((prep) => (
                   <label
@@ -384,11 +486,17 @@ export default function ChickenCustomizer({
                       type="radio"
                       name="preparation"
                       checked={selectedCustomizations.includes(prep.id)}
-                      onChange={() => handleCustomizationToggle(prep.id, "preparation")}
+                      onChange={() =>
+                        handleCustomizationToggle(prep.id, "preparation")
+                      }
                       className="w-4 h-4 text-blue-600"
                     />
                     <span className="flex-1">{prep.name}</span>
-                    {prep.base_price > 0 && <span className="text-green-600 font-semibold">+${prep.base_price.toFixed(2)}</span>}
+                    {prep.base_price > 0 && (
+                      <span className="text-green-600 font-semibold">
+                        +${prep.base_price.toFixed(2)}
+                      </span>
+                    )}
                   </label>
                 ))}
               </div>
@@ -398,7 +506,9 @@ export default function ChickenCustomizer({
           {/* Condiments */}
           {availableCustomizations.condiments.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">🧄 Condiments</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                🧄 Condiments
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {availableCustomizations.condiments.map((condiment) => (
                   <label
@@ -412,11 +522,17 @@ export default function ChickenCustomizer({
                     <input
                       type="checkbox"
                       checked={selectedCustomizations.includes(condiment.id)}
-                      onChange={() => handleCustomizationToggle(condiment.id, "condiments")}
+                      onChange={() =>
+                        handleCustomizationToggle(condiment.id, "condiments")
+                      }
                       className="w-4 h-4 text-blue-600"
                     />
                     <span className="flex-1">{condiment.name}</span>
-                    {condiment.base_price > 0 && <span className="text-green-600 font-semibold">+${condiment.base_price.toFixed(2)}</span>}
+                    {condiment.base_price > 0 && (
+                      <span className="text-green-600 font-semibold">
+                        +${condiment.base_price.toFixed(2)}
+                      </span>
+                    )}
                   </label>
                 ))}
               </div>
@@ -426,7 +542,9 @@ export default function ChickenCustomizer({
           {/* Quantity and Special Instructions */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Quantity
+              </label>
               <select
                 value={quantity}
                 onChange={(e) => setQuantity(parseInt(e.target.value))}
@@ -441,7 +559,9 @@ export default function ChickenCustomizer({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Special Instructions</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Special Instructions
+              </label>
               <textarea
                 value={specialInstructions}
                 onChange={(e) => setSpecialInstructions(e.target.value)}
@@ -464,7 +584,9 @@ export default function ChickenCustomizer({
             </button>
             <button
               onClick={handleComplete}
-              disabled={hasValidationErrors || isCalculatingPrice || !isInitialized}
+              disabled={
+                hasValidationErrors || isCalculatingPrice || !isInitialized
+              }
               className="px-8 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               {isCalculatingPrice ? (
