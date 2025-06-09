@@ -1,4 +1,4 @@
-// src/components/features/orders/ChickenCustomizer.tsx - FINAL CLEANED VERSION
+// src/components/features/orders/ChickenCustomizer.tsx - REFACTORED AND FIXED
 "use client";
 
 import {
@@ -9,8 +9,9 @@ import {
   MenuItemWithVariants,
 } from "@/lib/types";
 import { useChickenCustomization } from "@/lib/utils/chicken-customization";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+// Interfaces can remain the same
 interface ChickenCustomizerProps {
   item: MenuItemWithVariants;
   selectedVariant?: MenuItemVariant;
@@ -38,9 +39,9 @@ export default function ChickenCustomizer({
   isOpen,
   restaurantId,
 }: ChickenCustomizerProps) {
-  // --- 1. STATE MANAGEMENT ---
+  // --- 1. STATE MANAGEMENT (Simplified) ---
   const [currentVariant, setCurrentVariant] = useState<MenuItemVariant | null>(
-    selectedVariant || (item.variants && item.variants[0]) || null
+    selectedVariant || item.variants?.[0] || null
   );
   const [allCustomizations, setAllCustomizations] = useState<Customization[]>(
     []
@@ -54,13 +55,10 @@ export default function ChickenCustomizer({
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [loading, setLoading] = useState(true);
   const [currentPrice, setCurrentPrice] = useState(0);
-  const [isCalculatingPrice, setIsCalculatingPrice] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const initializationRef = useRef<boolean>(false);
-  const priceUpdateTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const [isCalculatingPrice, setIsCalculatingPrice] = useState(false);
 
-  // --- 2. MEMOIZED VALUES & HOOKS ---
+  // --- 2. HOOKS (No change) ---
   const stableVariant = useMemo(() => currentVariant, [currentVariant]);
   const {
     availableCustomizations,
@@ -69,45 +67,92 @@ export default function ChickenCustomizer({
     validate,
   } = useChickenCustomization(stableVariant!, allCustomizations, restaurantId);
 
-  // --- 3. DATA FETCHING & INITIALIZATION EFFECTS ---
+  // --- 3. REFACTORED: Price Calculation ---
+  // This function will now be our single source of truth for price updates.
+  const recalculatePrice = useCallback(
+    (
+      variant: MenuItemVariant,
+      tier: WhiteMeatTier | null,
+      customizationIds: string[]
+    ) => {
+      setIsCalculatingPrice(true);
+      let newPrice = variant.price;
+
+      if (tier) {
+        // Ensure you're adding the price from the hook's generated tiers
+        const tierDetails = whiteMeatTiers.find((t) => t.id === tier.id);
+        if (tierDetails) {
+          newPrice += tierDetails.price;
+        }
+      }
+
+      customizationIds.forEach((id) => {
+        const custom = allCustomizations.find((c) => c.id === id);
+        const isWhiteMeatCustomization = custom?.name
+          .toLowerCase()
+          .includes("white meat");
+        if (custom && !isWhiteMeatCustomization) {
+          newPrice += custom.base_price;
+        }
+      });
+
+      setCurrentPrice(newPrice);
+      setIsCalculatingPrice(false);
+    },
+    [allCustomizations, whiteMeatTiers]
+  );
+
+  // --- 4. REFACTORED: Single Initialization and Data Loading Effect ---
   useEffect(() => {
     if (!isOpen) return;
-    initializationRef.current = false;
-    setIsInitialized(false);
-    const loadData = async () => {
-      setLoading(true);
+
+    let isMounted = true;
+
+    // This resets the state when the modal is opened for a new item
+    setCurrentVariant(selectedVariant || item.variants?.[0] || null);
+    setLoading(true);
+
+    const initialize = async () => {
       try {
         const response = await fetch(
           `/api/menu/customization?restaurant_id=${restaurantId}&applies_to=chicken`
         );
         if (response.ok) {
           const data = await response.json();
-          setAllCustomizations(data.data || []);
+          if (isMounted) {
+            setAllCustomizations(data.data || []);
+          }
         }
       } catch (error) {
         console.error("Error loading customizations:", error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
     };
-    loadData();
-  }, [isOpen, restaurantId]);
 
+    initialize();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, item, selectedVariant, restaurantId]);
+
+  // --- 5. NEW: Effect to set defaults and initial price after data loads ---
   useEffect(() => {
-    if (
-      loading ||
-      !isOpen ||
-      initializationRef.current ||
-      whiteMeatTiers.length === 0
-    )
-      return;
-    initializationRef.current = true;
+    if (loading || !currentVariant) return;
+
+    let initialTier: WhiteMeatTier | null = null;
+    let initialCustomizations: string[] = [];
 
     if (existingCartItem) {
       setQuantity(existingCartItem.quantity);
       setSpecialInstructions(existingCartItem.specialInstructions || "");
-      const modifierIds =
+
+      initialCustomizations =
         existingCartItem.selectedModifiers?.map((m) => m.id) || [];
-      setSelectedCustomizations(modifierIds);
+
       const whiteMeatModifier = existingCartItem.selectedModifiers?.find((m) =>
         m.name.toLowerCase().includes("white meat")
       );
@@ -117,132 +162,90 @@ export default function ChickenCustomizer({
         else if (whiteMeatModifier.name.includes("Extra")) tierLevel = "extra";
         else tierLevel = "normal";
       }
-      setSelectedWhiteMeatTier(
-        whiteMeatTiers.find((t) => t.level === tierLevel) || whiteMeatTiers[0]
-      );
+      initialTier =
+        whiteMeatTiers.find((t) => t.level === tierLevel) || whiteMeatTiers[0];
     } else {
-      setSelectedCustomizations(defaultSelections.map((d) => d.id));
-      setSelectedWhiteMeatTier(
-        whiteMeatTiers.find((t) => t.level === "none") || whiteMeatTiers[0]
-      );
-    }
-    setIsInitialized(true);
-  }, [isOpen, loading, existingCartItem, whiteMeatTiers, defaultSelections]);
-
-  // --- 4. CALCULATION & VALIDATION EFFECTS ---
-  const updatePrice = useCallback(() => {
-    if (!currentVariant || !isInitialized) return;
-
-    setIsCalculatingPrice(true);
-
-    let newPrice = currentVariant.price;
-
-    // Add white meat tier price
-    const whiteMeatTierInHook = whiteMeatTiers.find(
-      (t) => t.id === selectedWhiteMeatTier?.id
-    );
-    if (whiteMeatTierInHook) {
-      newPrice += whiteMeatTierInHook.price;
+      initialCustomizations = defaultSelections.map((d) => d.id);
+      initialTier =
+        whiteMeatTiers.find((t) => t.level === "none") || whiteMeatTiers[0];
     }
 
-    // Add customizations price
-    selectedCustomizations.forEach((id) => {
-      const custom = allCustomizations.find((c) => c.id === id);
-      // Ensure we don't double-add the white meat cost if it's also a "customization"
-      const isWhiteMeatCustomization = custom?.name
-        .toLowerCase()
-        .includes("white meat");
-      if (custom && !isWhiteMeatCustomization) {
-        newPrice += custom.base_price;
-      }
-    });
+    setSelectedCustomizations(initialCustomizations);
+    setSelectedWhiteMeatTier(initialTier);
 
-    // --- ADD THIS LINE FOR DEBUGGING ---
-    console.log("UPDATING PRICE:", {
-      variantPrice: currentVariant.price,
-      calculatedPrice: newPrice,
-    });
-    // ------------------------------------
-
-    setCurrentPrice(newPrice);
-    setIsCalculatingPrice(false);
+    // Initial price calculation
+    recalculatePrice(currentVariant, initialTier, initialCustomizations);
   }, [
+    loading,
     currentVariant,
-    isInitialized,
-    selectedWhiteMeatTier,
-    selectedCustomizations,
-    allCustomizations,
+    existingCartItem,
     whiteMeatTiers,
+    defaultSelections,
+    recalculatePrice,
   ]);
-  useEffect(() => {
-    if (isInitialized) {
-      if (priceUpdateTimeoutRef.current)
-        clearTimeout(priceUpdateTimeoutRef.current);
-      priceUpdateTimeoutRef.current = setTimeout(updatePrice, 250);
-    }
-    return () => {
-      if (priceUpdateTimeoutRef.current)
-        clearTimeout(priceUpdateTimeoutRef.current);
-    };
-  }, [updatePrice, isInitialized]);
 
   useEffect(() => {
-    if (!isInitialized) return;
+    if (loading) return; // Don't validate while loading customizations
     const validation = validate(selectedWhiteMeatTier, selectedCustomizations);
     setValidationErrors(validation.errors);
-  }, [selectedWhiteMeatTier, selectedCustomizations, validate, isInitialized]);
+  }, [selectedWhiteMeatTier, selectedCustomizations, validate, loading]);
 
-  // --- 5. EVENT HANDLERS ---
+  // --- 6. EVENT HANDLERS (Now trigger price recalculation directly) ---
   const handleVariantChange = useCallback(
     (variantId: string) => {
       const variant = item.variants?.find((v) => v.id === variantId);
       if (variant && variant.id !== currentVariant?.id) {
-        initializationRef.current = false;
-        setIsInitialized(false);
+        // Set the new variant, which will trigger the initialization effect
         setCurrentVariant(variant);
-        setSelectedCustomizations([]);
-        setSelectedWhiteMeatTier(null);
       }
     },
     [item.variants, currentVariant?.id]
   );
 
-  const handleWhiteMeatTierChange = useCallback((tier: WhiteMeatTier) => {
-    setSelectedWhiteMeatTier(tier);
-  }, []);
+  const handleWhiteMeatTierChange = useCallback(
+    (tier: WhiteMeatTier) => {
+      setSelectedWhiteMeatTier(tier);
+      recalculatePrice(currentVariant!, tier, selectedCustomizations);
+    },
+    [currentVariant, selectedCustomizations, recalculatePrice]
+  );
 
   const handleCustomizationToggle = useCallback(
     (
       customizationId: string,
       category: "sides" | "preparation" | "condiments"
     ) => {
-      setSelectedCustomizations((prev) => {
-        if (category === "preparation") {
-          const preparationIds = availableCustomizations.preparation.map(
-            (p) => p.id
-          );
-          const withoutPreparation = prev.filter(
-            (id) => !preparationIds.includes(id)
-          );
-          return [...withoutPreparation, customizationId];
-        }
-        return prev.includes(customizationId)
-          ? prev.filter((id) => id !== customizationId)
-          : [...prev, customizationId];
-      });
+      const newCustomizations =
+        category === "preparation"
+          ? [
+              ...selectedCustomizations.filter(
+                (id) =>
+                  !availableCustomizations.preparation.some((p) => p.id === id)
+              ),
+              customizationId,
+            ]
+          : selectedCustomizations.includes(customizationId)
+          ? selectedCustomizations.filter((id) => id !== customizationId)
+          : [...selectedCustomizations, customizationId];
+
+      setSelectedCustomizations(newCustomizations);
+      recalculatePrice(
+        currentVariant!,
+        selectedWhiteMeatTier,
+        newCustomizations
+      );
     },
-    [availableCustomizations.preparation]
+    [
+      availableCustomizations.preparation,
+      currentVariant,
+      selectedCustomizations,
+      selectedWhiteMeatTier,
+      recalculatePrice,
+    ]
   );
 
   const handleComplete = useCallback(() => {
     if (!currentVariant) return;
-
-    let finalPrice = currentVariant.price;
-    if (selectedWhiteMeatTier?.price) finalPrice += selectedWhiteMeatTier.price;
-    selectedCustomizations.forEach((id) => {
-      const custom = allCustomizations.find((c) => c.id === id);
-      if (custom) finalPrice += custom.base_price;
-    });
 
     const validation = validate(selectedWhiteMeatTier, selectedCustomizations);
     if (!validation.isValid) {
@@ -285,7 +288,7 @@ export default function ChickenCustomizer({
       selectedToppings: [],
       selectedModifiers: configuredModifiers,
       specialInstructions,
-      totalPrice: finalPrice,
+      totalPrice: currentPrice * quantity, // Use the live-calculated price
       displayName: `${item.name} (${currentVariant.name})`,
     };
     onComplete(configuredItem);
@@ -300,17 +303,12 @@ export default function ChickenCustomizer({
     existingCartItem,
     item,
     onComplete,
+    currentPrice,
   ]);
 
-  useEffect(() => {
-    return () => {
-      if (priceUpdateTimeoutRef.current)
-        clearTimeout(priceUpdateTimeoutRef.current);
-      initializationRef.current = false;
-    };
-  }, []);
+  // --- RENDER LOGIC (No changes needed) ---
+  if (!isOpen) return null;
 
-  // --- 6. RENDER LOGIC ---
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -324,7 +322,7 @@ export default function ChickenCustomizer({
     );
   }
 
-  if (!isOpen || !currentVariant) return null;
+  if (!currentVariant) return null; // Guard against null variant after loading
 
   const totalPrice = currentPrice * quantity;
   const hasValidationErrors = validationErrors.length > 0;
@@ -579,7 +577,6 @@ export default function ChickenCustomizer({
             </div>
           </div>
         </div>
-
         {/* Footer */}
         <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6">
           <div className="flex justify-between items-center">
@@ -591,9 +588,7 @@ export default function ChickenCustomizer({
             </button>
             <button
               onClick={handleComplete}
-              disabled={
-                hasValidationErrors || isCalculatingPrice || !isInitialized
-              }
+              disabled={hasValidationErrors || isCalculatingPrice}
               className="px-8 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               {isCalculatingPrice ? (
@@ -601,8 +596,6 @@ export default function ChickenCustomizer({
                   <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
                   Calculating...
                 </span>
-              ) : !isInitialized ? (
-                "Loading..."
               ) : (
                 `Add to Cart - $${totalPrice.toFixed(2)}`
               )}
