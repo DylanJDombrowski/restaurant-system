@@ -5,10 +5,10 @@ import { ApiResponse, MenuItemVariant } from "@/lib/types";
 
 export async function PATCH(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ): Promise<NextResponse<ApiResponse<MenuItemVariant>>> {
   try {
-    const variantId = context.params.id;
+    const variantId = params.id;
     const body = await request.json();
 
     const { data, error } = await supabaseServer
@@ -38,10 +38,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ): Promise<NextResponse<ApiResponse<null>>> {
   try {
-    const variantId = context.params.id;
+    const variantId = params.id;
 
     const { error } = await supabaseServer
       .from("menu_item_variants")
