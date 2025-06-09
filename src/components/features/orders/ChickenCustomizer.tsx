@@ -205,10 +205,7 @@ export default function ChickenCustomizer({
 
     setIsInitialized(true);
 
-    // Calculate initial price immediately after initialization
-    setTimeout(() => {
-      recalculatePrice();
-    }, 0);
+    // Price will be calculated by the useEffect that watches state changes
   }, [
     loading,
     isOpen,
@@ -216,10 +213,27 @@ export default function ChickenCustomizer({
     existingCartItem,
     whiteMeatTiers,
     defaultSelections,
+  ]);
+
+  // --- 6. PRICE UPDATE EFFECT (RELIABLE STATE-DRIVEN) ---
+  useEffect(() => {
+    if (isInitialized) {
+      console.log("🔄 State changed, recalculating price...", {
+        variant: currentVariant?.name,
+        whiteMeat: selectedWhiteMeatTier?.name,
+        customizations: selectedCustomizations.length,
+      });
+      recalculatePrice();
+    }
+  }, [
+    isInitialized,
+    currentVariant,
+    selectedWhiteMeatTier,
+    selectedCustomizations,
     recalculatePrice,
   ]);
 
-  // --- 6. VALIDATION EFFECT ---
+  // --- 7. VALIDATION EFFECT ---
   useEffect(() => {
     if (!isInitialized) return;
 
@@ -242,15 +256,10 @@ export default function ChickenCustomizer({
     [item.variants, currentVariant?.id]
   );
 
-  const handleWhiteMeatTierChange = useCallback(
-    (tier: WhiteMeatTier) => {
-      console.log("🍗 Changing white meat tier:", tier.name);
-      setSelectedWhiteMeatTier(tier);
-      // Calculate price immediately after state update
-      setTimeout(() => recalculatePrice(), 0);
-    },
-    [recalculatePrice]
-  );
+  const handleWhiteMeatTierChange = useCallback((tier: WhiteMeatTier) => {
+    console.log("🍗 Changing white meat tier:", tier.name);
+    setSelectedWhiteMeatTier(tier);
+  }, []);
 
   const handleCustomizationToggle = useCallback(
     (
@@ -260,8 +269,6 @@ export default function ChickenCustomizer({
       console.log("🔧 Toggling customization:", customizationId, category);
 
       setSelectedCustomizations((prev) => {
-        let newSelections: string[];
-
         if (category === "preparation") {
           // Radio button behavior for preparation
           const preparationIds = availableCustomizations.preparation.map(
@@ -270,21 +277,16 @@ export default function ChickenCustomizer({
           const withoutPreparation = prev.filter(
             (id) => !preparationIds.includes(id)
           );
-          newSelections = [...withoutPreparation, customizationId];
+          return [...withoutPreparation, customizationId];
         } else {
           // Checkbox behavior for sides and condiments
-          newSelections = prev.includes(customizationId)
+          return prev.includes(customizationId)
             ? prev.filter((id) => id !== customizationId)
             : [...prev, customizationId];
         }
-
-        // Calculate price immediately after state update
-        setTimeout(() => recalculatePrice(), 0);
-
-        return newSelections;
       });
     },
-    [availableCustomizations.preparation, recalculatePrice]
+    [availableCustomizations.preparation]
   );
 
   const handleComplete = useCallback(() => {
