@@ -157,6 +157,13 @@ export default function ChickenCustomizer({
       }
     });
 
+    // --- ADD THIS LINE FOR DEBUGGING ---
+    console.log("UPDATING PRICE:", {
+      variantPrice: currentVariant.price,
+      calculatedPrice: newPrice,
+    });
+    // ------------------------------------
+
     setCurrentPrice(newPrice);
     setIsCalculatingPrice(false);
   }, [
