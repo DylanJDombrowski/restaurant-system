@@ -1,13 +1,14 @@
-// src/app/staff/layout.tsx - FIXED
+// src/app/staff/layout.tsx - FINAL
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ProtectedRoute, useAuth } from "@/lib/contexts/auth-context";
 
-/**
- * StaffLayoutContent provides the UI for authenticated staff members,
- * including the navigation bar.
- */
+// This line forces this layout and its children to be rendered dynamically.
+// This is necessary because the layout's content depends on the user's
+// authentication state and the URL, which are only known at request time.
+export const dynamic = "force-dynamic";
+
 function StaffLayoutContent({ children }: { children: React.ReactNode }) {
   const { staff, restaurant, signOut, isManager, isAdmin } = useAuth();
 
@@ -68,11 +69,6 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * StaffLayout is now a conditional layout.
- * - If the user is on the /staff login page and not logged in, it renders the page directly.
- * - If the user is logged in OR on a deeper staff page, it enforces authentication.
- */
 export default function StaffLayout({
   children,
 }: {
@@ -81,7 +77,6 @@ export default function StaffLayout({
   const { user, loading } = useAuth();
   const pathname = usePathname();
 
-  // Show a loading state while authentication is being checked
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -90,14 +85,14 @@ export default function StaffLayout({
     );
   }
 
-  // If the user is on the PIN login page and is not logged in, show the login page directly
-  // without the protected layout wrapper.
+  // If we are on the main /staff page and the user is not logged in, just render the child
+  // (which is the PIN login page) without the full layout.
   if (pathname === "/staff" && !user) {
     return <>{children}</>;
   }
 
-  // Otherwise, for all other /staff pages or if the user is already logged in,
-  // apply the protected route and render the full staff layout with navigation.
+  // For any other staff page, or if the user is logged in, use the protected route
+  // and render the full layout with the navigation bar.
   return (
     <ProtectedRoute requireRole="staff">
       <StaffLayoutContent>{children}</StaffLayoutContent>
