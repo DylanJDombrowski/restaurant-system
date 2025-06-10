@@ -1,21 +1,23 @@
-// src/app/staff/layout.tsx - Protected Staff Layout
+// src/app/staff/layout.tsx - FINAL CORRECTED VERSION
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ProtectedRoute, useAuth } from "@/lib/contexts/auth-context";
 
+// This forces the layout to be rendered dynamically at request time.
+// It's essential because the layout's structure depends on authentication
+// status and the URL, which are only known when a user makes a request.
+export const dynamic = "force-dynamic";
+
 /**
- * Protected Staff Layout
- *
- * This layout wraps all staff routes with authentication protection.
- * It also provides role-based navigation, showing different options
- * based on the staff member's role.
+ * This component contains the actual UI for an authenticated staff member,
+ * including the navigation bar and main content area.
  */
 function StaffLayoutContent({ children }: { children: React.ReactNode }) {
   const { staff, restaurant, signOut, isManager, isAdmin } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Staff Navigation with Role-Based Features */}
       <nav className="bg-white shadow-md border-b">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-between h-16">
@@ -24,52 +26,41 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
                 Pizza Mia - Staff
               </Link>
               <div className="ml-4 text-sm text-gray-800">
-                {" "}
-                {/* Darker text */}
                 {restaurant?.name} • {staff?.name} ({staff?.role})
               </div>
             </div>
-
             <div className="flex items-center space-x-4">
-              {/* Core staff features - available to all authenticated staff */}
               <Link
                 href="/staff/orders"
-                className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium" // Darker text
+                className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium"
               >
                 Orders
               </Link>
-
-              {/* Manager features - only visible to managers and admins */}
               {isManager && (
                 <Link
-                  href="/staff/menu"
-                  className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium" // Darker text
+                  href="/admin/menu" // Corrected link for managers
+                  className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium"
                 >
                   Menu
                 </Link>
               )}
-
-              {/* Admin features - only visible to admins */}
               {isAdmin && (
                 <Link
                   href="/admin"
-                  className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium" // Darker text
+                  className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium"
                 >
                   Admin
                 </Link>
               )}
-
               <Link
                 href="/kitchen"
                 className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium"
               >
                 Kitchen Display
               </Link>
-
-              {/* Sign out button */}
               <button
                 onClick={signOut}
-                className="text-gray-900 hover:text-red-600 px-3 py-2 rounded-md border border-gray-300 hover:border-red-400 font-medium" // Darker text
+                className="text-gray-900 hover:text-red-600 px-3 py-2 rounded-md border border-gray-300 hover:border-red-400 font-medium"
               >
                 Sign Out
               </button>
@@ -77,24 +68,42 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </nav>
-
-      {/* Staff Content */}
       <main className="max-w-7xl mx-auto py-6 px-4">{children}</main>
     </div>
   );
 }
 
 /**
- * Staff Layout with Protection
- *
- * This is the main export that wraps the content with authentication.
- * All staff routes will require authentication and at least 'staff' role.
+ * StaffLayout is a conditional layout that correctly handles the public
+ * PIN login page versus protected internal staff pages.
  */
 export default function StaffLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { user, loading } = useAuth();
+  const pathname = usePathname();
+
+  // Show a simple loading state while we check for an active session.
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
+
+  // If the user is on the PIN login page (`/staff`) and is not logged in,
+  // we render the page directly without the protected layout. This allows
+  // unauthenticated users to see the PIN pad.
+  if (pathname === "/staff" && !user) {
+    return <>{children}</>;
+  }
+
+  // For all other /staff/* pages, or if the user is already logged in on /staff,
+  // we enforce the authentication protection and render the full staff layout
+  // with the navigation bar.
   return (
     <ProtectedRoute requireRole="staff">
       <StaffLayoutContent>{children}</StaffLayoutContent>
