@@ -7,6 +7,12 @@ interface SetPinRequest {
   pin?: string;
 }
 
+interface RouteContext {
+  params: {
+    id: string; // The staff member's ID from the URL
+  };
+}
+
 /**
  * PIN Management API for Staff
  *
@@ -15,10 +21,7 @@ interface SetPinRequest {
  */
 
 // GET: Check if a staff member has a PIN
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: RouteContext) {
   const supabase = createRouteHandlerClient({ cookies });
   try {
     const { id: staffId } = params;
