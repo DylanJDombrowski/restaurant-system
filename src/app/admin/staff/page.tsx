@@ -5,45 +5,129 @@ import { Staff, Restaurant, StaffRole } from "@/lib/types";
 import { useAuth } from "@/lib/contexts/auth-context";
 
 /**
+ * A modal dialog for setting a staff member's 4-digit PIN.
+ * It handles input, validation, and API submission.
+ */
+function SetPinModal({
+  staff,
+  onClose,
+  onPinSet,
+}: {
+  staff: Staff | null;
+  onClose: () => void;
+  onPinSet: () => void;
+}) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Don't render anything if no staff member is selected
+  if (!staff) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!/^\d{4}$/.test(pin)) {
+      setError("PIN must be exactly 4 digits.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/admin/staff/${staff.id}/pin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to set PIN.");
+      }
+
+      onPinSet();
+      onClose();
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unexpected error occurred.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 transition-opacity">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm m-4">
+        <h2 className="text-xl font-bold mb-4 text-gray-800">
+          Set PIN for {staff.name}
+        </h2>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label
+              htmlFor="pin"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              4-Digit PIN
+            </label>
+            <input
+              type="password"
+              id="pin"
+              name="pin"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+              maxLength={4}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Enter 4 digits"
+              autoFocus
+            />
+          </div>
+          {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || pin.length !== 4}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+            >
+              {loading ? "Saving..." : "Set PIN"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Staff Management Component
- *
- * This interface allows admins to manage all staff members for their restaurant.
- * It demonstrates several important patterns:
- *
- * 1. Administrative Control: Only admins can create, edit, or deactivate staff
- * 2. Role Management: Admins can assign appropriate roles to staff members
- * 3. Security Integration: Links Supabase Auth with business logic seamlessly
- *
- * Think of this as the HR department's digital filing cabinet - it keeps
- * track of everyone who works at the restaurant and what they're allowed to do.
  */
 export default function StaffManagementPage() {
-  // State management for the staff list and UI states
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [selectedStaffForPin, setSelectedStaffForPin] = useState<Staff | null>(
+    null
+  );
 
-  // Get current authentication context
   const { restaurant } = useAuth();
 
-  /**
-   * Load Staff Data
-   *
-   * This function fetches all staff members for the current restaurant.
-   * Notice how we filter by restaurant_id - this ensures multi-tenancy
-   * security (admins only see staff from their own restaurant).
-   */
-  // Wrap loadStaff in useCallback to prevent unnecessary re-renders
-  // and satisfy the exhaustive-deps rule
   const loadStaff = useCallback(async () => {
-    if (!restaurant) return; // Guard clause to prevent API calls without restaurant
+    if (!restaurant) return;
 
     try {
       setError(null);
-
-      // Fetch staff for current restaurant only
       const response = await fetch(
         `/api/admin/staff?restaurant_id=${restaurant.id}`
       );
@@ -60,28 +144,12 @@ export default function StaffManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, [restaurant]); // restaurant is the only dependency of loadStaff
+  }, [restaurant]);
 
-  /**
-   * Effect to load staff data when restaurant becomes available
-   *
-   * Now that loadStaff is wrapped in useCallback, we can safely
-   * include it in the dependency array. This effect will run when:
-   * 1. The component mounts
-   * 2. The restaurant changes
-   * 3. The loadStaff function changes (which only happens when restaurant changes)
-   */
   useEffect(() => {
     loadStaff();
-  }, [loadStaff]); // Now includes loadStaff as a dependency
+  }, [loadStaff]);
 
-  /**
-   * Toggle Staff Active Status
-   *
-   * Instead of deleting staff (which could break order history),
-   * we deactivate them. Think of this like suspending an employee
-   * ID badge - they can't access the system, but their history remains.
-   */
   const toggleStaffStatus = async (staffId: string, currentStatus: boolean) => {
     try {
       const response = await fetch(`/api/admin/staff/${staffId}`, {
@@ -94,7 +162,6 @@ export default function StaffManagementPage() {
         throw new Error("Failed to update staff status");
       }
 
-      // Update local state to reflect the change immediately
       setStaff((prev) =>
         prev.map((member) =>
           member.id === staffId
@@ -108,7 +175,11 @@ export default function StaffManagementPage() {
     }
   };
 
-  // Loading state with a professional spinner
+  const handleSetPinClick = (staffMember: Staff) => {
+    setSelectedStaffForPin(staffMember);
+    setIsPinModalOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -117,7 +188,6 @@ export default function StaffManagementPage() {
     );
   }
 
-  // Error state with recovery option
   if (error) {
     return (
       <div className="text-center py-16">
@@ -137,7 +207,6 @@ export default function StaffManagementPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header with Action Button */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Staff Management</h1>
@@ -153,7 +222,6 @@ export default function StaffManagementPage() {
         </button>
       </div>
 
-      {/* Staff Summary Cards */}
       <div className="grid md:grid-cols-3 gap-6">
         <StaffSummaryCard
           title="Total Staff"
@@ -178,7 +246,6 @@ export default function StaffManagementPage() {
         />
       </div>
 
-      {/* Staff List */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Staff Members</h2>
@@ -201,6 +268,7 @@ export default function StaffManagementPage() {
                 key={member.id}
                 staff={member}
                 onEdit={() => setEditingStaff(member)}
+                onSetPin={() => handleSetPinClick(member)}
                 onToggleStatus={() =>
                   toggleStaffStatus(member.id, member.is_active)
                 }
@@ -210,7 +278,6 @@ export default function StaffManagementPage() {
         )}
       </div>
 
-      {/* Create/Edit Form Modal */}
       {(showCreateForm || editingStaff) && (
         <StaffFormModal
           staff={editingStaff}
@@ -226,17 +293,21 @@ export default function StaffManagementPage() {
           }}
         />
       )}
+
+      {isPinModalOpen && (
+        <SetPinModal
+          staff={selectedStaffForPin}
+          onClose={() => setIsPinModalOpen(false)}
+          onPinSet={() => {
+            loadStaff();
+            setIsPinModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-/**
- * Staff Summary Card Component
- *
- * These cards provide a quick visual overview of staff metrics.
- * They're like a dashboard speedometer - giving admins instant
- * insight into their team composition.
- */
 function StaffSummaryCard({
   title,
   count,
@@ -269,49 +340,37 @@ function StaffSummaryCard({
   );
 }
 
-/**
- * Staff Member Row Component
- *
- * Each row represents one staff member with their key information
- * and available actions. Notice how we show different visual
- * indicators based on role and status.
- */
 function StaffMemberRow({
   staff,
   onEdit,
+  onSetPin,
   onToggleStatus,
 }: {
   staff: Staff;
   onEdit: () => void;
+  onSetPin: () => void;
   onToggleStatus: () => void;
 }) {
-  // Define role colors and badges
   const getRoleColor = (role: string) => {
     switch (role) {
       case "admin":
         return "bg-red-100 text-red-800";
       case "manager":
         return "bg-blue-100 text-blue-800";
-      case "staff":
-        return "bg-gray-100 text-gray-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
   };
 
-  // Format the creation date for better readability
   const joinedDate = new Date(staff.created_at).toLocaleDateString();
 
   return (
     <div className="px-6 py-4 hover:bg-gray-50 transition-colors">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          {/* Staff Avatar (using initials) */}
           <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
             {staff.name.charAt(0).toUpperCase()}
           </div>
-
-          {/* Staff Information */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
               {staff.name}
@@ -328,15 +387,28 @@ function StaffMemberRow({
               >
                 {staff.role.charAt(0).toUpperCase() + staff.role.slice(1)}
               </span>
+              {staff.pin ? (
+                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                  PIN Set
+                </span>
+              ) : (
+                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                  No PIN
+                </span>
+              )}
               <span className="text-sm text-gray-500">
                 Joined: {joinedDate}
               </span>
             </div>
           </div>
         </div>
-
-        {/* Action Buttons */}
         <div className="flex items-center space-x-2">
+          <button
+            onClick={onSetPin}
+            className="bg-purple-100 text-purple-700 px-3 py-1 rounded text-sm font-medium hover:bg-purple-200 transition-colors"
+          >
+            Set PIN
+          </button>
           <button
             onClick={onEdit}
             className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm font-medium hover:bg-blue-200 transition-colors"
@@ -359,16 +431,6 @@ function StaffMemberRow({
   );
 }
 
-/**
- * Staff Form Modal Component
- *
- * This modal handles both creating new staff and editing existing staff.
- * It's a perfect example of a reusable component - the same interface
- * serves two purposes based on whether we pass it an existing staff member.
- *
- * The form creates both the Supabase Auth user AND the staff record
- * simultaneously, ensuring they stay in sync.
- */
 function StaffFormModal({
   staff,
   restaurant,
@@ -380,41 +442,28 @@ function StaffFormModal({
   onClose: () => void;
   onSave: () => void;
 }) {
-  // Form state management
   const [formData, setFormData] = useState({
     name: staff?.name || "",
     email: staff?.email || "",
     role: staff?.role || "staff",
-    // Only show password fields for new staff
     password: "",
     confirmPassword: "",
   });
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Determine if this is an edit operation
   const isEditing = Boolean(staff);
 
-  /**
-   * Form Submission Handler
-   *
-   * This function demonstrates the coordinated creation of both
-   * Supabase Auth user and staff record. It's like opening both
-   * a bank account and employee file simultaneously.
-   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
 
     try {
-      // Validation
       if (!formData.name || !formData.email) {
         throw new Error("Name and email are required");
       }
 
-      // For new staff, validate password
       if (!isEditing) {
         if (!formData.password || formData.password.length < 6) {
           throw new Error("Password must be at least 6 characters");
@@ -424,17 +473,14 @@ function StaffFormModal({
         }
       }
 
-      // Prepare request data
       const requestData = {
         name: formData.name,
         email: formData.email,
         role: formData.role,
         restaurant_id: restaurant.id,
-        // Only include password for new staff
         ...(!isEditing && { password: formData.password }),
       };
 
-      // Make API call
       const endpoint = isEditing
         ? `/api/admin/staff/${staff!.id}`
         : "/api/admin/staff";
@@ -454,7 +500,6 @@ function StaffFormModal({
         );
       }
 
-      // Success! Close the modal and refresh the list
       onSave();
     } catch (error) {
       setError(error instanceof Error ? error.message : "An error occurred");
@@ -470,7 +515,6 @@ function StaffFormModal({
           {isEditing ? "Edit Staff Member" : "Add New Staff Member"}
         </h2>
 
-        {/* Error Display */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
             {error}
@@ -478,7 +522,6 @@ function StaffFormModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Full Name *
@@ -495,7 +538,6 @@ function StaffFormModal({
             />
           </div>
 
-          {/* Email Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Email Address *
@@ -509,7 +551,7 @@ function StaffFormModal({
               }
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="john@pizzamia.com"
-              disabled={isEditing} // Email can't be changed after creation
+              disabled={isEditing}
             />
             {isEditing && (
               <p className="text-xs text-gray-500 mt-1">
@@ -518,7 +560,6 @@ function StaffFormModal({
             )}
           </div>
 
-          {/* Role Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Role *
@@ -543,7 +584,6 @@ function StaffFormModal({
             </p>
           </div>
 
-          {/* Password Fields (Only for new staff) */}
           {!isEditing && (
             <>
               <div>
@@ -588,7 +628,6 @@ function StaffFormModal({
             </>
           )}
 
-          {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <button
               type="button"

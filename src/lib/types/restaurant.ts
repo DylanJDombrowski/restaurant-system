@@ -19,4 +19,5 @@ export interface Staff {
   role: StaffRole;
   is_active: boolean;
   created_at: Timestamp;
+  pin?: string | null;
 }
