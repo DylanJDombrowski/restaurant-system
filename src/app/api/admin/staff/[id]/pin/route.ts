@@ -18,10 +18,10 @@ interface SetPinRequest {
 // GET: Check if staff member has a PIN
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const staffId = params.id;
+    const { id: staffId } = await params;
 
     // Get current user from session
     const {
@@ -93,10 +93,10 @@ export async function GET(
 // POST: Set or generate PIN for staff member
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const staffId = params.id;
+    const { id: staffId } = await params;
     const body: SetPinRequest = await request.json();
 
     // Get current user from session
@@ -281,10 +281,10 @@ export async function POST(
 // DELETE: Remove PIN from staff member
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const staffId = params.id;
+    const { id: staffId } = await params;
 
     // Get current user from session
     const {
