@@ -22,6 +22,7 @@ function SetPinModal({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatedPin, setGeneratedPin] = useState<string | null>(null);
+  const { session } = useAuth();
 
   // Don't render anything if no staff member is selected
   if (!staff) return null;
@@ -45,7 +46,10 @@ function SetPinModal({
 
       const response = await fetch(`/api/admin/staff/${staff.id}/pin`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+        },
         body: JSON.stringify(requestBody),
       });
 
