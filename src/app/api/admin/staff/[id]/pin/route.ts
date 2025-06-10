@@ -127,6 +127,8 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<SetPinResponse>>> {
+  console.log("🔍 PIN API called");
+  console.log("Headers:", Object.fromEntries(request.headers.entries()));
   try {
     const params = await context.params;
     const staffId = params.id;
@@ -139,6 +141,10 @@ export async function POST(
       data: { user },
       error: authError,
     } = await supabaseServer.auth.getUser();
+    console.log("🔍 Supabase Auth Result:", {
+      user: user ? { id: user.id, email: user.email } : null,
+      error: authError,
+    });
 
     if (authError || !user) {
       console.error("❌ Authentication failed:", authError);
