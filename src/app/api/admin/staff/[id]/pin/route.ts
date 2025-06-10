@@ -264,7 +264,6 @@ export async function POST(
       .from("staff")
       .update({
         pin_hash: pinHash,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", staffId);
 
@@ -373,8 +372,7 @@ export async function DELETE(
       .from("staff")
       .update({
         pin_hash: null,
-        is_logged_in: false, // Log them out for security
-        updated_at: new Date().toISOString(),
+        is_logged_in: false,
       })
       .eq("id", staffId);
 
