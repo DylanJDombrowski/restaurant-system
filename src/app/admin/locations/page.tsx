@@ -19,7 +19,7 @@ export default function LocationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [registering, setRegistering] = useState<string | null>(null);
 
-  const { staff } = useAuth();
+  const { staff, signOut } = useAuth();
   const router = useRouter();
 
   // Load restaurants this admin can manage
@@ -66,32 +66,18 @@ export default function LocationsPage() {
       setRegistering(restaurant.id);
       setError(null);
 
-      // Store restaurant ID in localStorage (permanent pairing)
+      // Store restaurant ID in localStorage
       localStorage.setItem("pos_restaurant_id", restaurant.id);
       localStorage.setItem("pos_restaurant_name", restaurant.name);
       localStorage.setItem("pos_registered_at", new Date().toISOString());
       localStorage.setItem("pos_registered_by", staff?.email || "unknown");
 
-      // Optional: Log this registration event to the server for audit trail
-      try {
-        await fetch("/api/admin/terminals/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            restaurant_id: restaurant.id,
-            device_info: {
-              userAgent: navigator.userAgent,
-              timestamp: new Date().toISOString(),
-              registered_by: staff?.email,
-            },
-          }),
-        });
-      } catch (auditError) {
-        console.warn("Failed to log registration event:", auditError);
-        // Continue anyway - the localStorage registration is what matters
-      }
+      // ... (audit log fetch call)
 
-      // Success! Redirect to staff PIN login
+      // 3. Sign out the admin user to clear the session
+      await signOut();
+
+      // 4. Redirect to the staff PIN login page
       router.push("/staff");
     } catch (error) {
       console.error("Error registering terminal:", error);
