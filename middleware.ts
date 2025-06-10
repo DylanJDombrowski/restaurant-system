@@ -1,3 +1,4 @@
+// middleware.ts - Fixed to allow admin API routes
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -6,6 +7,11 @@ export function middleware(request: NextRequest) {
 
   // Skip all middleware logic in development
   if (process.env.NODE_ENV === "development") {
+    return NextResponse.next();
+  }
+
+  // Allow API routes to handle their own authentication
+  if (pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
 
@@ -29,11 +35,10 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Protect all routes except for the ones starting with:
-  // - /api/auth (authentication routes)
+  // Protect all routes except for:
+  // - /api/* (API routes handle their own auth)
   // - _next/static (static files)
   // - _next/image (image optimization files)
   // - favicon.ico (favicon file)
-  // The main /staff route is handled in the logic above.
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };
