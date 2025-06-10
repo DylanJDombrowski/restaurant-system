@@ -214,17 +214,6 @@ export const SECURITY_CONFIG = {
   PIN_HISTORY_COUNT: 5, // Remember last 5 PINs to prevent reuse
 } as const;
 
-// API response types
-export interface ApiResponse<T = unknown> {
-  data?: T;
-  error?: string;
-  message?: string;
-  metadata?: {
-    timestamp?: string;
-    request_id?: string;
-  };
-}
-
 // Form validation types
 export interface PinSetupForm {
   useCustomPin: boolean;
