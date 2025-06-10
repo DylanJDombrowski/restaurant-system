@@ -1,7 +1,7 @@
 // src/app/api/auth/pin-login/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { createHash } from "crypto";
+import { compare } from "bcryptjs";
 import { sign } from "jsonwebtoken";
 import type {
   PinLoginRequest,
@@ -47,45 +47,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash the provided PIN using the same method used during setup
-    const hashedPin = createHash("sha256").update(pin).digest("hex");
-
-    console.log("🔐 PIN login attempt:", {
+    console.log("🔐 PIN login attempt for restaurant:", {
       restaurant_id,
-      pin_hash: hashedPin.substring(0, 8) + "...", // Log partial hash for debugging
       client_ip: clientIP,
-      timestamp: new Date().toISOString(),
     });
-
     // Query staff table for matching PIN and restaurant
-    const { data: staffData, error: staffError } = await supabaseServer
+    const { data: staffList, error: staffError } = await supabaseServer
       .from("staff")
       .select(
-        `
-        id,
-        restaurant_id,
-        email,
-        name,
-        role,
-        is_active,
-        pin_hash,
-        last_login,
-        created_at
-      `
+        "id, name, email, role, is_active, pin_hash, restaurant_id, last_login, created_at"
       )
       .eq("restaurant_id", restaurant_id)
-      .eq("pin_hash", hashedPin)
       .eq("is_active", true)
-      .single();
+      .not("pin_hash", "is", null);
 
-    if (staffError || !staffData) {
-      console.log("❌ PIN login failed:", {
-        error: staffError?.message,
-        restaurant_id,
-        found_staff: !!staffData,
-        client_ip: clientIP,
-      });
+    if (staffError) {
+      console.error("❌ Database error fetching staff:", staffError);
+      return NextResponse.json(
+        { error: "Database query failed" },
+        { status: 500 }
+      );
+    }
 
+    if (!staffList || staffList.length === 0) {
+      console.log("❌ No active staff with PINs found for this restaurant.");
+      return NextResponse.json(
+        { error: "Invalid PIN or inactive account" },
+        { status: 401 }
+      );
+    }
+
+    // Step 2: Iterate and compare the PIN against each hash
+    let foundStaff: StaffRecord | null = null;
+    for (const staff of staffList) {
+      if (staff.pin_hash && (await compare(pin, staff.pin_hash))) {
+        foundStaff = staff as StaffRecord;
+        break; // Exit loop once a match is found
+      }
+    }
+
+    // Step 3: Handle login failure or success
+    if (!foundStaff) {
+      console.log("❌ PIN login failed: No matching hash found.");
       // Generic error message to prevent information leakage
       return NextResponse.json(
         { error: "Invalid PIN or inactive account" },
@@ -93,7 +96,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const typedStaffData = staffData as StaffRecord;
+    const typedStaffData = foundStaff;
 
     // Load restaurant data
     const { data: restaurantData, error: restaurantError } =
