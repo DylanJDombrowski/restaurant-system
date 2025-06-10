@@ -29,3 +29,5 @@ export * from "./restaurant";
 
 // Utility types
 export * from "./utils";
+
+export * from "./pin-login";

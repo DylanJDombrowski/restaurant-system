@@ -1,3 +1,4 @@
+// src/app/admin/layout.tsx - Updated with Locations link
 "use client";
 
 import Link from "next/link";
@@ -5,10 +6,6 @@ import { ProtectedRoute, useAuth } from "@/lib/contexts/auth-context";
 
 /**
  * Protected Admin Layout Content
- *
- * This layout is specifically for admin-only features. Notice how
- * it's structurally similar to the staff layout but with different
- * navigation options and styling to distinguish the admin area.
  */
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const { staff, restaurant, signOut } = useAuth();
@@ -55,6 +52,20 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
               Staff Management
             </Link>
 
+            {/* NEW: Terminal Registration Link */}
+            <Link
+              href="/admin/locations"
+              className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 border-l-4 border-orange-500"
+            >
+              <div className="flex items-center gap-2">
+                <span>📱</span>
+                <span>Terminal Registration</span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Setup POS devices
+              </div>
+            </Link>
+
             <div className="mt-8 border-t pt-4">
               <Link
                 href="/staff"
@@ -81,10 +92,6 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
 /**
  * Admin Layout with Protection
- *
- * This layout requires 'admin' role specifically. Notice how we use
- * ProtectedRoute with requireRole="admin" to enforce admin-only access.
- * This means managers and regular staff will see an access denied message.
  */
 export default function AdminLayout({
   children,

@@ -1,8 +1,16 @@
+// src/lib/contexts/auth-context.tsx
 "use client";
 import { supabase } from "@/lib/supabase/client";
 import { Restaurant, Staff } from "@/lib/types";
 import { Session, User } from "@supabase/supabase-js";
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 interface AuthContextType {
   user: User | null;
@@ -12,6 +20,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
+  loginWithPin: (pin: string, restaurantId: string) => Promise<void>; // NEW
   signOut: () => Promise<void>;
   isStaff: boolean;
   isManager: boolean;
@@ -39,100 +48,213 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /**
    * Load Staff Data via API Route
    *
-   * This new approach uses our API route to fetch staff data, which bypasses
-   * RLS issues and provides more reliable performance. Think of it like using
-   * the employee entrance instead of the customer entrance - it's a direct
-   * path to the data without security checkpoints that might slow things down.
+   * This approach uses our API route to fetch staff data, which bypasses
+   * RLS issues and provides more reliable performance.
    */
-  const loadStaffData = useCallback(async (session: Session, retryCount = 0) => {
-    // Prevent concurrent loading attempts
-    if (loadingStaffData.current) {
-      console.log("Staff data already loading, skipping...");
-      return;
-    }
+  const loadStaffData = useCallback(
+    async (session: Session, retryCount = 0) => {
+      // Prevent concurrent loading attempts
+      if (loadingStaffData.current) {
+        console.log("Staff data already loading, skipping...");
+        return;
+      }
 
-    // Prevent reloading the same user's data unless it's a retry
-    const userId = session.user.id;
-    if (currentUserId.current === userId && retryCount === 0) {
-      console.log("Staff data already loaded for this user, skipping...");
-      return;
-    }
+      // Prevent reloading the same user's data unless it's a retry
+      const userId = session.user.id;
+      if (currentUserId.current === userId && retryCount === 0) {
+        console.log("Staff data already loaded for this user, skipping...");
+        return;
+      }
 
-    loadingStaffData.current = true;
-    currentUserId.current = userId;
+      loadingStaffData.current = true;
+      currentUserId.current = userId;
 
-    try {
-      console.log(`Loading staff data via API (attempt ${retryCount + 1})`);
-      setError(null);
+      try {
+        console.log(`Loading staff data via API (attempt ${retryCount + 1})`);
+        setError(null);
 
-      // Use the API route with the access token
-      const response = await fetch("/api/auth/staff", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-      });
+        // Use the API route with the access token
+        const response = await fetch("/api/auth/staff", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
+        if (!response.ok) {
+          const errorData = await response.json();
 
-        if (response.status === 401) {
-          throw new Error("Authentication failed - please sign in again");
-        } else if (response.status === 404) {
-          throw new Error("No staff record found for this account");
+          if (response.status === 401) {
+            throw new Error("Authentication failed - please sign in again");
+          } else if (response.status === 404) {
+            throw new Error("No staff record found for this account");
+          } else {
+            throw new Error(
+              errorData.error ||
+                `API request failed with status ${response.status}`
+            );
+          }
+        }
+
+        const result = await response.json();
+
+        if (!result.data) {
+          throw new Error("Invalid response from API");
+        }
+
+        const { staff: staffData, restaurant: restaurantData } = result.data;
+
+        // Update state atomically
+        setStaff(staffData);
+        setRestaurant(restaurantData);
+        setError(null);
+
+        console.log(
+          "Staff data loaded successfully via API:",
+          staffData.name,
+          staffData.role
+        );
+        console.log("Restaurant data loaded:", restaurantData.name);
+      } catch (error) {
+        console.error("Failed to load staff data:", error);
+
+        // Handle different types of errors
+        if (error instanceof Error) {
+          if (error.message.includes("Failed to fetch") && retryCount < 2) {
+            // Network error - retry with delay
+            console.log(`Retrying API call (attempt ${retryCount + 1})`);
+            await new Promise((resolve) =>
+              setTimeout(resolve, (retryCount + 1) * 1000)
+            );
+            return loadStaffData(session, retryCount + 1);
+          }
+
+          setError(error.message);
         } else {
-          throw new Error(errorData.error || `API request failed with status ${response.status}`);
+          setError("An unexpected error occurred during authentication");
         }
+
+        // Clear user data on error
+        setUser(null);
+        setStaff(null);
+        setRestaurant(null);
+        currentUserId.current = null;
+
+        // Sign out for auth errors
+        if (
+          error instanceof Error &&
+          error.message.includes("Authentication failed")
+        ) {
+          await supabase.auth.signOut();
+        }
+      } finally {
+        loadingStaffData.current = false;
+        setLoading(false);
       }
+    },
+    []
+  );
 
-      const result = await response.json();
-
-      if (!result.data) {
-        throw new Error("Invalid response from API");
-      }
-
-      const { staff: staffData, restaurant: restaurantData } = result.data;
-
-      // Update state atomically
-      setStaff(staffData);
-      setRestaurant(restaurantData);
+  /**
+   * NEW: PIN Login Function
+   *
+   * This function handles authentication via PIN for registered terminals.
+   * It creates a custom session that integrates with our existing auth flow.
+   */
+  const loginWithPin = useCallback(
+    async (pin: string, restaurantId: string) => {
+      setLoading(true);
       setError(null);
 
-      console.log("Staff data loaded successfully via API:", staffData.name, staffData.role);
-      console.log("Restaurant data loaded:", restaurantData.name);
-    } catch (error) {
-      console.error("Failed to load staff data:", error);
+      try {
+        console.log("🔐 Attempting PIN login...");
 
-      // Handle different types of errors
-      if (error instanceof Error) {
-        if (error.message.includes("Failed to fetch") && retryCount < 2) {
-          // Network error - retry with delay
-          console.log(`Retrying API call (attempt ${retryCount + 1})`);
-          await new Promise((resolve) => setTimeout(resolve, (retryCount + 1) * 1000));
-          return loadStaffData(session, retryCount + 1);
+        // Call our PIN login API
+        const response = await fetch("/api/auth/pin-login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            pin,
+            restaurant_id: restaurantId,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "PIN login failed");
         }
 
-        setError(error.message);
-      } else {
-        setError("An unexpected error occurred during authentication");
-      }
+        const result = await response.json();
+        const {
+          staff: staffData,
+          restaurant: restaurantData,
+          session: sessionData,
+        } = result.data;
 
-      // Clear user data on error
-      setUser(null);
-      setStaff(null);
-      setRestaurant(null);
-      currentUserId.current = null;
+        // Create a custom user object for PIN-based sessions
+        const customUser: User = {
+          id: staffData.id,
+          aud: "staff",
+          role: "authenticated",
+          email: staffData.email,
+          phone: "",
+          confirmed_at: new Date().toISOString(),
+          email_confirmed_at: new Date().toISOString(),
+          last_sign_in_at: new Date().toISOString(),
+          app_metadata: {},
+          user_metadata: {
+            name: staffData.name,
+            role: staffData.role,
+            login_method: "pin",
+          },
+          identities: [],
+          created_at: staffData.created_at,
+          updated_at: new Date().toISOString(),
+        };
 
-      // Sign out for auth errors
-      if (error instanceof Error && error.message.includes("Authentication failed")) {
-        await supabase.auth.signOut();
+        // Create a custom session object
+        const customSession: Session = {
+          access_token: sessionData.token,
+          refresh_token: sessionData.token, // Use same token for simplicity
+          expires_in: 8 * 60 * 60, // 8 hours
+          expires_at: Math.floor(
+            new Date(sessionData.expires_at).getTime() / 1000
+          ),
+          token_type: "bearer",
+          user: customUser,
+        };
+
+        // Update auth state
+        setUser(customUser);
+        setStaff(staffData);
+        setRestaurant(restaurantData);
+        setSession(customSession);
+
+        // Store session data in localStorage for persistence
+        localStorage.setItem(
+          "pin_session",
+          JSON.stringify({
+            session: customSession,
+            staff: staffData,
+            restaurant: restaurantData,
+            expires_at: sessionData.expires_at,
+          })
+        );
+
+        console.log("✅ PIN login successful:", staffData.name);
+      } catch (error) {
+        console.error("❌ PIN login failed:", error);
+        setError(error instanceof Error ? error.message : "PIN login failed");
+        throw error;
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      loadingStaffData.current = false;
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Update the refs whenever staff or restaurant change
   useEffect(() => {
@@ -145,9 +267,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * Initialize Authentication
-   *
-   * Gets the initial session and loads staff data if user is signed in.
-   * This now uses a simpler approach since we're not doing database queries directly.
    */
   useEffect(() => {
     let mounted = true;
@@ -157,7 +276,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Initializing authentication...");
         setLoading(true);
 
-        // Get initial session
+        // First, check for existing PIN session
+        const storedPinSession = localStorage.getItem("pin_session");
+        if (storedPinSession) {
+          try {
+            const sessionData = JSON.parse(storedPinSession);
+            const expiresAt = new Date(sessionData.expires_at);
+
+            if (expiresAt > new Date()) {
+              console.log("📱 Restoring PIN session...");
+              setUser(sessionData.session.user);
+              setStaff(sessionData.staff);
+              setRestaurant(sessionData.restaurant);
+              setSession(sessionData.session);
+              setLoading(false);
+              return;
+            } else {
+              console.log("📱 PIN session expired, clearing...");
+              localStorage.removeItem("pin_session");
+            }
+          } catch (error) {
+            console.warn("Failed to restore PIN session:", error);
+            localStorage.removeItem("pin_session");
+          }
+        }
+
+        // Fall back to standard Supabase session
         const {
           data: { session: initialSession },
           error,
@@ -184,7 +328,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error("Error initializing auth:", error);
         if (mounted) {
-          setError(error instanceof Error ? error.message : "Failed to initialize authentication");
+          setError(
+            error instanceof Error
+              ? error.message
+              : "Failed to initialize authentication"
+          );
           setLoading(false);
         }
       }
@@ -199,8 +347,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * Auth State Change Listener
-   *
-   * Handles sign in, sign out, and token refresh events.
    */
   useEffect(() => {
     console.log("Setting up auth state listener...");
@@ -214,6 +360,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (loadingStaffData.current) {
         console.log("Still loading staff data, skipping auth change...");
         return;
+      }
+
+      // Clear PIN session on Supabase auth changes
+      if (event === "SIGNED_OUT") {
+        localStorage.removeItem("pin_session");
       }
 
       setSession(session);
@@ -235,7 +386,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Token refreshed - update user but only reload staff data if needed
         setUser(session.user);
 
-        // Check current state directly instead of relying on stale closure values
         const currentStaff = staffRef.current;
         const currentRestaurant = restaurantRef.current;
 
@@ -253,8 +403,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * Manual Retry Function
-   *
-   * Allows users to retry authentication if they get stuck.
    */
   const retryAuthentication = () => {
     console.log("Manually retrying authentication...");
@@ -298,6 +446,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loadingStaffData.current = false;
       currentUserId.current = null;
 
+      // Clear PIN session
+      localStorage.removeItem("pin_session");
+
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
@@ -323,6 +474,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         error,
         signIn,
+        loginWithPin, // NEW
         signOut,
         isStaff,
         isManager,
@@ -343,23 +495,27 @@ export const useAuth = () => {
   return context;
 };
 
-/**
- * Protected Route Component - Unchanged
- */
+// ProtectedRoute component remains the same...
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireRole?: "staff" | "manager" | "admin";
   fallback?: React.ReactNode;
 }
 
-export function ProtectedRoute({ children, requireRole, fallback }: ProtectedRouteProps) {
+export function ProtectedRoute({
+  children,
+  requireRole,
+  fallback,
+}: ProtectedRouteProps) {
   const { user, staff, loading, error, retryAuthentication } = useAuth();
 
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center h-screen">
         <div className="text-lg mb-4">Checking authentication...</div>
-        <div className="text-sm text-gray-600 mb-4">This usually takes just a moment</div>
+        <div className="text-sm text-gray-600 mb-4">
+          This usually takes just a moment
+        </div>
         <RetryButton onRetry={retryAuthentication} />
       </div>
     );
@@ -371,10 +527,16 @@ export function ProtectedRoute({ children, requireRole, fallback }: ProtectedRou
         <div className="text-center max-w-md">
           <div className="text-red-600 text-lg mb-2">Authentication Error</div>
           <div className="text-gray-600 mb-4">{error}</div>
-          <button onClick={retryAuthentication} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2">
+          <button
+            onClick={retryAuthentication}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2"
+          >
             Try Again
           </button>
-          <button onClick={() => window.location.reload()} className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+          >
             Refresh Page
           </button>
         </div>
@@ -388,15 +550,20 @@ export function ProtectedRoute({ children, requireRole, fallback }: ProtectedRou
 
   if (requireRole) {
     const roleHierarchy = { staff: 1, manager: 2, admin: 3 };
-    const userLevel = roleHierarchy[staff.role as keyof typeof roleHierarchy] || 0;
+    const userLevel =
+      roleHierarchy[staff.role as keyof typeof roleHierarchy] || 0;
     const requiredLevel = roleHierarchy[requireRole];
 
     if (userLevel < requiredLevel) {
       return (
         <div className="text-center py-16">
           <div className="text-red-600 text-lg mb-2">Access Denied</div>
-          <p className="text-gray-600">You need {requireRole} or higher privileges to access this area.</p>
-          <p className="text-sm text-gray-500 mt-2">Current role: {staff.role}</p>
+          <p className="text-gray-600">
+            You need {requireRole} or higher privileges to access this area.
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Current role: {staff.role}
+          </p>
         </div>
       );
     }
@@ -405,9 +572,6 @@ export function ProtectedRoute({ children, requireRole, fallback }: ProtectedRou
   return <>{children}</>;
 }
 
-/**
- * Retry Button Component
- */
 function RetryButton({ onRetry }: { onRetry: () => void }) {
   const [showRetry, setShowRetry] = useState(false);
 
@@ -423,17 +587,19 @@ function RetryButton({ onRetry }: { onRetry: () => void }) {
 
   return (
     <div className="text-center">
-      <div className="text-sm text-gray-500 mb-2">Taking longer than expected?</div>
-      <button onClick={onRetry} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">
+      <div className="text-sm text-gray-500 mb-2">
+        Taking longer than expected?
+      </div>
+      <button
+        onClick={onRetry}
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+      >
         Retry Authentication
       </button>
     </div>
   );
 }
 
-/**
- * Login Form Component - Unchanged
- */
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -450,7 +616,8 @@ function LoginForm() {
     try {
       await signIn(email, password);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Login failed";
+      const errorMessage =
+        error instanceof Error ? error.message : "Login failed";
       setLoginError(errorMessage);
       setPassword("");
     } finally {
@@ -462,8 +629,12 @@ function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-gray-900">🍕 Pizza Mia Staff Login</h2>
-          <p className="mt-2 text-gray-600">Sign in to access the staff dashboard</p>
+          <h2 className="text-3xl font-extrabold text-gray-900">
+            🍕 Pizza Mia Staff Login
+          </h2>
+          <p className="mt-2 text-gray-600">
+            Sign in to access the staff dashboard
+          </p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -480,7 +651,10 @@ function LoginForm() {
           )}
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700"
+            >
               Email Address
             </label>
             <input
@@ -497,7 +671,10 @@ function LoginForm() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700"
+            >
               Password
             </label>
             <input
@@ -519,8 +696,20 @@ function LoginForm() {
           >
             {isSubmitting ? (
               <span className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <svg
+                  className="animate-spin -ml-1 mr-3 h-5 w-5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
                   <path
                     className="opacity-75"
                     fill="currentColor"
