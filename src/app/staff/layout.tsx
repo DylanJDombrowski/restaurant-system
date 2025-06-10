@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ProtectedRoute, useAuth } from "@/lib/contexts/auth-context";
+import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
 
 // This forces the layout to be rendered dynamically at request time.
 // It's essential because the layout's structure depends on authentication
@@ -87,11 +88,7 @@ export default function StaffLayout({
 
   // Show a simple loading state while we check for an active session.
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        Loading...
-      </div>
-    );
+    return <AuthLoadingScreen />;
   }
 
   // If the user is on the PIN login page (`/staff`) and is not logged in,
