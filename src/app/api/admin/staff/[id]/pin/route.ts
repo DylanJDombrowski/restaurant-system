@@ -7,6 +7,8 @@ interface SetPinRequest {
   pin?: string;
 }
 
+// Define the shape of the context object passed to the route handlers.
+// This includes the dynamic route parameters.
 interface RouteContext {
   params: {
     id: string; // The staff member's ID from the URL
@@ -110,9 +112,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       );
     }
 
-    if (!body.pin || !/^\d{4}$/.test(body.pin)) {
+    // Updated validation to require exactly 6 digits.
+    if (!body.pin || !/^\d{6}$/.test(body.pin)) {
       return NextResponse.json(
-        { error: "PIN must be exactly 4 digits" },
+        { error: "PIN must be exactly 6 digits" },
         { status: 400 }
       );
     }
