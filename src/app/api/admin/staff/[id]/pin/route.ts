@@ -80,10 +80,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 }
 
 // POST: Set a new PIN for a staff member
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, { params }: RouteContext) {
   const supabase = createRouteHandlerClient({ cookies });
   try {
     const { id: staffId } = params;
@@ -150,10 +147,7 @@ export async function POST(
 }
 
 // DELETE: Remove a PIN from a staff member
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
   const supabase = createRouteHandlerClient({ cookies });
   try {
     const { id: staffId } = params;
