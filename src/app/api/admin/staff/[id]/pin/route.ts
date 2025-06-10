@@ -1,8 +1,33 @@
-// src/app/api/admin/staff/[id]/pin/route.ts - Fixed PIN Management API
+// src/app/api/admin/staff/[id]/pin/route.ts - Fixed Authentication
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { hash, compare } from "bcryptjs";
 import { ApiResponse } from "@/lib/types";
+
+// Helper function to get authenticated user (same as auth/staff route)
+async function getAuthenticatedUser(request: NextRequest) {
+  // Get the authorization header
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    throw new Error("Missing or invalid authorization header");
+  }
+
+  // Extract the access token
+  const accessToken = authHeader.substring(7);
+
+  // Verify the user with Supabase Auth using the access token
+  const {
+    data: { user },
+    error: authError,
+  } = await supabaseServer.auth.getUser(accessToken);
+
+  if (authError || !user) {
+    console.error("Auth verification failed:", authError);
+    throw new Error("Invalid or expired token");
+  }
+
+  return user;
+}
 
 interface SetPinRequest {
   pin?: string;
@@ -31,13 +56,6 @@ interface SetPinResponse {
   };
 }
 
-/**
- * PIN Management API for Staff Members
- *
- * Handles 6-digit PIN creation, verification, and removal for staff authentication.
- * Only admins and managers can manage PINs for their restaurant's staff.
- */
-
 // GET: Check if a staff member has a PIN set
 export async function GET(
   request: NextRequest,
@@ -49,19 +67,9 @@ export async function GET(
 
     console.log("🔍 Checking PIN status for staff:", staffId);
 
-    // Get current user from Supabase Auth
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseServer.auth.getUser();
-
-    if (authError || !user) {
-      console.error("❌ Authentication failed:", authError);
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
+    // ✅ FIXED: Use proper authentication
+    const user = await getAuthenticatedUser(request);
+    console.log("🔐 Authenticated user:", user.email);
 
     // Verify admin has permission to manage this staff member
     const { data: adminStaff, error: adminError } = await supabaseServer
@@ -115,6 +123,11 @@ export async function GET(
     return NextResponse.json({ data: response });
   } catch (error) {
     console.error("💥 Error checking PIN status:", error);
+
+    if (error instanceof Error && error.message.includes("authorization")) {
+      return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -127,8 +140,6 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<SetPinResponse>>> {
-  console.log("🔍 PIN API called");
-  console.log("Headers:", Object.fromEntries(request.headers.entries()));
   try {
     const params = await context.params;
     const staffId = params.id;
@@ -136,23 +147,9 @@ export async function POST(
 
     console.log("🔐 Setting PIN for staff:", staffId);
 
-    // Get current user from Supabase Auth
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseServer.auth.getUser();
-    console.log("🔍 Supabase Auth Result:", {
-      user: user ? { id: user.id, email: user.email } : null,
-      error: authError,
-    });
-
-    if (authError || !user) {
-      console.error("❌ Authentication failed:", authError);
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
+    // ✅ FIXED: Use proper authentication
+    const user = await getAuthenticatedUser(request);
+    console.log("🔐 Authenticated user:", user.email);
 
     // Verify admin permissions
     const { data: adminStaff, error: adminError } = await supabaseServer
@@ -260,7 +257,7 @@ export async function POST(
     }
 
     // Hash the PIN securely
-    const pinHash = await hash(finalPin, 12); // Increased rounds for better security
+    const pinHash = await hash(finalPin, 12);
 
     // Update staff record with new PIN
     const { error: updateError } = await supabaseServer
@@ -300,6 +297,11 @@ export async function POST(
     return NextResponse.json({ data: response });
   } catch (error) {
     console.error("💥 Error setting PIN:", error);
+
+    if (error instanceof Error && error.message.includes("authorization")) {
+      return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -318,18 +320,8 @@ export async function DELETE(
 
     console.log("🗑️ Removing PIN for staff:", staffId);
 
-    // Get current user from Supabase Auth
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseServer.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
+    // ✅ FIXED: Use proper authentication
+    const user = await getAuthenticatedUser(request);
 
     // Verify admin permissions
     const { data: adminStaff, error: adminError } = await supabaseServer
@@ -402,6 +394,11 @@ export async function DELETE(
     });
   } catch (error) {
     console.error("💥 Error removing PIN:", error);
+
+    if (error instanceof Error && error.message.includes("authorization")) {
+      return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
