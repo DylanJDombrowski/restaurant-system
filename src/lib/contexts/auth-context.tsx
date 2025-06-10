@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
 
 interface AuthContextType {
   user: User | null;
@@ -506,15 +507,7 @@ export function ProtectedRoute({
   const { user, staff, loading, error, retryAuthentication } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex flex-col justify-center items-center h-screen">
-        <div className="text-lg mb-4">Checking authentication...</div>
-        <div className="text-sm text-gray-600 mb-4">
-          This usually takes just a moment
-        </div>
-        <RetryButton onRetry={retryAuthentication} />
-      </div>
-    );
+    return <AuthLoadingScreen />;
   }
 
   if (error) {
@@ -566,34 +559,6 @@ export function ProtectedRoute({
   }
 
   return <>{children}</>;
-}
-
-function RetryButton({ onRetry }: { onRetry: () => void }) {
-  const [showRetry, setShowRetry] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowRetry(true);
-    }, 5000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!showRetry) return null;
-
-  return (
-    <div className="text-center">
-      <div className="text-sm text-gray-500 mb-2">
-        Taking longer than expected?
-      </div>
-      <button
-        onClick={onRetry}
-        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-      >
-        Retry Authentication
-      </button>
-    </div>
-  );
 }
 
 function LoginForm() {
