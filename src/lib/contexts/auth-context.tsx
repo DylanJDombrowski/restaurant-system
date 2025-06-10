@@ -20,12 +20,13 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
-  loginWithPin: (pin: string, restaurantId: string) => Promise<void>; // NEW
+  loginWithPin: (pin: string, restaurantId: string) => Promise<void>;
   signOut: () => Promise<void>;
   isStaff: boolean;
   isManager: boolean;
   isAdmin: boolean;
   retryAuthentication: () => void;
+  authMethod: "email" | "pin" | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authMethod, setAuthMethod] = useState<"email" | "pin" | null>(null); // NEW
 
   // Refs for state management
   const loadingStaffData = useRef(false);
@@ -47,19 +49,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * Load Staff Data via API Route
-   *
-   * This approach uses our API route to fetch staff data, which bypasses
-   * RLS issues and provides more reliable performance.
    */
   const loadStaffData = useCallback(
     async (session: Session, retryCount = 0) => {
-      // Prevent concurrent loading attempts
       if (loadingStaffData.current) {
         console.log("Staff data already loading, skipping...");
         return;
       }
 
-      // Prevent reloading the same user's data unless it's a retry
       const userId = session.user.id;
       if (currentUserId.current === userId && retryCount === 0) {
         console.log("Staff data already loaded for this user, skipping...");
@@ -73,7 +70,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log(`Loading staff data via API (attempt ${retryCount + 1})`);
         setError(null);
 
-        // Use the API route with the access token
         const response = await fetch("/api/auth/staff", {
           method: "GET",
           headers: {
@@ -105,7 +101,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const { staff: staffData, restaurant: restaurantData } = result.data;
 
-        // Update state atomically
         setStaff(staffData);
         setRestaurant(restaurantData);
         setError(null);
@@ -119,10 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error("Failed to load staff data:", error);
 
-        // Handle different types of errors
         if (error instanceof Error) {
           if (error.message.includes("Failed to fetch") && retryCount < 2) {
-            // Network error - retry with delay
             console.log(`Retrying API call (attempt ${retryCount + 1})`);
             await new Promise((resolve) =>
               setTimeout(resolve, (retryCount + 1) * 1000)
@@ -135,13 +128,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setError("An unexpected error occurred during authentication");
         }
 
-        // Clear user data on error
         setUser(null);
         setStaff(null);
         setRestaurant(null);
         currentUserId.current = null;
 
-        // Sign out for auth errors
         if (
           error instanceof Error &&
           error.message.includes("Authentication failed")
@@ -157,10 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   /**
-   * NEW: PIN Login Function
-   *
-   * This function handles authentication via PIN for registered terminals.
-   * It creates a custom session that integrates with our existing auth flow.
+   * ENHANCED: PIN Login Function with better session management
    */
   const loginWithPin = useCallback(
     async (pin: string, restaurantId: string) => {
@@ -170,7 +158,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         console.log("🔐 Attempting PIN login...");
 
-        // Call our PIN login API
         const response = await fetch("/api/auth/pin-login", {
           method: "POST",
           headers: {
@@ -218,8 +205,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Create a custom session object
         const customSession: Session = {
           access_token: sessionData.token,
-          refresh_token: sessionData.token, // Use same token for simplicity
-          expires_in: 8 * 60 * 60, // 8 hours
+          refresh_token: sessionData.token,
+          expires_in: 8 * 60 * 60,
           expires_at: Math.floor(
             new Date(sessionData.expires_at).getTime() / 1000
           ),
@@ -232,6 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setStaff(staffData);
         setRestaurant(restaurantData);
         setSession(customSession);
+        setAuthMethod("pin"); // NEW: Track auth method
 
         // Store session data in localStorage for persistence
         localStorage.setItem(
@@ -241,6 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             staff: staffData,
             restaurant: restaurantData,
             expires_at: sessionData.expires_at,
+            auth_method: "pin",
           })
         );
 
@@ -256,17 +245,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  // Update the refs whenever staff or restaurant change
-  useEffect(() => {
-    staffRef.current = staff;
-  }, [staff]);
-
-  useEffect(() => {
-    restaurantRef.current = restaurant;
-  }, [restaurant]);
-
   /**
-   * Initialize Authentication
+   * ENHANCED: Initialize Authentication with better session handling
    */
   useEffect(() => {
     let mounted = true;
@@ -276,7 +256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Initializing authentication...");
         setLoading(true);
 
-        // First, check for existing PIN session
+        // Check for existing PIN session FIRST
         const storedPinSession = localStorage.getItem("pin_session");
         if (storedPinSession) {
           try {
@@ -289,8 +269,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setStaff(sessionData.staff);
               setRestaurant(sessionData.restaurant);
               setSession(sessionData.session);
+              setAuthMethod("pin");
               setLoading(false);
-              return;
+              return; // Early return - don't check Supabase session
             } else {
               console.log("📱 PIN session expired, clearing...");
               localStorage.removeItem("pin_session");
@@ -301,7 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // Fall back to standard Supabase session
+        // No valid PIN session - check Supabase session
         const {
           data: { session: initialSession },
           error,
@@ -319,8 +300,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
 
-        // Load staff data if user exists
         if (initialSession?.user) {
+          setAuthMethod("email"); // Traditional Supabase auth
           await loadStaffData(initialSession);
         } else {
           setLoading(false);
@@ -346,7 +327,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadStaffData]);
 
   /**
-   * Auth State Change Listener
+   * ENHANCED: Auth State Change Listener
    */
   useEffect(() => {
     console.log("Setting up auth state listener...");
@@ -356,13 +337,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event);
 
-      // Don't process events if we're still loading
+      // Don't process Supabase events if we're using PIN auth
+      if (authMethod === "pin") {
+        console.log("Ignoring Supabase auth change - using PIN session");
+        return;
+      }
+
       if (loadingStaffData.current) {
         console.log("Still loading staff data, skipping auth change...");
         return;
       }
 
-      // Clear PIN session on Supabase auth changes
       if (event === "SIGNED_OUT") {
         localStorage.removeItem("pin_session");
       }
@@ -371,20 +356,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
 
       if (event === "SIGNED_OUT" || !session?.user) {
-        // Clear all user data
         setUser(null);
         setStaff(null);
         setRestaurant(null);
+        setAuthMethod(null);
         currentUserId.current = null;
         setLoading(false);
         console.log("User signed out - cleared auth state");
       } else if (event === "SIGNED_IN" && session?.user) {
-        // User signed in - load their staff data
         setUser(session.user);
+        setAuthMethod("email");
         await loadStaffData(session);
       } else if (event === "TOKEN_REFRESHED" && session?.user) {
-        // Token refreshed - update user but only reload staff data if needed
         setUser(session.user);
+        setAuthMethod("email");
 
         const currentStaff = staffRef.current;
         const currentRestaurant = restaurantRef.current;
@@ -399,7 +384,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Cleaning up auth listener...");
       subscription.unsubscribe();
     };
-  }, [loadStaffData]);
+  }, [loadStaffData, authMethod]);
+
+  // Update refs
+  useEffect(() => {
+    staffRef.current = staff;
+  }, [staff]);
+
+  useEffect(() => {
+    restaurantRef.current = restaurant;
+  }, [restaurant]);
 
   /**
    * Manual Retry Function
@@ -410,12 +404,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     if (session?.user) {
-      // Reset state and retry
       currentUserId.current = null;
       loadingStaffData.current = false;
       loadStaffData(session);
     } else {
-      // No session - refresh page
       window.location.reload();
     }
   };
@@ -425,6 +417,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
 
     try {
+      // Clear any PIN session first
+      localStorage.removeItem("pin_session");
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -442,12 +437,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
-      // Clear refs and state before signing out
       loadingStaffData.current = false;
       currentUserId.current = null;
 
-      // Clear PIN session
+      // Clear both auth methods
       localStorage.removeItem("pin_session");
+      setAuthMethod(null);
 
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
@@ -474,12 +469,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         error,
         signIn,
-        loginWithPin, // NEW
+        loginWithPin,
         signOut,
         isStaff,
         isManager,
         isAdmin,
         retryAuthentication,
+        authMethod, // NEW
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-// src/app/staff/page.tsx
+// src/app/staff/page.tsx - ENHANCED VERSION
 "use client";
 
 import { useEffect, useState } from "react";
@@ -6,11 +6,10 @@ import { useAuth } from "@/lib/contexts/auth-context";
 import { useRouter } from "next/navigation";
 
 /**
- * Staff PIN Login Page
+ * ENHANCED Staff PIN Login Page
  *
- * This is the main interface staff see when they open the POS system.
- * It provides a simple, touch-friendly way to log in using only a 6-digit PIN
- * on a device that's already been registered to their restaurant.
+ * This page now properly handles the dual authentication system
+ * and provides better user experience during auth state transitions.
  */
 export default function StaffLoginPage() {
   const [pin, setPin] = useState("");
@@ -18,8 +17,9 @@ export default function StaffLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [restaurantName, setRestaurantName] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [showEmailLogin, setShowEmailLogin] = useState(false);
 
-  const { user, staff, loginWithPin } = useAuth();
+  const { user, staff, authMethod, loginWithPin, signOut } = useAuth();
   const router = useRouter();
 
   // Check terminal registration status
@@ -37,18 +37,22 @@ export default function StaffLoginPage() {
     }
   }, []);
 
-  // Redirect if already logged in
+  // Handle redirect for already authenticated users
   useEffect(() => {
-    if (user && staff) {
-      router.push("/staff/orders");
+    if (user && staff && authMethod) {
+      console.log(`User authenticated via ${authMethod}, redirecting...`);
+
+      // Small delay to prevent flash
+      const timer = setTimeout(() => {
+        router.push("/staff/orders");
+      }, 100);
+
+      return () => clearTimeout(timer);
     }
-  }, [user, staff, router]);
+  }, [user, staff, authMethod, router]);
 
   /**
    * Handle PIN Input
-   *
-   * This function manages the PIN entry process, including validation
-   * and calling the authentication API.
    */
   const handlePinSubmit = async () => {
     if (pin.length !== 6) {
@@ -66,10 +70,8 @@ export default function StaffLoginPage() {
     setError(null);
 
     try {
-      // Call the enhanced auth context method
       await loginWithPin(pin, restaurantId);
-
-      // Success - redirect will happen automatically via auth context
+      // Redirect will happen automatically via useEffect above
     } catch (error) {
       console.error("PIN login failed:", error);
       setError(error instanceof Error ? error.message : "Login failed");
@@ -81,17 +83,13 @@ export default function StaffLoginPage() {
 
   /**
    * Handle Keypad Input
-   *
-   * This function manages the numeric keypad interactions.
    */
   const handleKeypadPress = (digit: string) => {
     if (pin.length < 6) {
       const newPin = pin + digit;
       setPin(newPin);
 
-      // Auto-submit when 6 digits are entered
       if (newPin.length === 6) {
-        // Small delay to show the complete PIN
         setTimeout(() => handlePinSubmit(), 100);
       }
     }
@@ -107,7 +105,57 @@ export default function StaffLoginPage() {
     setError(null);
   };
 
-  // If terminal is not registered, show registration prompt
+  /**
+   * Handle Email Login Mode
+   */
+  const handleSwitchToEmail = async () => {
+    // Clear any existing PIN session
+    localStorage.removeItem("pin_session");
+    await signOut();
+    setShowEmailLogin(true);
+  };
+
+  // Show loading state while auth is being determined
+  if (user && staff && authMethod) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-medium text-gray-900 mb-2">
+            Welcome back, {staff.name}!
+          </div>
+          <div className="text-sm text-gray-600">Redirecting to orders...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show email login interface if requested
+  if (showEmailLogin) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+          <h1 className="text-2xl font-bold text-center mb-6">Admin Login</h1>
+          <p className="text-center text-gray-600 mb-6">
+            Use email and password for administrative access
+          </p>
+          <button
+            onClick={() => router.push("/admin")}
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Go to Admin Login
+          </button>
+          <button
+            onClick={() => setShowEmailLogin(false)}
+            className="w-full mt-3 bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+          >
+            ← Back to PIN Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Terminal not registered
   if (!isRegistered) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -122,7 +170,7 @@ export default function StaffLoginPage() {
           </p>
           <div className="space-y-3">
             <button
-              onClick={() => router.push("/admin")}
+              onClick={handleSwitchToEmail}
               className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
             >
               Admin Login to Register
@@ -221,11 +269,11 @@ export default function StaffLoginPage() {
           </button>
         </div>
 
-        {/* Manual Submit Button (backup) */}
+        {/* Manual Submit Button */}
         <button
           onClick={handlePinSubmit}
           disabled={loading || pin.length !== 6}
-          className="w-full bg-blue-600 text-white py-4 px-4 rounded-lg font-bold text-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
+          className="w-full bg-blue-600 text-white py-4 px-4 rounded-lg font-bold text-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors mb-4"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
@@ -257,18 +305,16 @@ export default function StaffLoginPage() {
         </button>
 
         {/* Footer */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
+        <div className="text-center">
+          <p className="text-xs text-gray-500 mb-2">
             Need help? Contact your manager or admin
           </p>
-          <div className="mt-2">
-            <button
-              onClick={() => router.push("/admin")}
-              className="text-xs text-blue-600 hover:text-blue-800 underline"
-            >
-              Admin Login
-            </button>
-          </div>
+          <button
+            onClick={handleSwitchToEmail}
+            className="text-xs text-blue-600 hover:text-blue-800 underline"
+          >
+            Admin Login (Email & Password)
+          </button>
         </div>
       </div>
     </div>
