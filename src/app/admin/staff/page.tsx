@@ -5,8 +5,8 @@ import { Staff, Restaurant, StaffRole } from "@/lib/types";
 import { useAuth } from "@/lib/contexts/auth-context";
 
 /**
- * A modal dialog for setting a staff member's 4-digit PIN.
- * It handles input, validation, and API submission.
+ * Enhanced modal dialog for setting a staff member's 6-digit PIN.
+ * Supports both custom PIN entry and auto-generation.
  */
 function SetPinModal({
   staff,
@@ -18,8 +18,10 @@ function SetPinModal({
   onPinSet: () => void;
 }) {
   const [pin, setPin] = useState("");
+  const [useCustomPin, setUseCustomPin] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [generatedPin, setGeneratedPin] = useState<string | null>(null);
 
   // Don't render anything if no staff member is selected
   if (!staff) return null;
@@ -27,16 +29,24 @@ function SetPinModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!/^\d{4}$/.test(pin)) {
-      setError("PIN must be exactly 4 digits.");
-      return;
+    setGeneratedPin(null);
+
+    // Validate custom PIN if provided
+    if (useCustomPin) {
+      if (!/^\d{6}$/.test(pin)) {
+        setError("PIN must be exactly 6 digits.");
+        return;
+      }
     }
+
     setLoading(true);
     try {
+      const requestBody = useCustomPin ? { pin } : {}; // Empty body = generate PIN
+
       const response = await fetch(`/api/admin/staff/${staff.id}/pin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -44,8 +54,16 @@ function SetPinModal({
         throw new Error(data.error || "Failed to set PIN.");
       }
 
-      onPinSet();
-      onClose();
+      const result = await response.json();
+
+      // Show generated PIN to admin (only time it's displayed)
+      if (result.data?.method === "generated") {
+        setGeneratedPin(result.data.pin);
+      } else {
+        // Custom PIN was set successfully
+        onPinSet();
+        onClose();
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -57,33 +75,139 @@ function SetPinModal({
     }
   };
 
+  const handleGeneratedPinAcknowledged = () => {
+    setGeneratedPin(null);
+    onPinSet();
+    onClose();
+  };
+
+  // Show generated PIN display
+  if (generatedPin) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md m-4">
+          <div className="text-center">
+            <div className="text-4xl mb-4">🔐</div>
+            <h2 className="text-xl font-bold mb-4 text-gray-800">
+              PIN Generated for {staff.name}
+            </h2>
+            <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6">
+              <div className="text-sm text-gray-600 mb-2">6-Digit PIN:</div>
+              <div className="text-4xl font-mono font-bold text-blue-600 tracking-widest">
+                {generatedPin}
+              </div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start space-x-2">
+                <span className="text-amber-500 mt-0.5">⚠️</span>
+                <div className="text-sm text-amber-800">
+                  <strong>Important:</strong> Write down this PIN immediately.
+                  For security reasons, it will not be shown again.
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleGeneratedPinAcknowledged}
+              className="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 font-medium"
+            >
+              I&apos;ve Written Down the PIN
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main PIN setting form
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 transition-opacity">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm m-4">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md m-4">
         <h2 className="text-xl font-bold mb-4 text-gray-800">
           Set PIN for {staff.name}
         </h2>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label
-              htmlFor="pin"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              4-Digit PIN
+
+        {/* PIN Method Selection */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            PIN Setup Method
+          </label>
+          <div className="space-y-2">
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="radio"
+                name="pinMethod"
+                checked={!useCustomPin}
+                onChange={() => {
+                  setUseCustomPin(false);
+                  setPin("");
+                  setError("");
+                }}
+                className="text-blue-600"
+              />
+              <div>
+                <div className="font-medium text-gray-800">
+                  Generate Random PIN
+                </div>
+                <div className="text-sm text-gray-600">
+                  System will create a secure 6-digit PIN
+                </div>
+              </div>
             </label>
-            <input
-              type="password"
-              id="pin"
-              name="pin"
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-              maxLength={4}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Enter 4 digits"
-              autoFocus
-            />
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="radio"
+                name="pinMethod"
+                checked={useCustomPin}
+                onChange={() => {
+                  setUseCustomPin(true);
+                  setError("");
+                }}
+                className="text-blue-600"
+              />
+              <div>
+                <div className="font-medium text-gray-800">Set Custom PIN</div>
+                <div className="text-sm text-gray-600">
+                  Choose your own 6-digit PIN
+                </div>
+              </div>
+            </label>
           </div>
-          {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {/* Custom PIN Input */}
+          {useCustomPin && (
+            <div className="mb-4">
+              <label
+                htmlFor="pin"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                6-Digit PIN
+              </label>
+              <input
+                type="password"
+                id="pin"
+                name="pin"
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+                maxLength={6}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-lg font-mono tracking-widest text-center"
+                placeholder="••••••"
+                autoFocus
+                required={useCustomPin}
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                Must be exactly 6 digits (numbers only)
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded mb-4 text-sm">
+              {error}
+            </div>
+          )}
+
           <div className="flex justify-end space-x-3">
             <button
               type="button"
@@ -95,10 +219,14 @@ function SetPinModal({
             </button>
             <button
               type="submit"
-              disabled={loading || pin.length !== 4}
+              disabled={loading || (useCustomPin && pin.length !== 6)}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
             >
-              {loading ? "Saving..." : "Set PIN"}
+              {loading
+                ? "Setting..."
+                : useCustomPin
+                ? "Set Custom PIN"
+                : "Generate PIN"}
             </button>
           </div>
         </form>
@@ -108,7 +236,7 @@ function SetPinModal({
 }
 
 /**
- * Staff Management Component
+ * Staff Management Component with Enhanced PIN Management
  */
 export default function StaffManagementPage() {
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -175,6 +303,34 @@ export default function StaffManagementPage() {
     }
   };
 
+  const handleRemovePin = async (staffMember: Staff) => {
+    if (
+      !confirm(
+        `Remove PIN for ${staffMember.name}? They will need a new PIN to log in.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/staff/${staffMember.id}/pin`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to remove PIN");
+      }
+
+      // Refresh staff list to update PIN status
+      loadStaff();
+      alert(`PIN removed successfully for ${staffMember.name}`);
+    } catch (error) {
+      console.error("Error removing PIN:", error);
+      alert(error instanceof Error ? error.message : "Failed to remove PIN");
+    }
+  };
+
   const handleSetPinClick = (staffMember: Staff) => {
     setSelectedStaffForPin(staffMember);
     setIsPinModalOpen(true);
@@ -211,7 +367,7 @@ export default function StaffManagementPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Staff Management</h1>
           <p className="text-gray-600 mt-1">
-            Manage staff accounts for {restaurant?.name}
+            Manage staff accounts and 6-digit PINs for {restaurant?.name}
           </p>
         </div>
         <button
@@ -230,9 +386,9 @@ export default function StaffManagementPage() {
           color="blue"
         />
         <StaffSummaryCard
-          title="Active Staff"
-          count={staff.filter((s) => s.is_active).length}
-          icon="✅"
+          title="With PINs Set"
+          count={staff.filter((s) => s.pin_hash).length}
+          icon="🔐"
           color="green"
         />
         <StaffSummaryCard
@@ -269,6 +425,7 @@ export default function StaffManagementPage() {
                 staff={member}
                 onEdit={() => setEditingStaff(member)}
                 onSetPin={() => handleSetPinClick(member)}
+                onRemovePin={() => handleRemovePin(member)}
                 onToggleStatus={() =>
                   toggleStaffStatus(member.id, member.is_active)
                 }
@@ -297,10 +454,14 @@ export default function StaffManagementPage() {
       {isPinModalOpen && (
         <SetPinModal
           staff={selectedStaffForPin}
-          onClose={() => setIsPinModalOpen(false)}
+          onClose={() => {
+            setIsPinModalOpen(false);
+            setSelectedStaffForPin(null);
+          }}
           onPinSet={() => {
             loadStaff();
             setIsPinModalOpen(false);
+            setSelectedStaffForPin(null);
           }}
         />
       )}
@@ -349,6 +510,7 @@ function StaffMemberRow({
   staff: Staff;
   onEdit: () => void;
   onSetPin: () => void;
+  onRemovePin: () => void;
   onToggleStatus: () => void;
 }) {
   const getRoleColor = (role: string) => {

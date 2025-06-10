@@ -1,8 +1,8 @@
-// src/lib/types/pin-login.ts - New types file for PIN login system
+// src/lib/types/pin-system.ts - Updated 6-digit PIN system types
 
 // Base interfaces
 export interface PinLoginRequest {
-  pin: string;
+  pin: string; // 6-digit PIN
   restaurant_id: string;
 }
 
@@ -25,17 +25,36 @@ export interface TerminalRegistrationRequest {
 }
 
 export interface StaffPinStatus {
-  staff_id: string;
-  name: string;
-  email: string;
-  role: string;
   has_pin: boolean;
-  pin_set_date: string | null;
+  staff_id: string;
+  staff_name: string;
+  staff_email: string;
+  pin_set_date?: string;
 }
 
 export interface SetPinRequest {
-  pin?: string; // Optional - if not provided, generates random PIN
+  pin?: string; // Optional 6-digit PIN - if not provided, generates random PIN
   regenerate?: boolean; // Force regenerate even if PIN exists
+}
+
+// Enhanced response interfaces for 6-digit system
+export interface SetPinResponse {
+  success: boolean;
+  message: string;
+  data: {
+    staff_id: string;
+    staff_name: string;
+    staff_email: string;
+    pin: string; // 6-digit PIN - ONLY returned once during creation
+    method: "custom" | "generated";
+    assigned_by: string;
+    assigned_at: string;
+  };
+}
+
+export interface PinConflictError {
+  error: string;
+  conflict_staff?: string; // Name of staff member with conflicting PIN
 }
 
 // Restaurant configuration interface
@@ -46,7 +65,12 @@ export interface RestaurantConfig {
   hours?: Record<string, unknown>;
   features?: Record<string, unknown>;
   theme?: Record<string, unknown>;
-  pos_settings?: Record<string, unknown>;
+  pos_settings?: {
+    pin_length?: 6; // Always 6 digits in this system
+    pin_expiry_days?: number;
+    max_login_attempts?: number;
+    session_timeout_minutes?: number;
+  };
   payment_settings?: Record<string, unknown>;
 }
 
@@ -58,8 +82,10 @@ export interface StaffData {
   role: string;
   restaurant_id: string;
   is_active: boolean;
+  pin_hash?: string; // Hashed 6-digit PIN
+  last_login?: string;
   created_at: string;
-  last_login: string;
+  updated_at?: string;
 }
 
 export interface RestaurantData {
@@ -74,6 +100,8 @@ export interface RestaurantData {
 export interface SessionData {
   token: string;
   expires_at: string;
+  staff_id: string;
+  restaurant_id: string;
 }
 
 // Response interfaces
@@ -116,22 +144,6 @@ export interface TerminalRegistration {
   device_summary: DeviceSummary;
 }
 
-export interface SetPinResponse {
-  success: boolean;
-  message: string;
-  data?: {
-    staff_id: string;
-    staff_name: string;
-    staff_email: string;
-    pin: string; // ONLY time the PIN is returned in plain text
-    method: "custom" | "generated";
-    assigned_by: string;
-    assigned_at: string;
-  };
-  error?: string;
-  conflict_staff?: string;
-}
-
 // Database record interfaces
 export interface StaffRecord {
   id: string;
@@ -140,9 +152,12 @@ export interface StaffRecord {
   name: string;
   role: string;
   is_active: boolean;
-  pin_hash: string | null;
+  pin_hash: string | null; // bcrypt hash of 6-digit PIN
   last_login: string | null;
+  is_logged_in?: boolean;
+  login_attempts?: number;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface RestaurantRecord {
@@ -156,6 +171,7 @@ export interface RestaurantRecord {
 
 export interface TerminalRegistrationRecord {
   id: string;
+  restaurant_id: string;
   device_info: DeviceInfo;
   registered_at: string;
   is_active: boolean;
@@ -166,4 +182,90 @@ export interface TerminalRegistrationRecord {
 export interface StaffInfo {
   name: string;
   email: string;
+  role: string;
+}
+
+// PIN validation utilities
+export const PIN_VALIDATION = {
+  LENGTH: 6,
+  PATTERN: /^\d{6}$/,
+  MIN_VALUE: 100000,
+  MAX_VALUE: 999999,
+} as const;
+
+// Helper type guards
+export function isValidPin(pin: string): boolean {
+  return PIN_VALIDATION.PATTERN.test(pin);
+}
+
+export function generateRandomPin(): string {
+  return Math.floor(
+    PIN_VALIDATION.MIN_VALUE +
+      Math.random() * (PIN_VALIDATION.MAX_VALUE - PIN_VALIDATION.MIN_VALUE + 1)
+  ).toString();
+}
+
+// Security settings
+export const SECURITY_CONFIG = {
+  BCRYPT_ROUNDS: 12, // Higher security for PIN hashing
+  MAX_LOGIN_ATTEMPTS: 3,
+  LOCKOUT_DURATION_MINUTES: 15,
+  SESSION_TIMEOUT_MINUTES: 480, // 8 hours
+  PIN_HISTORY_COUNT: 5, // Remember last 5 PINs to prevent reuse
+} as const;
+
+// API response types
+export interface ApiResponse<T = unknown> {
+  data?: T;
+  error?: string;
+  message?: string;
+  metadata?: {
+    timestamp?: string;
+    request_id?: string;
+  };
+}
+
+// Form validation types
+export interface PinSetupForm {
+  useCustomPin: boolean;
+  customPin: string;
+  confirmPin: string;
+}
+
+export interface PinLoginForm {
+  pin: string;
+  remember?: boolean;
+}
+
+// Error types
+export interface PinError {
+  code:
+    | "INVALID_PIN"
+    | "PIN_CONFLICT"
+    | "PIN_EXPIRED"
+    | "ACCOUNT_LOCKED"
+    | "PIN_REQUIRED";
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+// Audit log types for PIN operations
+export interface PinAuditLog {
+  id: string;
+  staff_id: string;
+  restaurant_id: string;
+  action:
+    | "PIN_SET"
+    | "PIN_RESET"
+    | "PIN_REMOVED"
+    | "LOGIN_SUCCESS"
+    | "LOGIN_FAILED";
+  performed_by: string; // Admin who performed the action
+  timestamp: string;
+  details?: {
+    method?: "custom" | "generated";
+    old_pin_hash?: string;
+    failed_attempts?: number;
+    device_info?: Partial<DeviceInfo>;
+  };
 }

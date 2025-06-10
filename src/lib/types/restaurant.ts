@@ -17,6 +17,7 @@ export interface Staff {
   email: string;
   name: string;
   role: StaffRole;
+  pin_hash?: string | null;
   is_active: boolean;
   created_at: Timestamp;
   pin?: string | null;
