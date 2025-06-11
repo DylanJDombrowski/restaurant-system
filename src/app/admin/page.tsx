@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { supabase } from "@/lib/supabase/client";
 import { AdminLogin } from "@/components/auth/AdminLogin";
-import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
-import { LoadingScreen } from "@/components/ui/LoadingScreen"; // Using your renamed generic loader
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
 
 // ============================================================================
 // Dashboard Components (You can move these to their own files if you prefer)
@@ -230,7 +229,7 @@ export default function AdminPage() {
 
   // 1. While the auth state is being determined, show the Lottie animation.
   if (loading) {
-    return <AuthLoadingScreen />;
+    return <LoadingScreen />;
   }
 
   // 2. If loading is finished and there's no user, show the login form.

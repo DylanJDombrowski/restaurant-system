@@ -15,7 +15,7 @@ export function AdminLogin() {
 
     try {
       // The signIn function will now set the global loading state.
-      // The main AdminPage will detect this and show the AuthLoadingScreen.
+      // The main AdminPage will detect this and show the LoadingScreen.
       await signIn(email, password);
       // No redirect or timeout is needed here.
       // The page will automatically switch to the dashboard when the user state updates.
