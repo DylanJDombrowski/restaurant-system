@@ -1,30 +1,22 @@
-// src/app/staff/orders/page.tsx - FIXED: Removed customizations prop
+// src/app/staff/orders/page.tsx - FIXED: Unified customer state + loyalty modal
 "use client";
 import CustomerDetails from "@/components/features/orders/CustomerDetails";
 import MenuNavigator from "@/components/features/orders/MenuNavigator";
 import OrderCart, {
   useCartStatistics,
 } from "@/components/features/orders/OrderCart";
+import OrderCompletionModal from "@/components/features/orders/OrderCompletionModal";
+import OrderSuccessMessage from "@/components/features/orders/OrderSuccessMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import {
   ConfiguredCartItem,
-  Customer,
+  CustomerLoyaltyDetails,
   MenuItemWithVariants,
   OrderWithItems,
   Restaurant,
+  LoyaltyRedemption,
 } from "@/lib/types";
-import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
-
-const OrderSuccessMessage = dynamic(
-  () =>
-    import("@/components/features/orders/OrderSuccessMessage").then(
-      (mod) => mod.default
-    ),
-  {
-    ssr: false,
-  }
-);
 
 type ActiveTab = "new-order" | "pickup";
 
@@ -35,7 +27,7 @@ export default function StaffOrdersPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("new-order");
 
   // ==========================================
-  // CORE DATA STATES - FIXED: Removed customizations
+  // CORE DATA STATES - SIMPLIFIED
   // ==========================================
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItemWithVariants[]>([]);
@@ -51,28 +43,22 @@ export default function StaffOrdersPage() {
     new Set()
   );
 
-  // Customer workflow states
-  const [customerInfo, setCustomerInfo] = useState({
-    name: "",
-    phone: "",
-    email: "",
-  });
+  // ✅ UNIFIED CUSTOMER STATE - Only one customer state needed
+  const [customer, setCustomer] = useState<CustomerLoyaltyDetails | null>(null);
 
-  const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
-  const [lookupLoading, setLookupLoading] = useState(false);
-  const [customerLookupStatus, setCustomerLookupStatus] = useState<
-    "idle" | "searching" | "found" | "not-found"
-  >("idle");
+  // ✅ REMOVED DUPLICATE STATES:
+  // - foundCustomer (duplicate of customer)
+  // - customerInfo (CustomerDetails handles this)
+  // - lookupLoading (CustomerDetails handles this)
+  // - customerLookupStatus (CustomerDetails handles this)
 
   const [orderType, setOrderType] = useState<"pickup" | "delivery">("pickup");
 
-  // Delivery address state
-  const [deliveryAddress, setDeliveryAddress] = useState({
-    address: "",
-    city: "",
-    zip: "",
-    instructions: "",
-  });
+  // ✅ NEW: Order completion modal states
+  const [showOrderCompletionModal, setShowOrderCompletionModal] =
+    useState(false);
+  const [pendingLoyaltyRedemption, setPendingLoyaltyRedemption] =
+    useState<LoyaltyRedemption | null>(null);
 
   // Order completion states
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,10 +76,12 @@ export default function StaffOrdersPage() {
     subtotal: cartStats.subtotal,
     tax: cartStats.tax,
     deliveryFee: orderType === "delivery" ? 3.99 : 0,
+    loyaltyDiscount: pendingLoyaltyRedemption?.discount_amount || 0,
     total:
       cartStats.subtotal +
       cartStats.tax +
-      (orderType === "delivery" ? 3.99 : 0),
+      (orderType === "delivery" ? 3.99 : 0) -
+      (pendingLoyaltyRedemption?.discount_amount || 0),
   };
 
   // ==========================================
@@ -126,14 +114,13 @@ export default function StaffOrdersPage() {
       const restaurantData = await restaurantResponse.json();
       setRestaurant(restaurantData.data);
 
-      // Load menu data (customizations not needed - components load their own)
+      // Load menu data
       const menuResponse = await fetch(
         `/api/menu/full?restaurant_id=${restaurantData.data.id}`
       );
       if (!menuResponse.ok) throw new Error("Failed to load menu data");
       const menuData = await menuResponse.json();
       setMenuItems(menuData.data.menu_items || []);
-      // ❌ REMOVED: setCustomizations(menuData.data.customizations || []);
 
       // Load orders
       await loadOrders(restaurantData.data.id);
@@ -198,63 +185,6 @@ export default function StaffOrdersPage() {
   };
 
   // ==========================================
-  // CUSTOMER LOOKUP
-  // ==========================================
-
-  const lookupCustomer = useCallback(
-    async (phone: string) => {
-      if (phone.length < 10 || !restaurant) {
-        setFoundCustomer(null);
-        setCustomerLookupStatus("idle");
-        return;
-      }
-
-      setLookupLoading(true);
-      setCustomerLookupStatus("searching");
-
-      try {
-        const response = await fetch(
-          `/api/customers/lookup?phone=${encodeURIComponent(
-            phone
-          )}&restaurant_id=${restaurant.id}`
-        );
-        const data = await response.json();
-
-        if (data.data && data.data.customer) {
-          const customer = data.data.customer;
-          setFoundCustomer(customer);
-          setCustomerLookupStatus("found");
-
-          setCustomerInfo((prev) => ({
-            name: customer.name || prev.name,
-            phone: customer.phone,
-            email: customer.email || prev.email,
-          }));
-        } else {
-          setFoundCustomer(null);
-          setCustomerLookupStatus("not-found");
-        }
-      } catch (error) {
-        console.error("Error looking up customer:", error);
-        setCustomerLookupStatus("idle");
-        setFoundCustomer(null);
-      } finally {
-        setLookupLoading(false);
-      }
-    },
-    [restaurant]
-  );
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (customerInfo.phone && restaurant) {
-        lookupCustomer(customerInfo.phone);
-      }
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [customerInfo.phone, lookupCustomer, restaurant]);
-
-  // ==========================================
   // CART MANAGEMENT
   // ==========================================
 
@@ -300,7 +230,21 @@ export default function StaffOrdersPage() {
   };
 
   // ==========================================
-  // ORDER COMPLETION WORKFLOW
+  // ✅ NEW: LOYALTY REDEMPTION MANAGEMENT
+  // ==========================================
+
+  const handleLoyaltyRedemptionApply = (redemption: LoyaltyRedemption) => {
+    console.log("🎁 Loyalty redemption applied:", redemption);
+    setPendingLoyaltyRedemption(redemption);
+  };
+
+  const handleLoyaltyRedemptionRemove = () => {
+    console.log("🎁 Loyalty redemption removed");
+    setPendingLoyaltyRedemption(null);
+  };
+
+  // ==========================================
+  // ✅ NEW: ORDER COMPLETION WORKFLOW
   // ==========================================
 
   const handleCompleteOrder = () => {
@@ -309,45 +253,60 @@ export default function StaffOrdersPage() {
       return;
     }
 
-    if (!customerInfo.name || !customerInfo.phone) {
-      alert("Please add customer information first.");
-      return;
-    }
-
-    if (
-      orderType === "delivery" &&
-      (!deliveryAddress.address ||
-        !deliveryAddress.city ||
-        !deliveryAddress.zip)
-    ) {
-      alert("Please fill in the delivery address.");
-      return;
-    }
-
-    handleSubmitOrder();
+    // Show order completion modal instead of immediate submission
+    setShowOrderCompletionModal(true);
   };
 
-  const handleSubmitOrder = async () => {
+  const handleOrderCompletionConfirm = async (orderData: {
+    customerInfo: {
+      name: string;
+      phone: string;
+      email?: string;
+    };
+    orderType: "pickup" | "delivery";
+    deliveryAddress?: {
+      address: string;
+      city: string;
+      zip: string;
+      instructions?: string;
+    };
+    loyaltyRedemption?: LoyaltyRedemption;
+  }) => {
     setIsSubmitting(true);
+    setShowOrderCompletionModal(false);
 
     try {
-      const orderData = {
+      // Calculate final totals with loyalty redemption
+      const finalLoyaltyDiscount =
+        orderData.loyaltyRedemption?.discount_amount || 0;
+      const finalTotal = Math.max(
+        0,
+        orderSummary.subtotal +
+          orderSummary.tax +
+          orderSummary.deliveryFee -
+          finalLoyaltyDiscount
+      );
+
+      const orderPayload = {
         restaurant_id: restaurant!.id,
-        customer_name: customerInfo.name,
-        customer_phone: customerInfo.phone,
-        customer_email: customerInfo.email || undefined,
-        order_type: orderType,
+        customer_name: orderData.customerInfo.name,
+        customer_phone: orderData.customerInfo.phone,
+        customer_email: orderData.customerInfo.email || undefined,
+        order_type: orderData.orderType,
         subtotal: orderSummary.subtotal,
         tax_amount: orderSummary.tax,
         delivery_fee: orderSummary.deliveryFee,
-        total: orderSummary.total,
+        total: finalTotal,
         status: "confirmed" as const,
-        ...(orderType === "delivery" && {
-          customer_address: deliveryAddress.address,
-          customer_city: deliveryAddress.city,
-          customer_zip: deliveryAddress.zip,
-          delivery_instructions: deliveryAddress.instructions || undefined,
-        }),
+        loyalty_redemption: orderData.loyaltyRedemption,
+        ...(orderData.orderType === "delivery" &&
+          orderData.deliveryAddress && {
+            customer_address: orderData.deliveryAddress.address,
+            customer_city: orderData.deliveryAddress.city,
+            customer_zip: orderData.deliveryAddress.zip,
+            delivery_instructions:
+              orderData.deliveryAddress.instructions || undefined,
+          }),
       };
 
       const orderItemsData = cartItems.map((item) => ({
@@ -363,7 +322,10 @@ export default function StaffOrdersPage() {
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderData, orderItems: orderItemsData }),
+        body: JSON.stringify({
+          orderData: orderPayload,
+          orderItems: orderItemsData,
+        }),
       });
 
       const responseData = await response.json();
@@ -373,9 +335,9 @@ export default function StaffOrdersPage() {
       // Show success message
       setCompletedOrder({
         orderNumber: responseData.data.order_number,
-        total: orderSummary.total,
-        orderType: orderType,
-        estimatedTime: orderType === "pickup" ? 25 : 45,
+        total: finalTotal,
+        orderType: orderData.orderType,
+        estimatedTime: orderData.orderType === "pickup" ? 25 : 45,
       });
       setShowOrderSuccess(true);
 
@@ -394,14 +356,16 @@ export default function StaffOrdersPage() {
     }
   };
 
+  const handleOrderCompletionCancel = () => {
+    setShowOrderCompletionModal(false);
+  };
+
   // Handle order success completion
   const handleOrderSuccessComplete = () => {
     setCartItems([]);
-    setCustomerInfo({ name: "", phone: "", email: "" });
+    setCustomer(null);
     setOrderType("pickup");
-    setDeliveryAddress({ address: "", city: "", zip: "", instructions: "" });
-    setFoundCustomer(null);
-    setCustomerLookupStatus("idle");
+    setPendingLoyaltyRedemption(null);
     setShowOrderSuccess(false);
     setCompletedOrder(null);
   };
@@ -459,6 +423,13 @@ export default function StaffOrdersPage() {
                       <span className="text-green-600 font-medium">
                         ${orderSummary.total.toFixed(2)}
                       </span>
+                      {pendingLoyaltyRedemption && (
+                        <span className="text-purple-600 font-medium">
+                          🎁 -
+                          {pendingLoyaltyRedemption.discount_amount.toFixed(2)}{" "}
+                          loyalty
+                        </span>
+                      )}
                     </>
                   )}
                 </div>
@@ -522,7 +493,6 @@ export default function StaffOrdersPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
               {/* LEFT: Menu Navigation */}
               <div className="lg:col-span-2">
-                {/* ✅ FIXED: Removed customizations prop */}
                 <MenuNavigator
                   menuItems={menuItems}
                   onAddToCart={handleAddToCart}
@@ -534,16 +504,8 @@ export default function StaffOrdersPage() {
               <div className="space-y-4">
                 {/* Customer Details */}
                 <CustomerDetails
-                  customerInfo={customerInfo}
-                  setCustomerInfo={setCustomerInfo}
-                  foundCustomer={foundCustomer}
-                  onCustomerLookup={lookupCustomer}
-                  lookupLoading={lookupLoading}
-                  customerLookupStatus={customerLookupStatus}
+                  onCustomerSelected={setCustomer}
                   restaurantId={restaurant?.id || ""}
-                  orderType={orderType}
-                  deliveryAddress={deliveryAddress}
-                  setDeliveryAddress={setDeliveryAddress}
                 />
 
                 {/* Order Type Selection */}
@@ -580,13 +542,18 @@ export default function StaffOrdersPage() {
                   </div>
                 )}
 
+                {/* ✅ UPDATED: Order Cart with loyalty props */}
                 <OrderCart
                   items={cartItems}
+                  customer={customer}
                   onUpdateItem={handleUpdateCartItem}
                   onRemoveItem={handleRemoveCartItem}
                   restaurantId={restaurant?.id || ""}
                   orderSummary={orderSummary}
                   onCompleteOrder={handleCompleteOrder}
+                  loyaltyRedemption={pendingLoyaltyRedemption}
+                  onLoyaltyRedemptionApply={handleLoyaltyRedemptionApply}
+                  onLoyaltyRedemptionRemove={handleLoyaltyRedemptionRemove}
                 />
               </div>
             </div>
@@ -603,6 +570,21 @@ export default function StaffOrdersPage() {
         </div>
       </div>
 
+      {/* ✅ NEW: Order Completion Modal */}
+      {showOrderCompletionModal && (
+        <OrderCompletionModal
+          isOpen={showOrderCompletionModal}
+          cartItems={cartItems}
+          orderSummary={orderSummary}
+          customer={customer}
+          pendingLoyaltyRedemption={pendingLoyaltyRedemption}
+          defaultOrderType={orderType}
+          onConfirm={handleOrderCompletionConfirm}
+          onCancel={handleOrderCompletionCancel}
+          restaurantId={restaurant?.id || ""}
+        />
+      )}
+
       {/* Order Success Modal */}
       {showOrderSuccess && completedOrder && (
         <OrderSuccessMessage
@@ -618,7 +600,7 @@ export default function StaffOrdersPage() {
 }
 
 // ==========================================
-// PICKUP ORDERS VIEW
+// PICKUP ORDERS VIEW (unchanged)
 // ==========================================
 
 interface PickupOrdersViewProps {

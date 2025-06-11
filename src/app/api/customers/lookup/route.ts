@@ -1,10 +1,11 @@
+// src/app/api/customers/lookup/route.ts - UPDATED
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { ApiResponse, Customer } from "@/lib/types";
+import { ApiResponse, CustomerLoyaltyDetails } from "@/lib/types";
 
 export async function GET(
   request: NextRequest
-): Promise<NextResponse<ApiResponse<{ customer: Customer | null }>>> {
+): Promise<NextResponse<ApiResponse<CustomerLoyaltyDetails | null>>> {
   try {
     const { searchParams } = new URL(request.url);
     const phone = searchParams.get("phone");
@@ -25,7 +26,21 @@ export async function GET(
     // Try to find customer by phone (with different formatting variations)
     const { data: customer, error } = await supabaseServer
       .from("customers")
-      .select("*")
+      .select(
+        `
+        id,
+        restaurant_id,
+        phone,
+        email,
+        name,
+        loyalty_points,
+        total_orders,
+        total_spent,
+        created_at,
+        updated_at,
+        last_order_date
+      `
+      )
       .eq("restaurant_id", restaurantId)
       .or(`phone.eq.${phone},phone.eq.${cleanPhone},phone.eq.+1${cleanPhone}`)
       .single();
@@ -37,17 +52,30 @@ export async function GET(
     }
 
     if (customer) {
+      // Load recent transactions
+      const { data: transactions } = await supabaseServer
+        .from("loyalty_transactions")
+        .select("*")
+        .eq("customer_id", customer.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      const customerLoyaltyDetails: CustomerLoyaltyDetails = {
+        ...customer,
+        recent_transactions: transactions || [],
+      };
+
       console.log("Customer found:", customer.name);
       return NextResponse.json({
-        data: { customer },
-        message: customer ? "Customer found" : "Customer not found",
+        data: customerLoyaltyDetails,
+        message: "Customer found",
       });
     } else {
       console.log("No customer found for phone:", phone);
-      return NextResponse.json({
-        data: { customer: null },
-        message: "Customer not found",
-      });
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 }
+      );
     }
   } catch (error) {
     console.error("Error looking up customer:", error);

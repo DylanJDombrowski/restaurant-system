@@ -1,11 +1,13 @@
-// src/components/features/orders/OrderCart.tsx - FIXED STATE PRESERVATION
+// src/components/features/orders/OrderCart.tsx - UPDATED: With loyalty redemption
 "use client";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import {
   ConfiguredCartItem,
   ConfiguredModifier,
   ConfiguredTopping,
+  CustomerLoyaltyDetails,
   Customization,
+  LoyaltyRedemption,
   MenuItemVariant,
   MenuItemWithVariants,
 } from "@/lib/types";
@@ -14,9 +16,11 @@ import AppetizerCustomizer from "./AppetizerCustomizer";
 import ChickenCustomizer from "./ChickenCustomizer";
 import PizzaCustomizer from "./PizzaCustomizer";
 import SandwichCustomizer from "./SandwichCustomizer";
+import LoyaltyRedemptionComponent from "./LoyaltyRedemption";
 
 interface OrderCartProps {
   items: ConfiguredCartItem[];
+  customer: CustomerLoyaltyDetails | null; // ✅ NEW customer prop
   onUpdateItem: (itemId: string, updates: Partial<ConfiguredCartItem>) => void;
   onRemoveItem: (itemId: string) => void;
   restaurantId: string;
@@ -24,18 +28,27 @@ interface OrderCartProps {
     subtotal: number;
     tax: number;
     deliveryFee: number;
+    loyaltyDiscount?: number; // ✅ NEW loyalty discount
     total: number;
   };
   onCompleteOrder: () => void;
+  // ✅ NEW loyalty props
+  loyaltyRedemption?: LoyaltyRedemption | null;
+  onLoyaltyRedemptionApply: (redemption: LoyaltyRedemption) => void;
+  onLoyaltyRedemptionRemove: () => void;
 }
 
 export default function OrderCart({
   items,
+  customer,
   onUpdateItem,
   onRemoveItem,
   restaurantId,
   orderSummary,
   onCompleteOrder,
+  loyaltyRedemption,
+  onLoyaltyRedemptionApply,
+  onLoyaltyRedemptionRemove,
 }: OrderCartProps) {
   // STATE MANAGEMENT - SIMPLIFIED
   const [customizingItem, setCustomizingItem] =
@@ -63,9 +76,6 @@ export default function OrderCart({
     useState<MenuItemWithVariants | null>(null);
   const [customizingChickenVariant, setCustomizingChickenVariant] =
     useState<MenuItemVariant | null>(null);
-
-  // Order notes
-  const [orderNotes, setOrderNotes] = useState("");
 
   // Cart statistics
   const cartStats = useMemo(() => {
@@ -116,7 +126,7 @@ export default function OrderCart({
     }
   };
 
-  // 🔧 FIXED: Enhanced customization handler with proper state preservation
+  // Enhanced customization handler with proper state preservation
   const handleCustomizeItem = async (item: ConfiguredCartItem) => {
     if (!item || !item.id) {
       console.error("Invalid item passed to handleCustomizeItem:", item);
@@ -175,7 +185,7 @@ export default function OrderCart({
 
         setCustomizingChickenItem(fullMenuItem);
         setCustomizingChickenVariant(selectedVariant);
-        setCustomizingItem(item); // 🔧 Store full cart item state
+        setCustomizingItem(item);
         setShowChickenCustomizer(true);
         return;
       }
@@ -196,7 +206,7 @@ export default function OrderCart({
 
         setCustomizingAppetizerItem(fullMenuItem);
         setCustomizingAppetizerVariant(selectedVariant);
-        setCustomizingItem(item); // 🔧 Store full cart item state
+        setCustomizingItem(item);
         setShowAppetizerCustomizer(true);
         return;
       }
@@ -208,7 +218,7 @@ export default function OrderCart({
         );
 
         setCustomizingSandwichItem(fullMenuItem);
-        setCustomizingItem(item); // 🔧 Store full cart item state
+        setCustomizingItem(item);
         setShowSandwichCustomizer(true);
         return;
       }
@@ -228,7 +238,6 @@ export default function OrderCart({
           specialInstructions: item.specialInstructions || "none",
         });
 
-        // 🔧 FIXED: Ensure all cart item state is preserved
         const safeItem: ConfiguredCartItem = {
           ...item,
           selectedToppings: item.selectedToppings || [],
@@ -265,11 +274,10 @@ export default function OrderCart({
       preservedQuantity: customizingItem?.quantity,
     });
 
-    // 🔧 FIXED: Preserve original cart item properties
     const finalItem: ConfiguredCartItem = {
       ...updatedItem,
-      id: customizingItem?.id || updatedItem.id, // Keep original cart item ID
-      quantity: customizingItem?.quantity || updatedItem.quantity, // Keep original quantity
+      id: customizingItem?.id || updatedItem.id,
+      quantity: customizingItem?.quantity || updatedItem.quantity,
     };
 
     onUpdateItem(finalItem.id, finalItem);
@@ -293,7 +301,6 @@ export default function OrderCart({
       variantName: updatedItem.variantName,
     });
 
-    // 🔧 FIXED: The pizza customizer preserves cart item ID, but ensure quantity is maintained
     const finalItem: ConfiguredCartItem = {
       ...updatedItem,
       quantity: customizingItem?.quantity || updatedItem.quantity,
@@ -319,7 +326,6 @@ export default function OrderCart({
       preservedQuantity: customizingItem?.quantity,
     });
 
-    // 🔧 FIXED: Preserve original cart item properties
     const finalItem: ConfiguredCartItem = {
       ...updatedItem,
       id: customizingItem?.id || updatedItem.id,
@@ -342,7 +348,6 @@ export default function OrderCart({
       preservedQuantity: customizingItem?.quantity,
     });
 
-    // 🔧 FIXED: Preserve original cart item properties
     const finalItem: ConfiguredCartItem = {
       ...updatedItem,
       id: customizingItem?.id || updatedItem.id,
@@ -377,7 +382,7 @@ export default function OrderCart({
 
   const getCompletionButtonText = () => {
     if (items.length === 0) return "Add Items First";
-    return `Complete Order - $${orderSummary.total.toFixed(2)}`;
+    return `Complete Order - ${orderSummary.total.toFixed(2)}`;
   };
 
   // RENDER
@@ -418,18 +423,19 @@ export default function OrderCart({
           )}
         </div>
 
-        {/* Order Notes */}
-        {items.length > 0 && (
+        {/* ✅ NEW: Loyalty Redemption Section */}
+        {items.length > 0 && customer && customer.loyalty_points >= 100 && (
           <div className="px-4 py-3 border-t border-gray-200">
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Order Notes
-            </label>
-            <textarea
-              placeholder="Special instructions for this order..."
-              value={orderNotes}
-              onChange={(e) => setOrderNotes(e.target.value)}
-              rows={2}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            <LoyaltyRedemptionComponent
+              customer={customer}
+              orderTotal={
+                orderSummary.subtotal +
+                orderSummary.tax +
+                orderSummary.deliveryFee
+              }
+              onRedemptionApply={onLoyaltyRedemptionApply}
+              onRedemptionRemove={onLoyaltyRedemptionRemove}
+              currentRedemption={loyaltyRedemption ?? undefined}
             />
           </div>
         )}
@@ -454,10 +460,10 @@ export default function OrderCart({
         )}
       </div>
 
-      {/* 🍕 PIZZA MODAL CUSTOMIZER - Enhanced state preservation */}
+      {/* 🍕 PIZZA MODAL CUSTOMIZER */}
       {showCustomizer && customizingItem && (
         <PizzaCustomizer
-          item={customizingItem} // 🔧 Pass complete cart item with all state
+          item={customizingItem}
           onComplete={handleCustomizationComplete}
           onCancel={handleCustomizationCancel}
           isOpen={showCustomizer}
@@ -469,7 +475,7 @@ export default function OrderCart({
       {showSandwichCustomizer && customizingSandwichItem && (
         <SandwichCustomizer
           item={customizingSandwichItem}
-          existingCartItem={customizingItem || undefined} // 🔧 Pass existing cart state
+          existingCartItem={customizingItem || undefined}
           onComplete={handleSandwichCustomizationComplete}
           onCancel={handleSandwichCustomizationCancel}
           isOpen={showSandwichCustomizer}
@@ -481,7 +487,7 @@ export default function OrderCart({
         <AppetizerCustomizer
           item={customizingAppetizerItem}
           selectedVariant={customizingAppetizerVariant || undefined}
-          existingCartItem={customizingItem || undefined} // 🔧 Pass existing cart state
+          existingCartItem={customizingItem || undefined}
           onComplete={handleAppetizerCustomizationComplete}
           onCancel={handleAppetizerCustomizationCancel}
           isOpen={showAppetizerCustomizer}
@@ -494,7 +500,7 @@ export default function OrderCart({
         <ChickenCustomizer
           item={customizingChickenItem}
           selectedVariant={customizingChickenVariant || undefined}
-          existingCartItem={customizingItem || undefined} // 🔧 Pass existing cart state
+          existingCartItem={customizingItem || undefined}
           onComplete={handleChickenCustomizationComplete}
           onCancel={handleChickenCustomizationCancel}
           isOpen={showChickenCustomizer}
@@ -505,7 +511,7 @@ export default function OrderCart({
   );
 }
 
-// HELPER COMPONENTS (same as before)
+// HELPER COMPONENTS
 function CartEmptyState() {
   return (
     <div className="p-8 text-center text-gray-500">
@@ -658,6 +664,7 @@ interface OrderSummaryDisplayProps {
     subtotal: number;
     tax: number;
     deliveryFee: number;
+    loyaltyDiscount?: number; // ✅ NEW loyalty discount
     total: number;
   };
 }
@@ -684,6 +691,16 @@ function OrderSummaryDisplay({ summary }: OrderSummaryDisplayProps) {
           <span className="text-gray-700">Delivery Fee:</span>
           <span className="font-semibold text-gray-900">
             ${summary.deliveryFee.toFixed(2)}
+          </span>
+        </div>
+      )}
+
+      {/* ✅ NEW: Loyalty discount display */}
+      {summary.loyaltyDiscount && summary.loyaltyDiscount > 0 && (
+        <div className="flex justify-between text-sm">
+          <span className="text-purple-700">🎁 Loyalty Discount:</span>
+          <span className="font-semibold text-purple-600">
+            -${summary.loyaltyDiscount.toFixed(2)}
           </span>
         </div>
       )}

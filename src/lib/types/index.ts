@@ -31,3 +31,5 @@ export * from "./restaurant";
 export * from "./utils";
 
 export * from "./pin-login";
+
+export * from "./loyalty";
