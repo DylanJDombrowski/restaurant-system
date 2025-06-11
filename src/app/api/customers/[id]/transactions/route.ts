@@ -3,10 +3,12 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { ApiResponse, LoyaltyTransaction } from "@/lib/types";
 
 export async function GET(
-  request: Request, // <-- FIX: Use standard Request
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: Promise<{ id: string }> } // ✅ FIXED: Use Promise<> wrapper
 ): Promise<NextResponse<ApiResponse<LoyaltyTransaction[]>>> {
   try {
+    // ✅ FIXED: Await the params
+    const params = await context.params;
     const customerId = params.id;
 
     const { data: transactions, error } = await supabaseServer
