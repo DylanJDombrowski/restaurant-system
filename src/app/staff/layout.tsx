@@ -1,14 +1,19 @@
 // src/app/staff/layout.tsx - FINAL CORRECTED VERSION
 "use client";
+import { ProtectedRoute, useAuth } from "@/lib/contexts/auth-context";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ProtectedRoute, useAuth } from "@/lib/contexts/auth-context";
-import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
 
-// This forces the layout to be rendered dynamically at request time.
-// It's essential because the layout's structure depends on authentication
-// status and the URL, which are only known when a user makes a request.
+// Import 'dynamic' and rename it to 'dynamicImport'
+import dynamicImport from "next/dynamic";
+
+// This is the Next.js configuration export - it's now safe to use
 export const dynamic = "force-dynamic";
+
+// Use the renamed 'dynamicImport' function for your component
+const AuthLoadingScreen = dynamicImport(() => import("@/components/ui/AuthLoadingScreen").then((mod) => mod.AuthLoadingScreen), {
+  ssr: false,
+});
 
 /**
  * This component contains the actual UI for an authenticated staff member,
@@ -31,32 +36,20 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Link
-                href="/staff/orders"
-                className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium"
-              >
+              <Link href="/staff/orders" className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium">
                 Orders
               </Link>
               {isManager && (
-                <Link
-                  href="/admin/menu" // Corrected link for managers
-                  className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium"
-                >
+                <Link href="/admin/menu" className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium">
                   Menu
                 </Link>
               )}
               {isAdmin && (
-                <Link
-                  href="/admin"
-                  className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium"
-                >
+                <Link href="/admin" className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium">
                   Admin
                 </Link>
               )}
-              <Link
-                href="/kitchen"
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium"
-              >
+              <Link href="/kitchen" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium">
                 Kitchen Display
               </Link>
               <button
@@ -78,11 +71,7 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
  * StaffLayout is a conditional layout that correctly handles the public
  * PIN login page versus protected internal staff pages.
  */
-export default function StaffLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function StaffLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const pathname = usePathname();
 
