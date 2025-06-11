@@ -3,6 +3,7 @@
 import CustomerDetails from "@/components/features/orders/CustomerDetails";
 import MenuNavigator from "@/components/features/orders/MenuNavigator";
 import OrderCart, { useCartStatistics } from "@/components/features/orders/OrderCart";
+import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
 import { ConfiguredCartItem, Customer, MenuItemWithVariants, OrderWithItems, Restaurant } from "@/lib/types";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
@@ -357,11 +358,7 @@ export default function StaffOrdersPage() {
   // ==========================================
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-96">
-        <div className="text-lg font-semibold text-gray-900">Loading ordering system...</div>
-      </div>
-    );
+    return <AuthLoadingScreen />;
   }
 
   if (error) {
