@@ -1,27 +1,13 @@
-// src/components/ui/AuthLoadingScreen.tsx
-
 "use client";
 
-import { Player } from "@lottiefiles/react-lottie-player";
-
+/**
+ * A lightweight, CSS-only loading spinner for authentication checks.
+ * It uses Tailwind CSS for styling and animations, ensuring a minimal footprint.
+ */
 export function AuthLoadingScreen() {
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        width: "100%",
-        height: "100vh",
-        backgroundColor: "#f0f2f5", // Optional: change to your app's background
-      }}
-    >
-      <Player
-        autoplay
-        loop
-        src="/auth-loader.json"
-        style={{ height: "300px", width: "300px" }}
-      />
+    <div className="flex justify-center items-center w-full h-screen bg-gray-50">
+      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-600"></div>
     </div>
   );
 }
