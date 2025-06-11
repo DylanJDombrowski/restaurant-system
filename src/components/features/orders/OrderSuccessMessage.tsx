@@ -86,7 +86,7 @@ export default function OrderSuccessMessage({
 
               <div className="flex justify-between items-center py-2 border-b border-gray-200">
                 <span className="font-medium text-gray-900">Order Type:</span>
-                <span className="capitalize font-medium text-gray-700 flex items-center">
+                <span className="capitalize font-medium text-gray-900 flex items-center">
                   {orderType === "pickup" ? "🏃" : "🚚"} {orderType}
                 </span>
               </div>

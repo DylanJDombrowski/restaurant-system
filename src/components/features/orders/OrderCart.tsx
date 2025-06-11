@@ -673,14 +673,14 @@ function OrderSummaryDisplay({ summary }: OrderSummaryDisplayProps) {
   return (
     <div className="space-y-2">
       <div className="flex justify-between text-sm">
-        <span className="text-gray-700">Subtotal:</span>
+        <span className="text-gray-900">Subtotal:</span>
         <span className="font-semibold text-gray-900">
           ${summary.subtotal.toFixed(2)}
         </span>
       </div>
 
       <div className="flex justify-between text-sm">
-        <span className="text-gray-700">Tax:</span>
+        <span className="text-gray-900">Tax:</span>
         <span className="font-semibold text-gray-900">
           ${summary.tax.toFixed(2)}
         </span>
@@ -688,7 +688,7 @@ function OrderSummaryDisplay({ summary }: OrderSummaryDisplayProps) {
 
       {summary.deliveryFee > 0 && (
         <div className="flex justify-between text-sm">
-          <span className="text-gray-700">Delivery Fee:</span>
+          <span className="text-gray-900">Delivery Fee:</span>
           <span className="font-semibold text-gray-900">
             ${summary.deliveryFee.toFixed(2)}
           </span>

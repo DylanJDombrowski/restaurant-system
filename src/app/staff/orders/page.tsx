@@ -520,7 +520,7 @@ export default function StaffOrdersPage() {
                         className={`p-3 rounded-lg border-2 transition-all text-center ${
                           orderType === "pickup"
                             ? "border-blue-600 bg-blue-50 text-blue-900"
-                            : "border-gray-300 text-gray-700 hover:border-gray-400"
+                            : "border-gray-300 text-gray-900 hover:border-gray-400"
                         }`}
                       >
                         <div className="font-semibold">🏃 Pickup</div>
@@ -532,7 +532,7 @@ export default function StaffOrdersPage() {
                         className={`p-3 rounded-lg border-2 transition-all text-center ${
                           orderType === "delivery"
                             ? "border-blue-600 bg-blue-50 text-blue-900"
-                            : "border-gray-300 text-gray-700 hover:border-gray-400"
+                            : "border-gray-300 text-gray-900 hover:border-gray-400"
                         }`}
                       >
                         <div className="font-semibold">🚚 Delivery</div>
@@ -684,11 +684,11 @@ function PickupOrdersView({
 
               {/* Customer Info */}
               <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <div className="text-sm text-gray-700">
+                <div className="text-sm text-gray-900">
                   📞 {order.customer_phone}
                 </div>
                 {order.customer_email && (
-                  <div className="text-sm text-gray-700">
+                  <div className="text-sm text-gray-900">
                     ✉️ {order.customer_email}
                   </div>
                 )}

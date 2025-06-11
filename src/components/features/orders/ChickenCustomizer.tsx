@@ -607,7 +607,7 @@ export default function ChickenCustomizer({
           {/* Quantity and Special Instructions */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-900 mb-2">
                 Quantity
               </label>
               <select
@@ -624,7 +624,7 @@ export default function ChickenCustomizer({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-900 mb-2">
                 Special Instructions
               </label>
               <textarea
@@ -643,7 +643,7 @@ export default function ChickenCustomizer({
           <div className="flex justify-between items-center">
             <button
               onClick={onCancel}
-              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+              className="px-6 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>

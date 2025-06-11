@@ -149,7 +149,7 @@ export default function CustomerDetails({
       <div className="mb-4">
         <label
           htmlFor="phone"
-          className="block text-sm font-medium text-gray-700 mb-2"
+          className="block text-sm font-medium text-gray-900 mb-2"
         >
           Customer Phone Number
         </label>
@@ -221,7 +221,7 @@ export default function CustomerDetails({
       {/* Recent Customers */}
       {state.recentCustomers.length > 0 && !state.customer && (
         <div>
-          <h4 className="text-sm font-medium text-gray-700 mb-2">
+          <h4 className="text-sm font-medium text-gray-900 mb-2">
             Recent Customers
           </h4>
           <div className="space-y-2 max-h-48 overflow-y-auto">

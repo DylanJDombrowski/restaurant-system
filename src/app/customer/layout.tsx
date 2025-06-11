@@ -19,13 +19,13 @@ export default function CustomerLayout({
             <div className="flex items-center space-x-6">
               <Link
                 href="/menu"
-                className="text-gray-700 hover:text-red-600 font-medium"
+                className="text-gray-900 hover:text-red-600 font-medium"
               >
                 Menu
               </Link>
               <Link
                 href="/customer/order"
-                className="text-gray-700 hover:text-red-600 font-medium"
+                className="text-gray-900 hover:text-red-600 font-medium"
               >
                 Order Now
               </Link>

@@ -147,7 +147,7 @@ export default function StaffLoginPage() {
           </button>
           <button
             onClick={() => setShowEmailLogin(false)}
-            className="w-full mt-3 bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            className="w-full mt-3 bg-gray-200 text-gray-900 py-3 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
           >
             ← Back to PIN Login
           </button>
@@ -178,7 +178,7 @@ export default function StaffLoginPage() {
             </button>
             <button
               onClick={() => window.location.reload()}
-              className="w-full bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+              className="w-full bg-gray-200 text-gray-900 py-3 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
             >
               Check Again
             </button>
@@ -204,7 +204,7 @@ export default function StaffLoginPage() {
         {/* PIN Display */}
         <div className="mb-8">
           <div className="text-center mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-900 mb-2">
               Enter Your 6-Digit PIN
             </label>
             <div className="flex justify-center space-x-3">
@@ -238,7 +238,7 @@ export default function StaffLoginPage() {
               key={digit}
               onClick={() => handleKeypadPress(digit.toString())}
               disabled={loading || pin.length >= 6}
-              className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg text-xl font-bold text-gray-700 transition-colors active:scale-95"
+              className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg text-xl font-bold text-gray-900 transition-colors active:scale-95"
             >
               {digit}
             </button>
@@ -256,7 +256,7 @@ export default function StaffLoginPage() {
           <button
             onClick={() => handleKeypadPress("0")}
             disabled={loading || pin.length >= 6}
-            className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg text-xl font-bold text-gray-700 transition-colors active:scale-95"
+            className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg text-xl font-bold text-gray-900 transition-colors active:scale-95"
           >
             0
           </button>
@@ -264,7 +264,7 @@ export default function StaffLoginPage() {
           <button
             onClick={handleBackspace}
             disabled={loading || pin.length === 0}
-            className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg text-sm font-bold text-gray-700 transition-colors active:scale-95"
+            className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg text-sm font-bold text-gray-900 transition-colors active:scale-95"
           >
             ⌫
           </button>
