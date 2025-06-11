@@ -16,11 +16,13 @@ interface AdjustPointsResponseData {
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } } // Use standard inline destructuring for params
+  context: { params: Promise<{ id: string }> } // ✅ FIXED: Use Promise<> wrapper
 ): Promise<NextResponse<ApiResponse<AdjustPointsResponseData>>> {
   try {
-    // Extract the customer ID from the params object
+    // ✅ FIXED: Await the params
+    const params = await context.params;
     const customerId = params.id;
+
     const body = (await request.json()) as AdjustPointsRequestBody;
     const { points_adjustment, reason, admin_notes } = body;
 
