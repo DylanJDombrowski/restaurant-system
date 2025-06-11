@@ -1,11 +1,18 @@
 // In src/app/admin/page.tsx
 "use client";
 
-import { LoadingScreen } from "@/components/ui/LoadingScreen";
-import { supabase } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/contexts/auth-context";
+import { supabase } from "@/lib/supabase/client";
+import { AdminLogin } from "@/components/auth/AdminLogin";
+import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
+import { LoadingScreen } from "@/components/ui/LoadingScreen"; // Using your renamed generic loader
 
-// New analytics component to be added to the admin dashboard
+// ============================================================================
+// Dashboard Components (You can move these to their own files if you prefer)
+// ============================================================================
+
 function DashboardAnalytics() {
   const [analytics, setAnalytics] = useState({
     todayOrders: 0,
@@ -19,13 +26,10 @@ function DashboardAnalytics() {
     async function fetchAnalytics() {
       try {
         setLoading(true);
-
-        // Get today's date
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayISOString = today.toISOString();
 
-        // Fetch today's orders
         const { data: todayOrders, error: ordersError } = await supabase
           .from("orders")
           .select("id, total")
@@ -33,11 +37,9 @@ function DashboardAnalytics() {
 
         if (ordersError) throw ordersError;
 
-        // Calculate today's revenue
         const todayRevenue =
           todayOrders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
 
-        // Fetch active orders
         const { data: activeOrders, error: activeError } = await supabase
           .from("orders")
           .select("id")
@@ -45,7 +47,6 @@ function DashboardAnalytics() {
 
         if (activeError) throw activeError;
 
-        // Fetch available menu items
         const { data: availableItems, error: itemsError } = await supabase
           .from("menu_items")
           .select("id")
@@ -65,9 +66,22 @@ function DashboardAnalytics() {
         setLoading(false);
       }
     }
-
     fetchAnalytics();
   }, []);
+
+  if (loading) {
+    // Using a simpler loading indicator for this small component
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="bg-white p-4 rounded-lg shadow-md h-24 animate-pulse"
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -76,35 +90,28 @@ function DashboardAnalytics() {
           Today&apos;s Orders
         </h3>
         <p className="text-2xl font-bold text-stone-950">
-          {loading ? "..." : analytics.todayOrders}
+          {analytics.todayOrders}
         </p>
-        <p className="text-xs text-stone-700">Total orders today</p>
       </div>
-
       <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
         <h3 className="text-sm font-medium text-stone-950">
           Today&apos;s Revenue
         </h3>
         <p className="text-2xl font-bold text-stone-950">
-          {loading ? "..." : `$${analytics.todayRevenue.toFixed(2)}`}
+          ${analytics.todayRevenue.toFixed(2)}
         </p>
-        <p className="text-xs text-stone-700">Revenue today</p>
       </div>
-
       <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-yellow-500">
         <h3 className="text-sm font-medium text-stone-950">Active Orders</h3>
         <p className="text-2xl font-bold text-stone-950">
-          {loading ? "..." : analytics.activeOrders}
+          {analytics.activeOrders}
         </p>
-        <p className="text-xs text-stone-700">In kitchen queue</p>
       </div>
-
       <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-purple-500">
         <h3 className="text-sm font-medium text-stone-950">Available Items</h3>
         <p className="text-2xl font-bold text-stone-950">
-          {loading ? "..." : analytics.availableItems}
+          {analytics.availableItems}
         </p>
-        <p className="text-xs text-stone-700">Menu items</p>
       </div>
     </div>
   );
@@ -114,7 +121,6 @@ interface Restaurant {
   id: string;
   name: string;
   created_at: string;
-  // Add other fields as needed
 }
 
 function RestaurantDetails() {
@@ -162,41 +168,35 @@ function RestaurantDetails() {
   );
 }
 
-export default function AdminDashboard() {
+function AdminDashboard() {
   return (
     <div>
       <h1 className="text-3xl font-bold text-stone-950 mb-8">
         Admin Dashboard
       </h1>
-
-      {/* Analytics Section */}
       <DashboardAnalytics />
-
       <div className="grid lg:grid-cols-2 gap-8">
-        {/* Restaurant Overview */}
         <RestaurantDetails />
-
-        {/* System Status */}
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-stone-950 mb-4">
             System Status
           </h2>
           <div className="space-y-3">
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-stone-950">Database</span>
-              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
+              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
                 Connected
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-stone-950">Authentication</span>
-              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
+              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
                 Active
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-stone-950">Real-time Updates</span>
-              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
+              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
                 Online
               </span>
             </div>
@@ -205,4 +205,39 @@ export default function AdminDashboard() {
       </div>
     </div>
   );
+}
+
+// ============================================================================
+// The Main Page Component - Acts as a Gatekeeper
+// ============================================================================
+
+export default function AdminPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  // This effect will run when the component mounts and whenever user or loading changes.
+  // It ensures that if a user is already logged in, they are sent to the dashboard.
+  // However, the primary check is the return logic below.
+  useEffect(() => {
+    if (!loading && user) {
+      // Redirect to a more specific dashboard URL if you have one,
+      // e.g., /admin/dashboard. For now, we render the dashboard directly.
+    } else if (!loading && !user) {
+      // If not loading and no user, the page will render the AdminLogin form.
+      // No redirect is necessary here.
+    }
+  }, [user, loading, router]);
+
+  // 1. While the auth state is being determined, show the Lottie animation.
+  if (loading) {
+    return <AuthLoadingScreen />;
+  }
+
+  // 2. If loading is finished and there's no user, show the login form.
+  if (!user) {
+    return <AdminLogin />;
+  }
+
+  // 3. If loading is finished and there IS a user, show the admin dashboard.
+  return <AdminDashboard />;
 }
