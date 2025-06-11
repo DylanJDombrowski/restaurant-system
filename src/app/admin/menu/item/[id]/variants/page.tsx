@@ -524,7 +524,7 @@ export default function VariantManagement() {
                   .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
                   .map((variant) => (
                     <tr key={variant.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                         <div className="font-medium text-gray-900">
                           {variant.name}
                         </div>
@@ -534,13 +534,13 @@ export default function VariantManagement() {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                         {variant.size_code || variant.crust_type || "-"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                         ${variant.price.toFixed(2)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                         <span
                           className={`px-2 py-1 text-xs font-semibold rounded-full ${
                             variant.is_available
@@ -551,7 +551,7 @@ export default function VariantManagement() {
                           {variant.is_available ? "Available" : "Unavailable"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900 text-right text-sm font-medium space-x-2">
                         <button
                           onClick={() => handleEditVariant(variant)}
                           className="text-blue-600 hover:text-blue-900"

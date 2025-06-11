@@ -216,7 +216,7 @@ export default function MenuManagement() {
             <tbody className="bg-white divide-y divide-stone-950">
               {menuItems.map((item) => (
                 <tr key={item.id} className="hover:bg-stone-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                     <div className="font-medium text-stone-900">
                       {item.name}
                     </div>
@@ -226,15 +226,15 @@ export default function MenuManagement() {
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                     <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                       {getItemTypeLabel(item.item_type || "unknown")}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                     ${item.base_price?.toFixed(2)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                     <button
                       onClick={() =>
                         toggleItemAvailability(item.id, item.is_available)
@@ -248,7 +248,7 @@ export default function MenuManagement() {
                       {item.is_available ? "Available" : "Unavailable"}
                     </button>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-900 text-right text-sm font-medium space-x-2">
                     <Link
                       href={`/admin/menu/item/${item.id}/variants`}
                       className="text-indigo-600 hover:text-indigo-900"

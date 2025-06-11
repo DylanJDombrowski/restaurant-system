@@ -148,13 +148,13 @@ export default function CategoriesManagement() {
             <tbody className="divide-y divide-stone-200">
               {categories.map((category) => (
                 <tr key={category.id} className="hover:bg-stone-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-900 text-gray-900">
                     {category.name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-900 text-gray-900">
                     {category.sort_order}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                     <span
                       className={`px-2 py-1 text-xs font-semibold rounded-full ${
                         category.is_active
@@ -165,7 +165,7 @@ export default function CategoriesManagement() {
                       {category.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-900 text-right text-sm font-medium">
                     <button
                       onClick={() => setEditingCategory(category)}
                       className="text-blue-600 hover:text-blue-900 mr-4"
@@ -191,7 +191,7 @@ export default function CategoriesManagement() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="p-6 border-b border-stone-200">
-              <h2 className="text-xl font-semibold">
+              <h2 className="text-xl font-semibold text-gray-900">
                 {editingCategory.id ? "Edit Category" : "Add New Category"}
               </h2>
             </div>
