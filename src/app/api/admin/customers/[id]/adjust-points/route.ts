@@ -14,20 +14,13 @@ interface AdjustPointsResponseData {
   new_points_balance: number;
 }
 
-// Define a type for the context object, which contains the dynamic route parameters
-type RouteContext = {
-  params: {
-    id: string; // This 'id' corresponds to the `[id]` in the folder name
-  };
-};
-
 export async function POST(
   request: Request,
-  context: RouteContext // Use the explicit context type here
+  { params }: { params: { id: string } } // Use standard inline destructuring for params
 ): Promise<NextResponse<ApiResponse<AdjustPointsResponseData>>> {
   try {
-    // Extract the customer ID from the context object
-    const customerId = context.params.id;
+    // Extract the customer ID from the params object
+    const customerId = params.id;
     const body = (await request.json()) as AdjustPointsRequestBody;
     const { points_adjustment, reason, admin_notes } = body;
 
