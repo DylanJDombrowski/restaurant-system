@@ -1,11 +1,11 @@
-// src/app/api/admin/customers/[id]/transactions/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
+import { ApiResponse, LoyaltyTransaction } from "@/lib/types";
 
 export async function GET(
-  request: NextRequest,
+  request: Request, // <-- FIX: Use standard Request
   { params }: { params: { id: string } }
-) {
+): Promise<NextResponse<ApiResponse<LoyaltyTransaction[]>>> {
   try {
     const customerId = params.id;
 
@@ -17,21 +17,24 @@ export async function GET(
       .limit(50);
 
     if (error) {
-      console.error("Error loading customer transactions:", error);
       return NextResponse.json(
-        { error: "Failed to load transactions" },
+        { error: "Failed to load transactions", details: error.message },
         { status: 500 }
       );
     }
 
+    const data = transactions || [];
+
     return NextResponse.json({
-      data: transactions || [],
-      message: `Found ${transactions?.length || 0} transactions`,
+      data: data,
+      message: `Found ${data.length} transactions`,
     });
   } catch (error) {
-    console.error("💥 Error loading transactions:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

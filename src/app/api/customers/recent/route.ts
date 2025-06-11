@@ -1,9 +1,10 @@
-// src/app/api/customers/recent/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { RecentCustomer } from "@/lib/types/loyalty";
+import { ApiResponse, RecentCustomer } from "@/lib/types";
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest
+): Promise<NextResponse<ApiResponse<RecentCustomer[]>>> {
   try {
     const { searchParams } = new URL(request.url);
     const restaurantId = searchParams.get("restaurant_id");
@@ -15,32 +16,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const thirtyDaysAgo = new Date(
+      Date.now() - 30 * 24 * 60 * 60 * 1000
+    ).toISOString();
+
     const { data: recentCustomers, error } = await supabaseServer
       .from("customers")
       .select(
-        `
-        id,
-        name,
-        phone,
-        loyalty_points,
-        total_orders,
-        last_order_date,
-        updated_at
-      `
+        "id, name, phone, loyalty_points, total_orders, last_order_date, updated_at"
       )
       .eq("restaurant_id", restaurantId)
       .not("last_order_date", "is", null)
-      .gte(
-        "last_order_date",
-        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-      ) // Last 30 days
+      .gte("last_order_date", thirtyDaysAgo)
       .order("last_order_date", { ascending: false })
       .limit(10);
 
     if (error) {
-      console.error("Error loading recent customers:", error);
       return NextResponse.json(
-        { error: "Failed to load recent customers" },
+        { error: "Failed to load recent customers", details: error.message },
         { status: 500 }
       );
     }
@@ -61,9 +54,11 @@ export async function GET(request: NextRequest) {
       message: `Found ${formattedCustomers.length} recent customers`,
     });
   } catch (error) {
-    console.error("💥 Error in recent customers API:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

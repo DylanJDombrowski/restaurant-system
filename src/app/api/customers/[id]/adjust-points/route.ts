@@ -1,14 +1,24 @@
-// src/app/api/admin/customers/[id]/adjust-points/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
+import { ApiResponse } from "@/lib/types";
+
+interface AdjustPointsRequestBody {
+  points_adjustment: number;
+  reason: string;
+  admin_notes?: string;
+}
+
+interface AdjustPointsResponseData {
+  new_points_balance: number;
+}
 
 export async function POST(
-  request: NextRequest,
+  request: Request, // <-- FIX: Use standard Request
   { params }: { params: { id: string } }
-) {
+): Promise<NextResponse<ApiResponse<AdjustPointsResponseData>>> {
   try {
     const customerId = params.id;
-    const body = await request.json();
+    const body = (await request.json()) as AdjustPointsRequestBody;
     const { points_adjustment, reason, admin_notes } = body;
 
     if (points_adjustment === undefined || !reason) {
@@ -20,7 +30,7 @@ export async function POST(
 
     const { data: customer, error: customerError } = await supabaseServer
       .from("customers")
-      .select("loyalty_points")
+      .select("id, loyalty_points")
       .eq("id", customerId)
       .single();
 
@@ -33,21 +43,20 @@ export async function POST(
 
     const newPointsBalance = Math.max(
       0,
-      (customer.loyalty_points || 0) + points_adjustment
+      customer.loyalty_points + points_adjustment
     );
 
     const { error: updateError } = await supabaseServer
       .from("customers")
-      .update({
-        loyalty_points: newPointsBalance,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ loyalty_points: newPointsBalance })
       .eq("id", customerId);
 
     if (updateError) {
-      console.error("Error updating customer points:", updateError);
       return NextResponse.json(
-        { error: "Failed to update customer points" },
+        {
+          error: "Failed to update customer points",
+          details: updateError.message,
+        },
         { status: 500 }
       );
     }
@@ -63,15 +72,15 @@ export async function POST(
     });
 
     return NextResponse.json({
-      data: {
-        new_points_balance: newPointsBalance,
-      },
+      data: { new_points_balance: newPointsBalance },
       message: `Successfully adjusted points. New balance: ${newPointsBalance}`,
     });
   } catch (error) {
-    console.error("💥 Error adjusting customer points:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

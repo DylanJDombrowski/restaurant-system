@@ -1,8 +1,10 @@
-// src/app/api/admin/customers/search/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
+import { ApiResponse, Customer } from "@/lib/types";
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest
+): Promise<NextResponse<ApiResponse<Customer[]>>> {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q");
@@ -24,21 +26,24 @@ export async function GET(request: NextRequest) {
       .limit(20);
 
     if (error) {
-      console.error("Error searching customers:", error);
       return NextResponse.json(
-        { error: "Failed to search customers" },
+        { error: "Failed to search customers", details: error.message },
         { status: 500 }
       );
     }
 
+    const data = customers || [];
+
     return NextResponse.json({
-      data: customers || [],
-      message: `Found ${customers?.length || 0} customers matching "${query}"`,
+      data: data,
+      message: `Found ${data.length} customers matching "${query}"`,
     });
   } catch (error) {
-    console.error("💥 Error in admin customer search:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
