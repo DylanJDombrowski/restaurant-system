@@ -2,22 +2,32 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { ApiResponse } from "@/lib/types";
 
+// Define the shape of the incoming request body for clarity
 interface AdjustPointsRequestBody {
   points_adjustment: number;
   reason: string;
   admin_notes?: string;
 }
 
+// Define the shape of the successful response data
 interface AdjustPointsResponseData {
   new_points_balance: number;
 }
 
+// Define a type for the context object, which contains the dynamic route parameters
+type RouteContext = {
+  params: {
+    id: string; // This 'id' corresponds to the `[id]` in the folder name
+  };
+};
+
 export async function POST(
-  request: Request, // <-- FIX: Use standard Request
-  { params }: { params: { id: string } }
+  request: Request,
+  context: RouteContext // Use the explicit context type here
 ): Promise<NextResponse<ApiResponse<AdjustPointsResponseData>>> {
   try {
-    const customerId = params.id;
+    // Extract the customer ID from the context object
+    const customerId = context.params.id;
     const body = (await request.json()) as AdjustPointsRequestBody;
     const { points_adjustment, reason, admin_notes } = body;
 
@@ -28,6 +38,7 @@ export async function POST(
       );
     }
 
+    // Get the customer from the database
     const { data: customer, error: customerError } = await supabaseServer
       .from("customers")
       .select("id, loyalty_points")
@@ -41,11 +52,13 @@ export async function POST(
       );
     }
 
+    // Calculate the new point balance, ensuring it doesn't go below zero
     const newPointsBalance = Math.max(
       0,
       customer.loyalty_points + points_adjustment
     );
 
+    // Update the customer's points in the database
     const { error: updateError } = await supabaseServer
       .from("customers")
       .update({ loyalty_points: newPointsBalance })
@@ -61,6 +74,7 @@ export async function POST(
       );
     }
 
+    // Log the adjustment as a new transaction for auditing purposes
     await supabaseServer.from("loyalty_transactions").insert({
       customer_id: customerId,
       points_earned: points_adjustment > 0 ? points_adjustment : 0,
@@ -71,11 +85,13 @@ export async function POST(
       }`,
     });
 
+    // Return a successful response
     return NextResponse.json({
       data: { new_points_balance: newPointsBalance },
       message: `Successfully adjusted points. New balance: ${newPointsBalance}`,
     });
   } catch (error) {
+    // Catch any other unexpected errors
     return NextResponse.json(
       {
         error: "Internal server error",
