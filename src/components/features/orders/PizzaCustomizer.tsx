@@ -1,5 +1,6 @@
 // src/components/features/orders/PizzaCustomizer.tsx - FIXED INFINITE LOOP & STATE ISSUES
 "use client";
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import type {
   ConfiguredCartItem,
   ToppingAmount,
@@ -759,7 +760,7 @@ export default function EnhancedPizzaCustomizer({
               disabled={!canSave}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
-              {canSave ? "Update Cart" : "Loading..."}
+              {canSave ? "Update Cart" : <LoadingScreen />}
             </button>
           </div>
         </div>
