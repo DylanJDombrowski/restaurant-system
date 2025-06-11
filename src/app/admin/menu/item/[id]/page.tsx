@@ -1,9 +1,10 @@
 // src/app/admin/menu/item/[id]/page.tsx (also works for /new)
 "use client";
-import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
-import Link from "next/link";
+import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
 import { MenuCategory } from "@/lib/types";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 // Define the form data structure with all possible fields
 interface MenuItemFormData {
@@ -74,8 +75,7 @@ export default function MenuItemForm() {
               base_price: itemData.data.base_price || 0,
               prep_time_minutes: itemData.data.prep_time_minutes || 15,
               is_available: itemData.data.is_available !== false, // Default to true
-              allows_custom_toppings:
-                itemData.data.allows_custom_toppings || false,
+              allows_custom_toppings: itemData.data.allows_custom_toppings || false,
               default_toppings_json: itemData.data.default_toppings_json,
               image_url: itemData.data.image_url,
             });
@@ -83,9 +83,7 @@ export default function MenuItemForm() {
         }
       } catch (err) {
         console.error("Error loading form data:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to load form data"
-        );
+        setError(err instanceof Error ? err.message : "Failed to load form data");
       } finally {
         setLoading(false);
       }
@@ -95,11 +93,7 @@ export default function MenuItemForm() {
   }, [isEdit, itemId]);
 
   // Update form data
-  const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
 
     // Handle different input types
@@ -132,9 +126,7 @@ export default function MenuItemForm() {
 
       // Prepare API call based on whether we're creating or editing
       const method = isEdit ? "PATCH" : "POST";
-      const url = isEdit
-        ? `/api/admin/menu/items/${itemId}`
-        : "/api/admin/menu/items";
+      const url = isEdit ? `/api/admin/menu/items/${itemId}` : "/api/admin/menu/items";
 
       const response = await fetch(url, {
         method,
@@ -146,21 +138,13 @@ export default function MenuItemForm() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(
-          errorData.error ||
-            `Failed to ${isEdit ? "update" : "create"} menu item`
-        );
+        throw new Error(errorData.error || `Failed to ${isEdit ? "update" : "create"} menu item`);
       }
 
       const result = await response.json();
 
       // Redirect to the variants page if this is a new item with variants
-      if (
-        !isEdit &&
-        (formData.item_type === "pizza" ||
-          formData.item_type === "appetizer" ||
-          formData.item_type === "chicken_meal")
-      ) {
+      if (!isEdit && (formData.item_type === "pizza" || formData.item_type === "appetizer" || formData.item_type === "chicken_meal")) {
         router.push(`/admin/menu/item/${result.data.id}/variants`);
         return;
       }
@@ -175,34 +159,23 @@ export default function MenuItemForm() {
   };
 
   if (loading) {
-    return <div className="text-center py-10">Loading...</div>;
+    return <AuthLoadingScreen />;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-stone-950">
-          {isEdit ? "Edit Menu Item" : "Add New Menu Item"}
-        </h1>
-        <Link
-          href="/admin/menu"
-          className="bg-gray-200 text-stone-950 px-4 py-2 rounded hover:bg-stone-850"
-        >
+        <h1 className="text-3xl font-bold text-stone-950">{isEdit ? "Edit Menu Item" : "Add New Menu Item"}</h1>
+        <Link href="/admin/menu" className="bg-gray-200 text-stone-950 px-4 py-2 rounded hover:bg-stone-850">
           Cancel
         </Link>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded">
-          {error}
-        </div>
-      )}
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded">{error}</div>}
 
       <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg">
         <div className="p-6 border-b border-stone-400">
-          <h2 className="text-lg font-semibold text-stone-950">
-            Basic Information
-          </h2>
+          <h2 className="text-lg font-semibold text-stone-950">Basic Information</h2>
         </div>
 
         <div className="p-6 space-y-6">
@@ -244,9 +217,7 @@ export default function MenuItemForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-stone-950 mb-1">
-              Description
-            </label>
+            <label className="block text-sm font-medium text-stone-950 mb-1">Description</label>
             <textarea
               name="description"
               value={formData.description}
@@ -300,9 +271,7 @@ export default function MenuItemForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-stone-950 mb-1">
-                Prep Time (minutes)
-              </label>
+              <label className="block text-sm font-medium text-stone-950 mb-1">Prep Time (minutes)</label>
               <input
                 type="number"
                 name="prep_time_minutes"
@@ -324,16 +293,12 @@ export default function MenuItemForm() {
                 onChange={handleInputChange}
                 className="h-4 w-4 text-blue-600 border-stone-400 rounded"
               />
-              <label
-                htmlFor="is_available"
-                className="ml-2 text-sm text-stone-950"
-              >
+              <label htmlFor="is_available" className="ml-2 text-sm text-stone-950">
                 Item is available for ordering
               </label>
             </div>
 
-            {(formData.item_type === "pizza" ||
-              formData.item_type === "sandwich") && (
+            {(formData.item_type === "pizza" || formData.item_type === "sandwich") && (
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -343,10 +308,7 @@ export default function MenuItemForm() {
                   onChange={handleInputChange}
                   className="h-4 w-4 text-blue-600 border-stone-950 rounded"
                 />
-                <label
-                  htmlFor="allows_custom_toppings"
-                  className="ml-2 text-sm text-stone-950"
-                >
+                <label htmlFor="allows_custom_toppings" className="ml-2 text-sm text-stone-950">
                   Allows customization
                 </label>
               </div>
@@ -356,48 +318,32 @@ export default function MenuItemForm() {
           {/* Item type specific fields */}
           {formData.item_type === "pizza" && (
             <div className="p-4 bg-blue-50 rounded-lg">
-              <h3 className="text-md font-medium text-stone-950 mb-2">
-                Pizza Options
-              </h3>
+              <h3 className="text-md font-medium text-stone-950 mb-2">Pizza Options</h3>
               <p className="text-sm text-stone-950 mb-4">
-                After saving, you&apos;ll be able to add size variants and set
-                up default toppings.
+                After saving, you&apos;ll be able to add size variants and set up default toppings.
               </p>
             </div>
           )}
 
           {formData.item_type === "sandwich" && (
             <div className="p-4 bg-yellow-50 rounded-lg">
-              <h3 className="text-md font-medium text-stone-950 mb-2">
-                Sandwich Options
-              </h3>
-              <p className="text-sm text-stone-950 mb-4">
-                After saving, you can configure bread types and sandwich
-                toppings.
-              </p>
+              <h3 className="text-md font-medium text-stone-950 mb-2">Sandwich Options</h3>
+              <p className="text-sm text-stone-950 mb-4">After saving, you can configure bread types and sandwich toppings.</p>
             </div>
           )}
 
           {formData.item_type === "chicken_meal" && (
             <div className="p-4 bg-orange-50 rounded-lg">
-              <h3 className="text-md font-medium text-stone-950 mb-2">
-                Chicken Meal Options
-              </h3>
-              <p className="text-sm text-stone-950 mb-4">
-                After saving, you&apos;ll need to add size variants (like 8pc,
-                12pc, etc.)
-              </p>
+              <h3 className="text-md font-medium text-stone-950 mb-2">Chicken Meal Options</h3>
+              <p className="text-sm text-stone-950 mb-4">After saving, you&apos;ll need to add size variants (like 8pc, 12pc, etc.)</p>
             </div>
           )}
 
           {formData.item_type === "appetizer" && (
             <div className="p-4 bg-green-50 rounded-lg">
-              <h3 className="text-md font-medium text-stone-950 mb-2">
-                Appetizer Options
-              </h3>
+              <h3 className="text-md font-medium text-stone-950 mb-2">Appetizer Options</h3>
               <p className="text-sm text-stone-950 mb-4">
-                For appetizers with multiple sizes (like 6pc, 12pc), add size
-                variants after saving.
+                For appetizers with multiple sizes (like 6pc, 12pc), add size variants after saving.
               </p>
             </div>
           )}
@@ -407,15 +353,9 @@ export default function MenuItemForm() {
           <button
             type="submit"
             disabled={submitting}
-            className={`px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 ${
-              submitting ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            className={`px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 ${submitting ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            {submitting
-              ? "Saving..."
-              : isEdit
-              ? "Update Menu Item"
-              : "Create Menu Item"}
+            {submitting ? "Saving..." : isEdit ? "Update Menu Item" : "Create Menu Item"}
           </button>
         </div>
       </form>

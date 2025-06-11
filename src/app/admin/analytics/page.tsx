@@ -1,22 +1,23 @@
 // src/app/admin/analytics/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
 import { supabase } from "@/lib/supabase/client";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  LineChart,
-  Line,
-  BarChart,
   Bar,
-  PieChart,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
   Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell,
 } from "recharts";
 
 // Define proper types for our data structures
@@ -45,18 +46,14 @@ interface CategoryData {
 
 export default function AnalyticsDashboard() {
   // State for time period selection
-  const [timeRange, setTimeRange] = useState<
-    "today" | "week" | "month" | "year"
-  >("week");
+  const [timeRange, setTimeRange] = useState<"today" | "week" | "month" | "year">("week");
 
   // State for various metrics with proper typing
   const [isLoading, setIsLoading] = useState(true);
   const [orderData, setOrderData] = useState<TimeSeriesDataPoint[]>([]);
   const [revenueData, setRevenueData] = useState<RevenueDataPoint[]>([]);
   const [topItems, setTopItems] = useState<PopularItemData[]>([]);
-  const [categoryDistribution, setCategoryDistribution] = useState<
-    CategoryData[]
-  >([]);
+  const [categoryDistribution, setCategoryDistribution] = useState<CategoryData[]>([]);
   const [orderMetrics, setOrderMetrics] = useState({
     totalOrders: 0,
     totalRevenue: 0,
@@ -65,21 +62,14 @@ export default function AnalyticsDashboard() {
   });
 
   // Colors for charts
-  const COLORS = useMemo(
-    () => ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82CA9D"],
-    []
-  );
+  const COLORS = useMemo(() => ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82CA9D"], []);
 
   // Fetch and process top selling items with useCallback
   const fetchTopSellingItems = useCallback(
     async (startDate: string, endDate: string) => {
       try {
         // First get order IDs in the date range
-        const { data: orders } = await supabase
-          .from("orders")
-          .select("id")
-          .gte("created_at", startDate)
-          .lte("created_at", endDate);
+        const { data: orders } = await supabase.from("orders").select("id").gte("created_at", startDate).lte("created_at", endDate);
 
         if (!orders || orders.length === 0) {
           setTopItems([]);
@@ -106,10 +96,7 @@ export default function AnalyticsDashboard() {
         }
 
         // Count items and quantities
-        const itemCounts: Record<
-          string,
-          { name: string; count: number; quantity: number }
-        > = {};
+        const itemCounts: Record<string, { name: string; count: number; quantity: number }> = {};
 
         orderItems.forEach((item) => {
           const itemId = item.menu_item_id;
@@ -152,11 +139,7 @@ export default function AnalyticsDashboard() {
       try {
         // This query is more complex, requiring multiple joins
         // First get order IDs in the date range
-        const { data: orders } = await supabase
-          .from("orders")
-          .select("id")
-          .gte("created_at", startDate)
-          .lte("created_at", endDate);
+        const { data: orders } = await supabase.from("orders").select("id").gte("created_at", startDate).lte("created_at", endDate);
 
         if (!orders || orders.length === 0) {
           setCategoryDistribution([]);
@@ -185,8 +168,7 @@ export default function AnalyticsDashboard() {
         }
 
         // Count items by category
-        const categoryCounts: Record<string, { name: string; count: number }> =
-          {};
+        const categoryCounts: Record<string, { name: string; count: number }> = {};
 
         orderItems.forEach((item) => {
           // Fix type handling for nested data
@@ -196,8 +178,7 @@ export default function AnalyticsDashboard() {
           } | null;
 
           const categoryId = menuItem?.category_id;
-          const categoryName =
-            menuItem?.menu_categories?.name || "Uncategorized";
+          const categoryName = menuItem?.menu_categories?.name || "Uncategorized";
           const quantity = item.quantity || 1;
 
           if (!categoryId) return;
@@ -267,15 +248,7 @@ export default function AnalyticsDashboard() {
       }
     } else if (timeRange === "week") {
       // Group by day for week
-      const dayNames = [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-      ];
+      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       const dayData: Record<number, { orders: number; revenue: number }> = {};
 
       // Initialize all days
@@ -307,12 +280,7 @@ export default function AnalyticsDashboard() {
       const dayData: Record<number, { orders: number; revenue: number }> = {};
 
       // Calculate number of days in the range
-      const days = Math.min(
-        31,
-        Math.ceil(
-          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-        )
-      );
+      const days = Math.min(31, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
 
       // Initialize all days
       for (let i = 1; i <= days; i++) {
@@ -336,20 +304,7 @@ export default function AnalyticsDashboard() {
       }
     } else if (timeRange === "year") {
       // Group by month for year
-      const monthNames = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       const monthData: Record<number, { orders: number; revenue: number }> = {};
 
       // Initialize all months
@@ -416,27 +371,16 @@ export default function AnalyticsDashboard() {
         if (ordersError) throw ordersError;
 
         // Process order data for time series charts
-        const processedOrderData = processTimeSeriesData(
-          orders || [],
-          startDate,
-          endDate,
-          timeRange
-        );
+        const processedOrderData = processTimeSeriesData(orders || [], startDate, endDate, timeRange);
         setOrderData(processedOrderData.orderCounts);
         setRevenueData(processedOrderData.revenueTotals);
 
         // Calculate order metrics
         const totalOrders = orders?.length || 0;
-        const totalRevenue =
-          orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
-        const averageOrderValue =
-          totalOrders > 0 ? totalRevenue / totalOrders : 0;
-        const completedOrders =
-          orders?.filter((order) =>
-            ["completed", "ready"].includes(order.status)
-          ).length || 0;
-        const completionRate =
-          totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
+        const totalRevenue = orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
+        const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+        const completedOrders = orders?.filter((order) => ["completed", "ready"].includes(order.status)).length || 0;
+        const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
 
         setOrderMetrics({
           totalOrders,
@@ -463,17 +407,11 @@ export default function AnalyticsDashboard() {
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-stone-950">
-          Analytics Dashboard
-        </h1>
+        <h1 className="text-3xl font-bold text-stone-950">Analytics Dashboard</h1>
         <div className="space-x-2">
           <select
             value={timeRange}
-            onChange={(e) =>
-              setTimeRange(
-                e.target.value as "today" | "week" | "month" | "year"
-              )
-            }
+            onChange={(e) => setTimeRange(e.target.value as "today" | "week" | "month" | "year")}
             className="px-4 py-2 rounded-md border border-stone-300 text-stone-950"
           >
             <option value="today">Today</option>
@@ -485,74 +423,35 @@ export default function AnalyticsDashboard() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-12">
-          <div className="text-xl text-stone-950">
-            Loading analytics data...
-          </div>
-        </div>
+        <AuthLoadingScreen />
       ) : (
         <>
           {/* Key Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <MetricCard
-              title="Total Orders"
-              value={orderMetrics.totalOrders}
-              format="number"
-              icon="📦"
-              color="blue"
-            />
-            <MetricCard
-              title="Total Revenue"
-              value={orderMetrics.totalRevenue}
-              format="currency"
-              icon="💰"
-              color="green"
-            />
-            <MetricCard
-              title="Average Order"
-              value={orderMetrics.averageOrderValue}
-              format="currency"
-              icon="🧾"
-              color="yellow"
-            />
-            <MetricCard
-              title="Completion Rate"
-              value={orderMetrics.completionRate}
-              format="percentage"
-              icon="✅"
-              color="purple"
-            />
+            <MetricCard title="Total Orders" value={orderMetrics.totalOrders} format="number" icon="📦" color="blue" />
+            <MetricCard title="Total Revenue" value={orderMetrics.totalRevenue} format="currency" icon="💰" color="green" />
+            <MetricCard title="Average Order" value={orderMetrics.averageOrderValue} format="currency" icon="🧾" color="yellow" />
+            <MetricCard title="Completion Rate" value={orderMetrics.completionRate} format="percentage" icon="✅" color="purple" />
           </div>
 
           {/* Order and Revenue Trends */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <ChartCard title="Order Volume">
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart
-                  data={orderData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
+                <LineChart data={orderData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="orders"
-                    stroke="#8884d8"
-                    activeDot={{ r: 8 }}
-                  />
+                  <Line type="monotone" dataKey="orders" stroke="#8884d8" activeDot={{ r: 8 }} />
                 </LineChart>
               </ResponsiveContainer>
             </ChartCard>
 
             <ChartCard title="Revenue Trend">
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={revenueData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
+                <BarChart data={revenueData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
@@ -576,29 +475,20 @@ export default function AnalyticsDashboard() {
             <ChartCard title="Popular Items">
               {topItems.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart
-                    data={topItems}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                  >
+                  <BarChart data={topItems} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis type="number" />
                     <YAxis dataKey="name" type="category" width={150} />
                     <Tooltip />
                     <Bar dataKey="quantity" fill="#8884d8">
                       {topItems.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-stone-950">
-                  No order data available
-                </div>
+                <div className="h-[300px] flex items-center justify-center text-stone-950">No order data available</div>
               )}
             </ChartCard>
 
@@ -611,27 +501,20 @@ export default function AnalyticsDashboard() {
                       cx="50%"
                       cy="50%"
                       labelLine={true}
-                      label={({ name, percent }) =>
-                        `${name} (${(percent * 100).toFixed(0)}%)`
-                      }
+                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
                     >
                       {categoryDistribution.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(value) => [value, "Orders"]} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-stone-950">
-                  No category data available
-                </div>
+                <div className="h-[300px] flex items-center justify-center text-stone-950">No category data available</div>
               )}
             </ChartCard>
           </div>
@@ -653,11 +536,7 @@ interface MetricCardProps {
 function MetricCard({ title, value, format, icon, color }: MetricCardProps) {
   // Format the value based on format type
   const formattedValue =
-    format === "currency"
-      ? `$${value.toFixed(2)}`
-      : format === "percentage"
-      ? `${value.toFixed(1)}%`
-      : value.toString();
+    format === "currency" ? `$${value.toFixed(2)}` : format === "percentage" ? `${value.toFixed(1)}%` : value.toString();
 
   // Determine color classes
   const colorClasses = {
@@ -673,9 +552,7 @@ function MetricCard({ title, value, format, icon, color }: MetricCardProps) {
       <div className="flex justify-between items-start">
         <div>
           <h3 className="text-lg font-medium text-stone-950">{title}</h3>
-          <p className="text-3xl font-bold mt-2 text-stone-950">
-            {formattedValue}
-          </p>
+          <p className="text-3xl font-bold mt-2 text-stone-950">{formattedValue}</p>
         </div>
         <div className="text-3xl">{icon}</div>
       </div>
@@ -684,13 +561,7 @@ function MetricCard({ title, value, format, icon, color }: MetricCardProps) {
 }
 
 // Chart Card Component - remains the same
-function ChartCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white p-6 rounded-lg shadow border border-stone-200">
       <h3 className="text-lg font-medium mb-4 text-stone-950">{title}</h3>

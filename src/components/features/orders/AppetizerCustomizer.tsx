@@ -1,7 +1,8 @@
 // src/components/features/orders/AppetizerCustomizer.tsx - FIXED VERSION
 "use client";
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { ConfiguredCartItem, MenuItemWithVariants, MenuItemVariant, ConfiguredModifier, Modifier } from "@/lib/types";
+import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
+import { ConfiguredCartItem, ConfiguredModifier, MenuItemVariant, MenuItemWithVariants, Modifier } from "@/lib/types";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 /**
  * 🍗 APPETIZER CUSTOMIZER COMPONENT
@@ -212,9 +213,7 @@ export default function AppetizerCustomizer({
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="p-6 text-center">
-              <div className="text-lg text-gray-600">Loading customization options...</div>
-            </div>
+            <AuthLoadingScreen />
           ) : (
             <div className="p-6 space-y-6">
               {/* Condiments Section */}

@@ -1,5 +1,6 @@
 // src/components/features/orders/CustomerDetails.tsx
 "use client";
+import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
 import { Customer } from "@/lib/types";
 import { useCallback, useEffect, useState } from "react";
 
@@ -391,12 +392,7 @@ export default function CustomerDetails({
                 📍 Delivery fee: $3.99 • Estimated time: 35-45 minutes
               </div>
 
-              {loadingAddresses && (
-                <div className="mt-2 text-sm text-gray-600 flex items-center">
-                  <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full mr-2"></div>
-                  Loading previous addresses...
-                </div>
-              )}
+              {loadingAddresses && <AuthLoadingScreen />}
             </div>
           )}
 
