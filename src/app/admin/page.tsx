@@ -85,30 +85,30 @@ function DashboardAnalytics() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
       <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
-        <h3 className="text-sm font-medium text-stone-950">
+        <h3 className="text-sm font-medium text-gray-900">
           Today&apos;s Orders
         </h3>
-        <p className="text-2xl font-bold text-stone-950">
+        <p className="text-2xl font-bold text-gray-900">
           {analytics.todayOrders}
         </p>
       </div>
       <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
-        <h3 className="text-sm font-medium text-stone-950">
+        <h3 className="text-sm font-medium text-gray-900">
           Today&apos;s Revenue
         </h3>
-        <p className="text-2xl font-bold text-stone-950">
+        <p className="text-2xl font-bold text-gray-900">
           ${analytics.todayRevenue.toFixed(2)}
         </p>
       </div>
       <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-yellow-500">
-        <h3 className="text-sm font-medium text-stone-950">Active Orders</h3>
-        <p className="text-2xl font-bold text-stone-950">
+        <h3 className="text-sm font-medium text-gray-900">Active Orders</h3>
+        <p className="text-2xl font-bold text-gray-900">
           {analytics.activeOrders}
         </p>
       </div>
       <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-purple-500">
-        <h3 className="text-sm font-medium text-stone-950">Available Items</h3>
-        <p className="text-2xl font-bold text-stone-950">
+        <h3 className="text-sm font-medium text-gray-900">Available Items</h3>
+        <p className="text-2xl font-bold text-gray-900">
           {analytics.availableItems}
         </p>
       </div>
@@ -142,21 +142,21 @@ function RestaurantDetails() {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-xl font-semibold text-stone-950 mb-4">
+      <h2 className="text-xl font-semibold text-gray-900 mb-4">
         Restaurant Details
       </h2>
       <div className="space-y-3">
         <div>
           <label className="text-sm text-stone-700">Name</label>
-          <p className="font-medium text-stone-950">{restaurant?.name}</p>
+          <p className="font-medium text-gray-900">{restaurant?.name}</p>
         </div>
         <div>
           <label className="text-sm text-stone-700">ID</label>
-          <p className="font-mono text-sm text-stone-950">{restaurant?.id}</p>
+          <p className="font-mono text-sm text-gray-900">{restaurant?.id}</p>
         </div>
         <div>
           <label className="text-sm text-stone-700">Created</label>
-          <p className="text-stone-950">
+          <p className="text-gray-900">
             {restaurant?.created_at
               ? new Date(restaurant.created_at).toLocaleString()
               : ""}
@@ -170,31 +170,29 @@ function RestaurantDetails() {
 function AdminDashboard() {
   return (
     <div>
-      <h1 className="text-3xl font-bold text-stone-950 mb-8">
-        Admin Dashboard
-      </h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">Admin Dashboard</h1>
       <DashboardAnalytics />
       <div className="grid lg:grid-cols-2 gap-8">
         <RestaurantDetails />
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-stone-950 mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
             System Status
           </h2>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-stone-950">Database</span>
+              <span className="text-gray-900">Database</span>
               <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
                 Connected
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-stone-950">Authentication</span>
+              <span className="text-gray-900">Authentication</span>
               <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
                 Active
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-stone-950">Real-time Updates</span>
+              <span className="text-gray-900">Real-time Updates</span>
               <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
                 Online
               </span>

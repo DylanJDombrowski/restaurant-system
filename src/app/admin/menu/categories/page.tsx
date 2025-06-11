@@ -110,9 +110,7 @@ export default function CategoriesManagement() {
   return (
     <div>
       <div className="p-4 border-b border-stone-200">
-        <h2 className="text-lg font-semibold text-stone-950">
-          Menu Categories
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-900">Menu Categories</h2>
       </div>
 
       <div className="p-4">
@@ -133,16 +131,16 @@ export default function CategoriesManagement() {
           <table className="w-full">
             <thead className="bg-stone-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-stone-950 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-stone-950 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Order
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-stone-950 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-stone-950 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -150,10 +148,10 @@ export default function CategoriesManagement() {
             <tbody className="divide-y divide-stone-200">
               {categories.map((category) => (
                 <tr key={category.id} className="hover:bg-stone-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-stone-950">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                     {category.name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-stone-950">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                     {category.sort_order}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -199,7 +197,7 @@ export default function CategoriesManagement() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-stone-950 mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Category Name <span className="text-red-600">*</span>
                 </label>
                 <input
@@ -217,7 +215,7 @@ export default function CategoriesManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-stone-950 mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Description
                 </label>
                 <textarea
@@ -234,7 +232,7 @@ export default function CategoriesManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-stone-950 mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Sort Order
                 </label>
                 <input
@@ -265,7 +263,7 @@ export default function CategoriesManagement() {
                 />
                 <label
                   htmlFor="is_active"
-                  className="ml-2 text-sm text-stone-950"
+                  className="ml-2 text-sm text-gray-900"
                 >
                   Category is active
                 </label>
@@ -274,7 +272,7 @@ export default function CategoriesManagement() {
             <div className="px-6 py-4 bg-stone-50 flex justify-end space-x-2 rounded-b-lg">
               <button
                 onClick={() => setEditingCategory(null)}
-                className="px-4 py-2 border border-stone-300 rounded-md text-stone-950 hover:bg-stone-100"
+                className="px-4 py-2 border border-stone-300 rounded-md text-gray-900 hover:bg-stone-100"
               >
                 Cancel
               </button>

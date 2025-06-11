@@ -464,7 +464,7 @@ export default function AnalyticsDashboard() {
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-stone-950">
+        <h1 className="text-3xl font-bold text-gray-900">
           Analytics Dashboard
         </h1>
         <div className="space-x-2">
@@ -475,7 +475,7 @@ export default function AnalyticsDashboard() {
                 e.target.value as "today" | "week" | "month" | "year"
               )
             }
-            className="px-4 py-2 rounded-md border border-stone-300 text-stone-950"
+            className="px-4 py-2 rounded-md border border-stone-300 text-gray-900"
           >
             <option value="today">Today</option>
             <option value="week">Last 7 Days</option>
@@ -593,7 +593,7 @@ export default function AnalyticsDashboard() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-stone-950">
+                <div className="h-[300px] flex items-center justify-center text-gray-900">
                   No order data available
                 </div>
               )}
@@ -626,7 +626,7 @@ export default function AnalyticsDashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-stone-950">
+                <div className="h-[300px] flex items-center justify-center text-gray-900">
                   No category data available
                 </div>
               )}
@@ -669,8 +669,8 @@ function MetricCard({ title, value, format, icon, color }: MetricCardProps) {
     <div className={`${colorClasses[color]} p-6 rounded-lg border-l-4 shadow`}>
       <div className="flex justify-between items-start">
         <div>
-          <h3 className="text-lg font-medium text-stone-950">{title}</h3>
-          <p className="text-3xl font-bold mt-2 text-stone-950">
+          <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+          <p className="text-3xl font-bold mt-2 text-gray-900">
             {formattedValue}
           </p>
         </div>
@@ -690,7 +690,7 @@ function ChartCard({
 }) {
   return (
     <div className="bg-white p-6 rounded-lg shadow border border-stone-200">
-      <h3 className="text-lg font-medium mb-4 text-stone-950">{title}</h3>
+      <h3 className="text-lg font-medium mb-4 text-gray-900">{title}</h3>
       {children}
     </div>
   );

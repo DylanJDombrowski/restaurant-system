@@ -145,7 +145,7 @@ export default function MenuManagement() {
     <div>
       <div className="p-4 border-b border-stone-200">
         <div className="flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-stone-950">Menu Items</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Menu Items</h2>
 
           {/* Add Category Selector */}
           <div className="flex flex-wrap gap-2 mt-2">
@@ -176,13 +176,13 @@ export default function MenuManagement() {
         </div>
       </div>
       <div className="p-4 border-b border-stone-200">
-        <h2 className="text-lg font-semibold text-stone-950">Menu Items</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Menu Items</h2>
       </div>
 
       {loading || categoryLoading ? (
         <LoadingScreen />
       ) : menuItems.length === 0 ? (
-        <div className="p-8 text-center text-stone-950">
+        <div className="p-8 text-center text-gray-900">
           <p>No menu items found in this category.</p>
           <Link
             href="/admin/menu/item/new"
@@ -196,19 +196,19 @@ export default function MenuManagement() {
           <table className="w-full min-w-full">
             <thead className="bg-stone-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-stone-950 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-stone-950 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Type
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-stone-950 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Base Price
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-stone-950 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-stone-950 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -221,7 +221,7 @@ export default function MenuManagement() {
                       {item.name}
                     </div>
                     {item.description && (
-                      <div className="text-sm text-stone-950 truncate max-w-md">
+                      <div className="text-sm text-gray-900 truncate max-w-md">
                         {item.description}
                       </div>
                     )}

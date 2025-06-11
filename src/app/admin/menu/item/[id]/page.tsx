@@ -182,12 +182,12 @@ export default function MenuItemForm() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-stone-950">
+        <h1 className="text-3xl font-bold text-gray-900">
           {isEdit ? "Edit Menu Item" : "Add New Menu Item"}
         </h1>
         <Link
           href="/admin/menu"
-          className="bg-gray-200 text-stone-950 px-4 py-2 rounded hover:bg-stone-850"
+          className="bg-gray-200 text-gray-900 px-4 py-2 rounded hover:bg-stone-850"
         >
           Cancel
         </Link>
@@ -201,7 +201,7 @@ export default function MenuItemForm() {
 
       <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg">
         <div className="p-6 border-b border-stone-400">
-          <h2 className="text-lg font-semibold text-stone-950">
+          <h2 className="text-lg font-semibold text-gray-900">
             Basic Information
           </h2>
         </div>
@@ -210,7 +210,7 @@ export default function MenuItemForm() {
           {/* Basic fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-stone-950 mb-1">
+              <label className="block text-sm font-medium text-gray-900 mb-1">
                 Name <span className="text-red-600">*</span>
               </label>
               <input
@@ -224,7 +224,7 @@ export default function MenuItemForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-stone-950 mb-1">
+              <label className="block text-sm font-medium text-gray-900 mb-1">
                 Category <span className="text-red-600">*</span>
               </label>
               <select
@@ -245,7 +245,7 @@ export default function MenuItemForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-stone-950 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Description
             </label>
             <textarea
@@ -259,7 +259,7 @@ export default function MenuItemForm() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label className="block text-sm font-medium text-stone-950 mb-1">
+              <label className="block text-sm font-medium text-gray-900 mb-1">
                 Item Type <span className="text-red-600">*</span>
               </label>
               <select
@@ -280,12 +280,12 @@ export default function MenuItemForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-stone-950 mb-1">
+              <label className="block text-sm font-medium text-gray-900 mb-1">
                 Base Price <span className="text-red-600">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-stone-950">$</span>
+                  <span className="text-gray-900">$</span>
                 </div>
                 <input
                   type="number"
@@ -301,7 +301,7 @@ export default function MenuItemForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-stone-950 mb-1">
+              <label className="block text-sm font-medium text-gray-900 mb-1">
                 Prep Time (minutes)
               </label>
               <input
@@ -327,7 +327,7 @@ export default function MenuItemForm() {
               />
               <label
                 htmlFor="is_available"
-                className="ml-2 text-sm text-stone-950"
+                className="ml-2 text-sm text-gray-900"
               >
                 Item is available for ordering
               </label>
@@ -346,7 +346,7 @@ export default function MenuItemForm() {
                 />
                 <label
                   htmlFor="allows_custom_toppings"
-                  className="ml-2 text-sm text-stone-950"
+                  className="ml-2 text-sm text-gray-900"
                 >
                   Allows customization
                 </label>
@@ -357,10 +357,10 @@ export default function MenuItemForm() {
           {/* Item type specific fields */}
           {formData.item_type === "pizza" && (
             <div className="p-4 bg-blue-50 rounded-lg">
-              <h3 className="text-md font-medium text-stone-950 mb-2">
+              <h3 className="text-md font-medium text-gray-900 mb-2">
                 Pizza Options
               </h3>
-              <p className="text-sm text-stone-950 mb-4">
+              <p className="text-sm text-gray-900 mb-4">
                 After saving, you&apos;ll be able to add size variants and set
                 up default toppings.
               </p>
@@ -369,10 +369,10 @@ export default function MenuItemForm() {
 
           {formData.item_type === "sandwich" && (
             <div className="p-4 bg-yellow-50 rounded-lg">
-              <h3 className="text-md font-medium text-stone-950 mb-2">
+              <h3 className="text-md font-medium text-gray-900 mb-2">
                 Sandwich Options
               </h3>
-              <p className="text-sm text-stone-950 mb-4">
+              <p className="text-sm text-gray-900 mb-4">
                 After saving, you can configure bread types and sandwich
                 toppings.
               </p>
@@ -381,10 +381,10 @@ export default function MenuItemForm() {
 
           {formData.item_type === "chicken_meal" && (
             <div className="p-4 bg-orange-50 rounded-lg">
-              <h3 className="text-md font-medium text-stone-950 mb-2">
+              <h3 className="text-md font-medium text-gray-900 mb-2">
                 Chicken Meal Options
               </h3>
-              <p className="text-sm text-stone-950 mb-4">
+              <p className="text-sm text-gray-900 mb-4">
                 After saving, you&apos;ll need to add size variants (like 8pc,
                 12pc, etc.)
               </p>
@@ -393,10 +393,10 @@ export default function MenuItemForm() {
 
           {formData.item_type === "appetizer" && (
             <div className="p-4 bg-green-50 rounded-lg">
-              <h3 className="text-md font-medium text-stone-950 mb-2">
+              <h3 className="text-md font-medium text-gray-900 mb-2">
                 Appetizer Options
               </h3>
-              <p className="text-sm text-stone-950 mb-4">
+              <p className="text-sm text-gray-900 mb-4">
                 For appetizers with multiple sizes (like 6pc, 12pc), add size
                 variants after saving.
               </p>

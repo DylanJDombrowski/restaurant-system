@@ -26,11 +26,11 @@ export default function MenuLayout({
       <div className="space-y-6">
         {/* Persistent Header */}
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-stone-950">Menu Management</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Menu Management</h1>
           <div className="space-x-2">
             <Link
               href="/admin"
-              className="bg-gray-200 text-stone-950 px-4 py-2 rounded hover:bg-gray-300"
+              className="bg-gray-200 text-gray-900 px-4 py-2 rounded hover:bg-gray-300"
             >
               Back to Dashboard
             </Link>
