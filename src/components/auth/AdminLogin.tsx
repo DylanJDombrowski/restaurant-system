@@ -2,39 +2,29 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/contexts/auth-context";
-import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
-import { useRouter } from "next/navigation";
 
 export function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const { signIn } = useAuth();
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setLoginError(null);
 
     try {
+      // The signIn function will now set the global loading state.
+      // The main AdminPage will detect this and show the AuthLoadingScreen.
       await signIn(email, password);
-      // Add a delay to allow the animation to play
-      setTimeout(() => {
-        router.push("/admin/dashboard");
-      }, 2000); // 2-second delay
+      // No redirect or timeout is needed here.
+      // The page will automatically switch to the dashboard when the user state updates.
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Login failed";
+        error instanceof Error ? error.message : "An unknown error occurred.";
       setLoginError(errorMessage);
-      setIsSubmitting(false);
     }
   };
-
-  if (isSubmitting) {
-    return <AuthLoadingScreen />;
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
