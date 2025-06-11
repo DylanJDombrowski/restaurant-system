@@ -1,6 +1,6 @@
 // src/app/admin/menu/item/[id]/variants/page.tsx
 "use client";
-import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { MenuItem, MenuItemVariant } from "@/lib/types";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -25,7 +25,9 @@ export default function VariantManagement() {
   // State
   const [menuItem, setMenuItem] = useState<MenuItem | null>(null);
   const [variants, setVariants] = useState<MenuItemVariant[]>([]);
-  const [editingVariant, setEditingVariant] = useState<VariantFormData | null>(null);
+  const [editingVariant, setEditingVariant] = useState<VariantFormData | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +46,9 @@ export default function VariantManagement() {
         setMenuItem(itemData.data);
 
         // Fetch variants
-        const variantsResponse = await fetch(`/api/admin/menu/items/${itemId}/variants`);
+        const variantsResponse = await fetch(
+          `/api/admin/menu/items/${itemId}/variants`
+        );
         if (!variantsResponse.ok) {
           throw new Error("Failed to load variants");
         }
@@ -64,7 +68,10 @@ export default function VariantManagement() {
   // Start creating a new variant
   const handleAddVariant = () => {
     // Set next sort order to be after the last one
-    const nextSortOrder = variants.length > 0 ? Math.max(...variants.map((v) => v.sort_order || 0)) + 10 : 10;
+    const nextSortOrder =
+      variants.length > 0
+        ? Math.max(...variants.map((v) => v.sort_order || 0)) + 10
+        : 10;
 
     setEditingVariant({
       name: "",
@@ -114,14 +121,21 @@ export default function VariantManagement() {
   };
 
   // Update variant form field
-  const handleVariantInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleVariantInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     if (!editingVariant) return;
 
     const { name, value, type } = e.target;
 
     setEditingVariant({
       ...editingVariant,
-      [name]: type === "number" ? parseFloat(value) || 0 : type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+      [name]:
+        type === "number"
+          ? parseFloat(value) || 0
+          : type === "checkbox"
+          ? (e.target as HTMLInputElement).checked
+          : value,
     });
   };
 
@@ -132,7 +146,9 @@ export default function VariantManagement() {
     try {
       const isEdit = !!editingVariant.id;
       const method = isEdit ? "PATCH" : "POST";
-      const url = isEdit ? `/api/admin/menu/variants/${editingVariant.id}` : `/api/admin/menu/items/${itemId}/variants`;
+      const url = isEdit
+        ? `/api/admin/menu/variants/${editingVariant.id}`
+        : `/api/admin/menu/items/${itemId}/variants`;
 
       const response = await fetch(url, {
         method,
@@ -153,7 +169,11 @@ export default function VariantManagement() {
 
       // Update UI
       if (isEdit) {
-        setVariants(variants.map((v) => (v.id === editingVariant.id ? resultData.data : v)));
+        setVariants(
+          variants.map((v) =>
+            v.id === editingVariant.id ? resultData.data : v
+          )
+        );
       } else {
         setVariants([...variants, resultData.data]);
       }
@@ -180,7 +200,9 @@ export default function VariantManagement() {
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Size Code</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Size Code
+              </label>
               <select
                 name="size_code"
                 value={editingVariant.size_code || ""}
@@ -196,7 +218,9 @@ export default function VariantManagement() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Crust Type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Crust Type
+              </label>
               <select
                 name="crust_type"
                 value={editingVariant.crust_type || ""}
@@ -217,7 +241,9 @@ export default function VariantManagement() {
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Piece Count</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Piece Count
+              </label>
               <select
                 name="size_code"
                 value={editingVariant.size_code || ""}
@@ -237,7 +263,9 @@ export default function VariantManagement() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Type
+              </label>
               <select
                 name="crust_type" // Reusing this field for meal type
                 value={editingVariant.crust_type || ""}
@@ -255,7 +283,9 @@ export default function VariantManagement() {
       case "appetizer":
         return (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Size/Count</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Size/Count
+            </label>
             <input
               type="text"
               name="size_code"
@@ -273,7 +303,7 @@ export default function VariantManagement() {
   };
 
   if (loading) {
-    <AuthLoadingScreen />;
+    <LoadingScreen />;
   }
 
   if (error) {
@@ -281,7 +311,10 @@ export default function VariantManagement() {
       <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded my-4">
         <h3 className="font-bold">Error</h3>
         <p>{error}</p>
-        <button onClick={() => window.location.reload()} className="mt-2 bg-red-600 text-white px-4 py-2 rounded">
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-2 bg-red-600 text-white px-4 py-2 rounded"
+        >
           Retry
         </button>
       </div>
@@ -298,10 +331,16 @@ export default function VariantManagement() {
           </p>
         </div>
         <div className="space-x-2">
-          <button onClick={handleAddVariant} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+          <button
+            onClick={handleAddVariant}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
             Add Variant
           </button>
-          <Link href="/admin/menu" className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">
+          <Link
+            href="/admin/menu"
+            className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300"
+          >
             Back to Menu
           </Link>
         </div>
@@ -312,7 +351,9 @@ export default function VariantManagement() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold">{editingVariant.id ? "Edit Variant" : "Add Variant"}</h2>
+              <h2 className="text-xl font-semibold">
+                {editingVariant.id ? "Edit Variant" : "Add Variant"}
+              </h2>
             </div>
 
             <div className="p-6 space-y-4">
@@ -358,7 +399,9 @@ export default function VariantManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Serves</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Serves
+                </label>
                 <input
                   type="text"
                   name="serves"
@@ -371,7 +414,9 @@ export default function VariantManagement() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sort Order
+                  </label>
                   <input
                     type="number"
                     name="sort_order"
@@ -382,7 +427,9 @@ export default function VariantManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Prep Time (minutes)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Prep Time (minutes)
+                  </label>
                   <input
                     type="number"
                     name="prep_time_minutes"
@@ -402,7 +449,10 @@ export default function VariantManagement() {
                   onChange={handleVariantInputChange}
                   className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                 />
-                <label htmlFor="is_available" className="ml-2 text-sm text-gray-700">
+                <label
+                  htmlFor="is_available"
+                  className="ml-2 text-sm text-gray-700"
+                >
                   Variant is available for ordering
                 </label>
               </div>
@@ -416,7 +466,11 @@ export default function VariantManagement() {
               >
                 Cancel
               </button>
-              <button type="button" onClick={handleSaveVariant} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+              <button
+                type="button"
+                onClick={handleSaveVariant}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
                 Save Variant
               </button>
             </div>
@@ -428,13 +482,18 @@ export default function VariantManagement() {
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold">Size/Variant Options</h2>
-          <p className="text-sm text-gray-600 mt-1">Add different sizes or variants with their specific prices.</p>
+          <p className="text-sm text-gray-600 mt-1">
+            Add different sizes or variants with their specific prices.
+          </p>
         </div>
 
         {variants.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             <p>No variants added yet.</p>
-            <button onClick={handleAddVariant} className="text-blue-600 underline mt-2">
+            <button
+              onClick={handleAddVariant}
+              className="text-blue-600 underline mt-2"
+            >
               Add your first variant
             </button>
           </div>
@@ -443,11 +502,21 @@ export default function VariantManagement() {
             <table className="w-full min-w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size/Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Size/Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Price
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -456,25 +525,43 @@ export default function VariantManagement() {
                   .map((variant) => (
                     <tr key={variant.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">{variant.name}</div>
-                        {variant.serves && <div className="text-sm text-gray-500">{variant.serves}</div>}
+                        <div className="font-medium text-gray-900">
+                          {variant.name}
+                        </div>
+                        {variant.serves && (
+                          <div className="text-sm text-gray-500">
+                            {variant.serves}
+                          </div>
+                        )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">{variant.size_code || variant.crust_type || "-"}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">${variant.price.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {variant.size_code || variant.crust_type || "-"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        ${variant.price.toFixed(2)}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            variant.is_available ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                            variant.is_available
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
                           }`}
                         >
                           {variant.is_available ? "Available" : "Unavailable"}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                        <button onClick={() => handleEditVariant(variant)} className="text-blue-600 hover:text-blue-900">
+                        <button
+                          onClick={() => handleEditVariant(variant)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
                           Edit
                         </button>
-                        <button onClick={() => handleDeleteVariant(variant.id)} className="text-red-600 hover:text-red-900">
+                        <button
+                          onClick={() => handleDeleteVariant(variant.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
                           Delete
                         </button>
                       </td>

@@ -1,7 +1,13 @@
 // src/components/features/orders/AppetizerCustomizer.tsx - FIXED VERSION
 "use client";
-import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
-import { ConfiguredCartItem, ConfiguredModifier, MenuItemVariant, MenuItemWithVariants, Modifier } from "@/lib/types";
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
+import {
+  ConfiguredCartItem,
+  ConfiguredModifier,
+  MenuItemVariant,
+  MenuItemWithVariants,
+  Modifier,
+} from "@/lib/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 /**
@@ -50,7 +56,9 @@ export default function AppetizerCustomizer({
 
   const [condiments, setCondiments] = useState<CondimentOption[]>([]);
   const [preparations, setPreparations] = useState<PreparationOption[]>([]);
-  const [specialInstructions, setSpecialInstructions] = useState(existingCartItem?.specialInstructions || "");
+  const [specialInstructions, setSpecialInstructions] = useState(
+    existingCartItem?.specialInstructions || ""
+  );
   const [loading, setLoading] = useState(true);
 
   // ==========================================
@@ -63,9 +71,13 @@ export default function AppetizerCustomizer({
 
       // Determine condiment category based on item type
       const isWings = item.name.toLowerCase().includes("wing");
-      const condimentCategory = isWings ? "wing_condiment" : "appetizer_condiment";
+      const condimentCategory = isWings
+        ? "wing_condiment"
+        : "appetizer_condiment";
 
-      const response = await fetch(`/api/menu/modifiers?restaurant_id=${restaurantId}`);
+      const response = await fetch(
+        `/api/menu/modifiers?restaurant_id=${restaurantId}`
+      );
       if (!response.ok) {
         throw new Error("Failed to load modifiers");
       }
@@ -74,24 +86,36 @@ export default function AppetizerCustomizer({
       const modifiers: Modifier[] = data.data || []; // 🔧 FIX: Proper typing instead of any
 
       // Separate condiments and preparations with proper typing
-      const condimentModifiers = modifiers.filter((mod: Modifier) => mod.category === condimentCategory);
-      const preparationModifiers = modifiers.filter((mod: Modifier) => mod.category === "appetizer_preparation");
+      const condimentModifiers = modifiers.filter(
+        (mod: Modifier) => mod.category === condimentCategory
+      );
+      const preparationModifiers = modifiers.filter(
+        (mod: Modifier) => mod.category === "appetizer_preparation"
+      );
 
       // Initialize condiments with existing selections
-      const condimentOptions: CondimentOption[] = condimentModifiers.map((mod: Modifier) => ({
-        id: mod.id,
-        name: mod.name,
-        price: mod.price_adjustment || 0,
-        selected: existingCartItem?.selectedModifiers?.some((m) => m.id === mod.id) || false,
-      }));
+      const condimentOptions: CondimentOption[] = condimentModifiers.map(
+        (mod: Modifier) => ({
+          id: mod.id,
+          name: mod.name,
+          price: mod.price_adjustment || 0,
+          selected:
+            existingCartItem?.selectedModifiers?.some((m) => m.id === mod.id) ||
+            false,
+        })
+      );
 
       // Initialize preparations with existing selections
-      const preparationOptions: PreparationOption[] = preparationModifiers.map((mod: Modifier) => ({
-        id: mod.id,
-        name: mod.name,
-        price: mod.price_adjustment || 0,
-        selected: existingCartItem?.selectedModifiers?.some((m) => m.id === mod.id) || false,
-      }));
+      const preparationOptions: PreparationOption[] = preparationModifiers.map(
+        (mod: Modifier) => ({
+          id: mod.id,
+          name: mod.name,
+          price: mod.price_adjustment || 0,
+          selected:
+            existingCartItem?.selectedModifiers?.some((m) => m.id === mod.id) ||
+            false,
+        })
+      );
 
       setCondiments(condimentOptions);
       setPreparations(preparationOptions);
@@ -114,17 +138,28 @@ export default function AppetizerCustomizer({
 
   const handleCondimentToggle = useCallback((condimentId: string) => {
     setCondiments((prev) =>
-      prev.map((condiment) => (condiment.id === condimentId ? { ...condiment, selected: !condiment.selected } : condiment))
+      prev.map((condiment) =>
+        condiment.id === condimentId
+          ? { ...condiment, selected: !condiment.selected }
+          : condiment
+      )
     );
   }, []);
 
   const handlePreparationToggle = useCallback((preparationId: string) => {
-    setPreparations((prev) => prev.map((prep) => (prep.id === preparationId ? { ...prep, selected: !prep.selected } : prep)));
+    setPreparations((prev) =>
+      prev.map((prep) =>
+        prep.id === preparationId ? { ...prep, selected: !prep.selected } : prep
+      )
+    );
   }, []);
 
-  const handleSpecialInstructionsChange = useCallback((instructions: string) => {
-    setSpecialInstructions(instructions);
-  }, []);
+  const handleSpecialInstructionsChange = useCallback(
+    (instructions: string) => {
+      setSpecialInstructions(instructions);
+    },
+    []
+  );
 
   // ==========================================
   // PRICE CALCULATION
@@ -133,9 +168,13 @@ export default function AppetizerCustomizer({
   const calculatedPrice = useMemo(() => {
     const basePrice = selectedVariant?.price || item.base_price;
 
-    const condimentCost = condiments.filter((c) => c.selected).reduce((total, c) => total + c.price, 0);
+    const condimentCost = condiments
+      .filter((c) => c.selected)
+      .reduce((total, c) => total + c.price, 0);
 
-    const preparationCost = preparations.filter((p) => p.selected).reduce((total, p) => total + p.price, 0);
+    const preparationCost = preparations
+      .filter((p) => p.selected)
+      .reduce((total, p) => total + p.price, 0);
 
     return basePrice + condimentCost + preparationCost;
   }, [selectedVariant, item.base_price, condiments, preparations]);
@@ -171,7 +210,9 @@ export default function AppetizerCustomizer({
 
     // Create cart item
     const cartItem: ConfiguredCartItem = {
-      id: existingCartItem?.id || `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id:
+        existingCartItem?.id ||
+        `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       menuItemId: item.id,
       menuItemName: item.name,
       variantId: selectedVariant?.id || null,
@@ -182,12 +223,23 @@ export default function AppetizerCustomizer({
       selectedModifiers,
       specialInstructions,
       totalPrice: calculatedPrice,
-      displayName: selectedVariant?.name ? `${selectedVariant.name} ${item.name}` : item.name,
+      displayName: selectedVariant?.name
+        ? `${selectedVariant.name} ${item.name}`
+        : item.name,
     };
 
     console.log("🍗 Completed appetizer customization:", cartItem);
     onComplete(cartItem);
-  }, [condiments, preparations, specialInstructions, calculatedPrice, item, selectedVariant, existingCartItem, onComplete]);
+  }, [
+    condiments,
+    preparations,
+    specialInstructions,
+    calculatedPrice,
+    item,
+    selectedVariant,
+    existingCartItem,
+    onComplete,
+  ]);
 
   // ==========================================
   // RENDER
@@ -201,11 +253,18 @@ export default function AppetizerCustomizer({
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Customize {selectedVariant?.name || item.name}</h2>
-            <p className="text-sm text-gray-600 mt-1">Base price: ${(selectedVariant?.price || item.base_price).toFixed(2)}</p>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Customize {selectedVariant?.name || item.name}
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Base price: $
+              {(selectedVariant?.price || item.base_price).toFixed(2)}
+            </p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-green-600">${calculatedPrice.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-green-600">
+              ${calculatedPrice.toFixed(2)}
+            </div>
             <div className="text-sm text-gray-500">Current total</div>
           </div>
         </div>
@@ -213,7 +272,7 @@ export default function AppetizerCustomizer({
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <AuthLoadingScreen />
+            <LoadingScreen />
           ) : (
             <div className="p-6 space-y-6">
               {/* Condiments Section */}
@@ -225,7 +284,11 @@ export default function AppetizerCustomizer({
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
                     {condiments.map((condiment) => (
-                      <CondimentOption key={condiment.id} condiment={condiment} onToggle={() => handleCondimentToggle(condiment.id)} />
+                      <CondimentOption
+                        key={condiment.id}
+                        condiment={condiment}
+                        onToggle={() => handleCondimentToggle(condiment.id)}
+                      />
                     ))}
                   </div>
                 </section>
@@ -252,11 +315,15 @@ export default function AppetizerCustomizer({
 
               {/* Special Instructions */}
               <section>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Special Instructions</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                  Special Instructions
+                </h3>
                 <textarea
                   placeholder="Any special requests for this item..."
                   value={specialInstructions}
-                  onChange={(e) => handleSpecialInstructionsChange(e.target.value)}
+                  onChange={(e) =>
+                    handleSpecialInstructionsChange(e.target.value)
+                  }
                   rows={3}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -277,7 +344,9 @@ export default function AppetizerCustomizer({
           <div className="flex items-center gap-4">
             <div className="text-right">
               <div className="text-sm text-gray-600">Total:</div>
-              <div className="text-xl font-bold text-green-600">${calculatedPrice.toFixed(2)}</div>
+              <div className="text-xl font-bold text-green-600">
+                ${calculatedPrice.toFixed(2)}
+              </div>
             </div>
             <button
               onClick={handleComplete}
@@ -306,14 +375,25 @@ function CondimentOption({ condiment, onToggle }: CondimentOptionProps) {
   return (
     <label
       className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-        condiment.selected ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+        condiment.selected
+          ? "border-blue-500 bg-blue-50"
+          : "border-gray-200 hover:border-gray-300"
       }`}
     >
       <div className="flex items-center">
-        <input type="checkbox" checked={condiment.selected} onChange={onToggle} className="mr-3 text-blue-600 focus:ring-blue-500" />
+        <input
+          type="checkbox"
+          checked={condiment.selected}
+          onChange={onToggle}
+          className="mr-3 text-blue-600 focus:ring-blue-500"
+        />
         <span className="font-medium text-gray-900">{condiment.name}</span>
       </div>
-      {condiment.price > 0 && <span className="text-sm font-semibold text-green-600">+${condiment.price.toFixed(2)}</span>}
+      {condiment.price > 0 && (
+        <span className="text-sm font-semibold text-green-600">
+          +${condiment.price.toFixed(2)}
+        </span>
+      )}
     </label>
   );
 }
@@ -327,14 +407,25 @@ function PreparationOption({ preparation, onToggle }: PreparationOptionProps) {
   return (
     <label
       className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-        preparation.selected ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+        preparation.selected
+          ? "border-blue-500 bg-blue-50"
+          : "border-gray-200 hover:border-gray-300"
       }`}
     >
       <div className="flex items-center">
-        <input type="checkbox" checked={preparation.selected} onChange={onToggle} className="mr-3 text-blue-600 focus:ring-blue-500" />
+        <input
+          type="checkbox"
+          checked={preparation.selected}
+          onChange={onToggle}
+          className="mr-3 text-blue-600 focus:ring-blue-500"
+        />
         <span className="font-medium text-gray-900">{preparation.name}</span>
       </div>
-      {preparation.price > 0 && <span className="text-sm font-semibold text-green-600">+${preparation.price.toFixed(2)}</span>}
+      {preparation.price > 0 && (
+        <span className="text-sm font-semibold text-green-600">
+          +${preparation.price.toFixed(2)}
+        </span>
+      )}
     </label>
   );
 }

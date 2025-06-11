@@ -1,16 +1,18 @@
 // src/lib/contexts/auth-context.tsx
 "use client";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { supabase } from "@/lib/supabase/client";
-import { Restaurant, Staff } from "@/lib/types";
+import { Restaurant, Staff } from "@/lib/types/restaurant";
 import { Session, User } from "@supabase/supabase-js";
-import dynamic from "next/dynamic"; // <-- ADD THIS IMPORT
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-
-const AuthLoadingScreen = dynamic(
-  () => import("@/components/ui/AuthLoadingScreen").then((mod) => mod.AuthLoadingScreen),
-  { ssr: false } // This is the key: disable server-side rendering
-);
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 interface AuthContextType {
   user: User | null;
@@ -50,176 +52,200 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /**
    * Load Staff Data via API Route
    */
-  const loadStaffData = useCallback(async (session: Session, retryCount = 0) => {
-    if (loadingStaffData.current) {
-      console.log("Staff data already loading, skipping...");
-      return;
-    }
+  const loadStaffData = useCallback(
+    async (session: Session, retryCount = 0) => {
+      if (loadingStaffData.current) {
+        console.log("Staff data already loading, skipping...");
+        return;
+      }
 
-    const userId = session.user.id;
-    if (currentUserId.current === userId && retryCount === 0) {
-      console.log("Staff data already loaded for this user, skipping...");
-      return;
-    }
+      const userId = session.user.id;
+      if (currentUserId.current === userId && retryCount === 0) {
+        console.log("Staff data already loaded for this user, skipping...");
+        return;
+      }
 
-    loadingStaffData.current = true;
-    currentUserId.current = userId;
+      loadingStaffData.current = true;
+      currentUserId.current = userId;
 
-    try {
-      console.log(`Loading staff data via API (attempt ${retryCount + 1})`);
-      setError(null);
+      try {
+        console.log(`Loading staff data via API (attempt ${retryCount + 1})`);
+        setError(null);
 
-      const response = await fetch("/api/auth/staff", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-      });
+        const response = await fetch("/api/auth/staff", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
+        if (!response.ok) {
+          const errorData = await response.json();
 
-        if (response.status === 401) {
-          throw new Error("Authentication failed - please sign in again");
-        } else if (response.status === 404) {
-          throw new Error("No staff record found for this account");
+          if (response.status === 401) {
+            throw new Error("Authentication failed - please sign in again");
+          } else if (response.status === 404) {
+            throw new Error("No staff record found for this account");
+          } else {
+            throw new Error(
+              errorData.error ||
+                `API request failed with status ${response.status}`
+            );
+          }
+        }
+
+        const result = await response.json();
+
+        if (!result.data) {
+          throw new Error("Invalid response from API");
+        }
+
+        const { staff: staffData, restaurant: restaurantData } = result.data;
+
+        setStaff(staffData);
+        setRestaurant(restaurantData);
+        setError(null);
+
+        console.log(
+          "Staff data loaded successfully via API:",
+          staffData.name,
+          staffData.role
+        );
+        console.log("Restaurant data loaded:", restaurantData.name);
+      } catch (error) {
+        console.error("Failed to load staff data:", error);
+
+        if (error instanceof Error) {
+          if (error.message.includes("Failed to fetch") && retryCount < 2) {
+            console.log(`Retrying API call (attempt ${retryCount + 1})`);
+            await new Promise((resolve) =>
+              setTimeout(resolve, (retryCount + 1) * 1000)
+            );
+            return loadStaffData(session, retryCount + 1);
+          }
+
+          setError(error.message);
         } else {
-          throw new Error(errorData.error || `API request failed with status ${response.status}`);
-        }
-      }
-
-      const result = await response.json();
-
-      if (!result.data) {
-        throw new Error("Invalid response from API");
-      }
-
-      const { staff: staffData, restaurant: restaurantData } = result.data;
-
-      setStaff(staffData);
-      setRestaurant(restaurantData);
-      setError(null);
-
-      console.log("Staff data loaded successfully via API:", staffData.name, staffData.role);
-      console.log("Restaurant data loaded:", restaurantData.name);
-    } catch (error) {
-      console.error("Failed to load staff data:", error);
-
-      if (error instanceof Error) {
-        if (error.message.includes("Failed to fetch") && retryCount < 2) {
-          console.log(`Retrying API call (attempt ${retryCount + 1})`);
-          await new Promise((resolve) => setTimeout(resolve, (retryCount + 1) * 1000));
-          return loadStaffData(session, retryCount + 1);
+          setError("An unexpected error occurred during authentication");
         }
 
-        setError(error.message);
-      } else {
-        setError("An unexpected error occurred during authentication");
-      }
+        setUser(null);
+        setStaff(null);
+        setRestaurant(null);
+        currentUserId.current = null;
 
-      setUser(null);
-      setStaff(null);
-      setRestaurant(null);
-      currentUserId.current = null;
-
-      if (error instanceof Error && error.message.includes("Authentication failed")) {
-        await supabase.auth.signOut();
+        if (
+          error instanceof Error &&
+          error.message.includes("Authentication failed")
+        ) {
+          await supabase.auth.signOut();
+        }
+      } finally {
+        loadingStaffData.current = false;
+        setLoading(false);
       }
-    } finally {
-      loadingStaffData.current = false;
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   /**
    * ENHANCED: PIN Login Function with better session management
    */
-  const loginWithPin = useCallback(async (pin: string, restaurantId: string) => {
-    setLoading(true);
-    setError(null);
+  const loginWithPin = useCallback(
+    async (pin: string, restaurantId: string) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      console.log("🔐 Attempting PIN login...");
+      try {
+        console.log("🔐 Attempting PIN login...");
 
-      const response = await fetch("/api/auth/pin-login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          pin,
-          restaurant_id: restaurantId,
-        }),
-      });
+        const response = await fetch("/api/auth/pin-login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            pin,
+            restaurant_id: restaurantId,
+          }),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "PIN login failed");
-      }
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "PIN login failed");
+        }
 
-      const result = await response.json();
-      const { staff: staffData, restaurant: restaurantData, session: sessionData } = result.data;
-
-      // Create a custom user object for PIN-based sessions
-      const customUser: User = {
-        id: staffData.id,
-        aud: "staff",
-        role: "authenticated",
-        email: staffData.email,
-        phone: "",
-        confirmed_at: new Date().toISOString(),
-        email_confirmed_at: new Date().toISOString(),
-        last_sign_in_at: new Date().toISOString(),
-        app_metadata: {},
-        user_metadata: {
-          name: staffData.name,
-          role: staffData.role,
-          login_method: "pin",
-        },
-        identities: [],
-        created_at: staffData.created_at,
-        updated_at: new Date().toISOString(),
-      };
-
-      // Create a custom session object
-      const customSession: Session = {
-        access_token: sessionData.token,
-        refresh_token: sessionData.token,
-        expires_in: 8 * 60 * 60,
-        expires_at: Math.floor(new Date(sessionData.expires_at).getTime() / 1000),
-        token_type: "bearer",
-        user: customUser,
-      };
-
-      // Update auth state
-      setUser(customUser);
-      setStaff(staffData);
-      setRestaurant(restaurantData);
-      setSession(customSession);
-      setAuthMethod("pin"); // NEW: Track auth method
-
-      // Store session data in localStorage for persistence
-      localStorage.setItem(
-        "pin_session",
-        JSON.stringify({
-          session: customSession,
+        const result = await response.json();
+        const {
           staff: staffData,
           restaurant: restaurantData,
-          expires_at: sessionData.expires_at,
-          auth_method: "pin",
-        })
-      );
+          session: sessionData,
+        } = result.data;
 
-      console.log("✅ PIN login successful:", staffData.name);
-    } catch (error) {
-      console.error("❌ PIN login failed:", error);
-      setError(error instanceof Error ? error.message : "PIN login failed");
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        // Create a custom user object for PIN-based sessions
+        const customUser: User = {
+          id: staffData.id,
+          aud: "staff",
+          role: "authenticated",
+          email: staffData.email,
+          phone: "",
+          confirmed_at: new Date().toISOString(),
+          email_confirmed_at: new Date().toISOString(),
+          last_sign_in_at: new Date().toISOString(),
+          app_metadata: {},
+          user_metadata: {
+            name: staffData.name,
+            role: staffData.role,
+            login_method: "pin",
+          },
+          identities: [],
+          created_at: staffData.created_at,
+          updated_at: new Date().toISOString(),
+        };
+
+        // Create a custom session object
+        const customSession: Session = {
+          access_token: sessionData.token,
+          refresh_token: sessionData.token,
+          expires_in: 8 * 60 * 60,
+          expires_at: Math.floor(
+            new Date(sessionData.expires_at).getTime() / 1000
+          ),
+          token_type: "bearer",
+          user: customUser,
+        };
+
+        // Update auth state
+        setUser(customUser);
+        setStaff(staffData);
+        setRestaurant(restaurantData);
+        setSession(customSession);
+        setAuthMethod("pin"); // NEW: Track auth method
+
+        // Store session data in localStorage for persistence
+        localStorage.setItem(
+          "pin_session",
+          JSON.stringify({
+            session: customSession,
+            staff: staffData,
+            restaurant: restaurantData,
+            expires_at: sessionData.expires_at,
+            auth_method: "pin",
+          })
+        );
+
+        console.log("✅ PIN login successful:", staffData.name);
+      } catch (error) {
+        console.error("❌ PIN login failed:", error);
+        setError(error instanceof Error ? error.message : "PIN login failed");
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   /**
    * ENHANCED: Initialize Authentication with better session handling
@@ -285,7 +311,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error("Error initializing auth:", error);
         if (mounted) {
-          setError(error instanceof Error ? error.message : "Failed to initialize authentication");
+          setError(
+            error instanceof Error
+              ? error.message
+              : "Failed to initialize authentication"
+          );
           setLoading(false);
         }
       }
@@ -470,11 +500,15 @@ interface ProtectedRouteProps {
   fallback?: React.ReactNode;
 }
 
-export function ProtectedRoute({ children, requireRole, fallback }: ProtectedRouteProps) {
+export function ProtectedRoute({
+  children,
+  requireRole,
+  fallback,
+}: ProtectedRouteProps) {
   const { user, staff, loading, error, retryAuthentication } = useAuth();
 
   if (loading) {
-    return <AuthLoadingScreen />;
+    return <LoadingScreen />;
   }
 
   if (error) {
@@ -483,10 +517,16 @@ export function ProtectedRoute({ children, requireRole, fallback }: ProtectedRou
         <div className="text-center max-w-md">
           <div className="text-red-600 text-lg mb-2">Authentication Error</div>
           <div className="text-gray-600 mb-4">{error}</div>
-          <button onClick={retryAuthentication} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2">
+          <button
+            onClick={retryAuthentication}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2"
+          >
             Try Again
           </button>
-          <button onClick={() => window.location.reload()} className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+          >
             Refresh Page
           </button>
         </div>
@@ -500,15 +540,20 @@ export function ProtectedRoute({ children, requireRole, fallback }: ProtectedRou
 
   if (requireRole) {
     const roleHierarchy = { staff: 1, manager: 2, admin: 3 };
-    const userLevel = roleHierarchy[staff.role as keyof typeof roleHierarchy] || 0;
+    const userLevel =
+      roleHierarchy[staff.role as keyof typeof roleHierarchy] || 0;
     const requiredLevel = roleHierarchy[requireRole];
 
     if (userLevel < requiredLevel) {
       return (
         <div className="text-center py-16">
           <div className="text-red-600 text-lg mb-2">Access Denied</div>
-          <p className="text-gray-600">You need {requireRole} or higher privileges to access this area.</p>
-          <p className="text-sm text-gray-500 mt-2">Current role: {staff.role}</p>
+          <p className="text-gray-600">
+            You need {requireRole} or higher privileges to access this area.
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Current role: {staff.role}
+          </p>
         </div>
       );
     }
