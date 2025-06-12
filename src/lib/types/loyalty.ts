@@ -1,4 +1,4 @@
-// src/lib/types/loyalty.ts - Add missing CustomerAddress interface
+// src/lib/types/loyalty.ts - Updated with consolidated CustomerAddress
 export interface CustomerAddress {
   id: string;
   customer_id: string;
