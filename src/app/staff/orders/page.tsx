@@ -15,8 +15,8 @@ import {
   OrderWithItems,
   Restaurant,
   LoyaltyRedemption,
+  CustomerAddress,
 } from "@/lib/types";
-import { CustomerAddress } from "@/lib/types/loyalty"; // ✅ Import CustomerAddress
 import { useCallback, useEffect, useState } from "react";
 
 type ActiveTab = "new-order" | "pickup";
