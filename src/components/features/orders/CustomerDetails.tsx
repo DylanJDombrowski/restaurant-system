@@ -1,10 +1,18 @@
+// src/components/features/orders/CustomerDetails.tsx - UPDATED with address passing
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { CustomerLoyaltyDetails, RecentCustomer } from "@/lib/types/loyalty";
+import {
+  CustomerLoyaltyDetails,
+  RecentCustomer,
+  CustomerAddress,
+} from "@/lib/types/loyalty";
 
 interface CustomerDetailsProps {
-  onCustomerSelected: (customer: CustomerLoyaltyDetails | null) => void;
+  onCustomerSelected: (
+    customer: CustomerLoyaltyDetails | null,
+    address?: CustomerAddress
+  ) => void; // ✅ Updated to pass address
   restaurantId: string;
 }
 
@@ -71,13 +79,20 @@ export default function CustomerDetails({
         const data = await response.json();
         const customer = data.data as CustomerLoyaltyDetails;
 
+        // ✅ Find the default address from the API response
+        const defaultAddress = customer.addresses?.find(
+          (addr: CustomerAddress) => addr.is_default
+        );
+
         setState((prev) => ({
           ...prev,
           customer,
           isLoading: false,
           error: null,
         }));
-        onCustomerSelected(customer);
+
+        // ✅ Pass both customer and default address
+        onCustomerSelected(customer, defaultAddress);
       } else if (response.status === 404) {
         // Customer not found - that's okay, we'll create a new one
         setState((prev) => ({
@@ -184,6 +199,22 @@ export default function CustomerDetails({
               {state.customer.email && (
                 <p className="text-sm text-green-700">{state.customer.email}</p>
               )}
+
+              {/* ✅ Display addresses if available */}
+              {state.customer.addresses &&
+                state.customer.addresses.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-green-600 mb-1">
+                      Saved Addresses:
+                    </p>
+                    {state.customer.addresses.map((addr) => (
+                      <div key={addr.id} className="text-xs text-green-700">
+                        {addr.is_default && "🏠 "}
+                        {addr.label}: {addr.street}, {addr.city}
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
             <div className="text-right">
               <div className="text-lg font-bold text-green-900">

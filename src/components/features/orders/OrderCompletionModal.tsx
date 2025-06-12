@@ -7,6 +7,7 @@ import {
   CustomerLoyaltyDetails,
   LoyaltyRedemption,
 } from "@/lib/types";
+import { CustomerAddress } from "@/lib/types/loyalty";
 
 interface OrderCompletionModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface OrderCompletionModalProps {
   customer: CustomerLoyaltyDetails | null;
   pendingLoyaltyRedemption: LoyaltyRedemption | null;
   defaultOrderType: "pickup" | "delivery";
+  deliveryAddress?: CustomerAddress;
   onConfirm: (orderData: {
     customerInfo: {
       name: string;
@@ -60,6 +62,7 @@ export default function OrderCompletionModal({
   customer,
   pendingLoyaltyRedemption,
   defaultOrderType,
+  deliveryAddress,
   onConfirm,
   onCancel,
 }: OrderCompletionModalProps) {
@@ -104,6 +107,28 @@ export default function OrderCompletionModal({
       });
     }
   }, [customer]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (orderType === "delivery" && deliveryAddress) {
+        console.log("🏠 Pre-filling delivery address:", deliveryAddress);
+        setDeliveryForm({
+          address: deliveryAddress.street || "",
+          city: deliveryAddress.city || "",
+          zip: deliveryAddress.zip_code || "",
+          instructions: deliveryAddress.notes || "",
+        });
+      } else if (orderType === "pickup") {
+        // Clear delivery form when switching to pickup
+        setDeliveryForm({
+          address: "",
+          city: "",
+          zip: "",
+          instructions: "",
+        });
+      }
+    }
+  }, [isOpen, orderType, deliveryAddress]);
 
   // Calculate points to be earned
   const pointsToEarn = Math.floor(orderSummary.total);
@@ -339,9 +364,14 @@ export default function OrderCompletionModal({
           {/* Delivery Address */}
           {orderType === "delivery" && (
             <div>
-              <h3 className="font-medium text-gray-900 mb-3">
-                Delivery Address
-              </h3>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-medium text-gray-900">Delivery Address</h3>
+                {deliveryAddress && (
+                  <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                    🏠 Using saved address
+                  </span>
+                )}
+              </div>
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-1">

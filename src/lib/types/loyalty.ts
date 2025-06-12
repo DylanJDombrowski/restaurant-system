@@ -1,4 +1,18 @@
-// src/lib/types/loyalty.ts - Add missing loyalty types
+// src/lib/types/loyalty.ts - Add missing CustomerAddress interface
+export interface CustomerAddress {
+  id: string;
+  customer_id: string;
+  label: string; // 'Home', 'Work', etc.
+  street: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  notes?: string;
+  is_default: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface CustomerLoyaltyDetails {
   id: string;
   restaurant_id: string;
@@ -11,7 +25,8 @@ export interface CustomerLoyaltyDetails {
   last_order_date?: string;
   created_at: string;
   updated_at: string;
-  recent_transactions?: LoyaltyTransaction[]; // ✅ Add missing field
+  recent_transactions?: LoyaltyTransaction[];
+  addresses?: CustomerAddress[]; // ✅ Add addresses array
 }
 
 export interface LoyaltyRedemption {

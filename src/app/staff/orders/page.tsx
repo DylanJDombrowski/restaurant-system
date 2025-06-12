@@ -1,4 +1,4 @@
-// src/app/staff/orders/page.tsx - FIXED: Unified customer state + loyalty modal
+// src/app/staff/orders/page.tsx - UPDATED with selectedAddress state
 "use client";
 import CustomerDetails from "@/components/features/orders/CustomerDetails";
 import MenuNavigator from "@/components/features/orders/MenuNavigator";
@@ -16,6 +16,7 @@ import {
   Restaurant,
   LoyaltyRedemption,
 } from "@/lib/types";
+import { CustomerAddress } from "@/lib/types/loyalty"; // ✅ Import CustomerAddress
 import { useCallback, useEffect, useState } from "react";
 
 type ActiveTab = "new-order" | "pickup";
@@ -43,18 +44,15 @@ export default function StaffOrdersPage() {
     new Set()
   );
 
-  // ✅ UNIFIED CUSTOMER STATE - Only one customer state needed
+  // ✅ UNIFIED CUSTOMER STATE + ADDRESS
   const [customer, setCustomer] = useState<CustomerLoyaltyDetails | null>(null);
-
-  // ✅ REMOVED DUPLICATE STATES:
-  // - foundCustomer (duplicate of customer)
-  // - customerInfo (CustomerDetails handles this)
-  // - lookupLoading (CustomerDetails handles this)
-  // - customerLookupStatus (CustomerDetails handles this)
+  const [selectedAddress, setSelectedAddress] = useState<
+    CustomerAddress | undefined
+  >(undefined); // ✅ NEW
 
   const [orderType, setOrderType] = useState<"pickup" | "delivery">("pickup");
 
-  // ✅ NEW: Order completion modal states
+  // Order completion modal states
   const [showOrderCompletionModal, setShowOrderCompletionModal] =
     useState(false);
   const [pendingLoyaltyRedemption, setPendingLoyaltyRedemption] =
@@ -137,7 +135,28 @@ export default function StaffOrdersPage() {
   }, [loadInitialData]);
 
   // ==========================================
-  // PICKUP FUNCTIONALITY
+  // ✅ UPDATED CUSTOMER HANDLERS
+  // ==========================================
+
+  const handleCustomerSelected = (
+    customer: CustomerLoyaltyDetails | null,
+    address?: CustomerAddress
+  ) => {
+    setCustomer(customer);
+    if (address) {
+      setSelectedAddress(address); // ✅ Set the address here
+      console.log(
+        "🏠 Selected customer with default address:",
+        address.label,
+        address.street
+      );
+    } else {
+      setSelectedAddress(undefined);
+    }
+  };
+
+  // ==========================================
+  // PICKUP FUNCTIONALITY (unchanged)
   // ==========================================
 
   const handleOrderPickupComplete = async (orderId: string) => {
@@ -185,7 +204,7 @@ export default function StaffOrdersPage() {
   };
 
   // ==========================================
-  // CART MANAGEMENT
+  // CART MANAGEMENT (unchanged)
   // ==========================================
 
   const handleAddToCart = (configuredItem: ConfiguredCartItem) => {
@@ -230,7 +249,7 @@ export default function StaffOrdersPage() {
   };
 
   // ==========================================
-  // ✅ NEW: LOYALTY REDEMPTION MANAGEMENT
+  // LOYALTY REDEMPTION MANAGEMENT (unchanged)
   // ==========================================
 
   const handleLoyaltyRedemptionApply = (redemption: LoyaltyRedemption) => {
@@ -244,7 +263,7 @@ export default function StaffOrdersPage() {
   };
 
   // ==========================================
-  // ✅ NEW: ORDER COMPLETION WORKFLOW
+  // ORDER COMPLETION WORKFLOW (unchanged)
   // ==========================================
 
   const handleCompleteOrder = () => {
@@ -253,7 +272,6 @@ export default function StaffOrdersPage() {
       return;
     }
 
-    // Show order completion modal instead of immediate submission
     setShowOrderCompletionModal(true);
   };
 
@@ -276,7 +294,6 @@ export default function StaffOrdersPage() {
     setShowOrderCompletionModal(false);
 
     try {
-      // Calculate final totals with loyalty redemption
       const finalLoyaltyDiscount =
         orderData.loyaltyRedemption?.discount_amount || 0;
       const finalTotal = Math.max(
@@ -332,7 +349,6 @@ export default function StaffOrdersPage() {
       if (!response.ok)
         throw new Error(responseData.error || "Failed to create order");
 
-      // Show success message
       setCompletedOrder({
         orderNumber: responseData.data.order_number,
         total: finalTotal,
@@ -360,10 +376,10 @@ export default function StaffOrdersPage() {
     setShowOrderCompletionModal(false);
   };
 
-  // Handle order success completion
   const handleOrderSuccessComplete = () => {
     setCartItems([]);
     setCustomer(null);
+    setSelectedAddress(undefined); // ✅ Clear address on completion
     setOrderType("pickup");
     setPendingLoyaltyRedemption(null);
     setShowOrderSuccess(false);
@@ -371,7 +387,7 @@ export default function StaffOrdersPage() {
   };
 
   // ==========================================
-  // RENDER LOGIC
+  // RENDER LOGIC (mostly unchanged)
   // ==========================================
 
   if (loading) {
@@ -444,7 +460,7 @@ export default function StaffOrdersPage() {
                 >
                   {isSubmitting
                     ? "Processing..."
-                    : `Complete Order - $${orderSummary.total.toFixed(2)}`}
+                    : `Complete Order - ${orderSummary.total.toFixed(2)}`}
                 </button>
               )}
             </div>
@@ -502,9 +518,9 @@ export default function StaffOrdersPage() {
 
               {/* RIGHT: Cart & Customer Info */}
               <div className="space-y-4">
-                {/* Customer Details */}
+                {/* ✅ UPDATED: Customer Details with address passing */}
                 <CustomerDetails
-                  onCustomerSelected={setCustomer}
+                  onCustomerSelected={handleCustomerSelected}
                   restaurantId={restaurant?.id || ""}
                 />
 
@@ -542,7 +558,7 @@ export default function StaffOrdersPage() {
                   </div>
                 )}
 
-                {/* ✅ UPDATED: Order Cart with loyalty props */}
+                {/* Order Cart with loyalty props */}
                 <OrderCart
                   items={cartItems}
                   customer={customer}
@@ -570,7 +586,7 @@ export default function StaffOrdersPage() {
         </div>
       </div>
 
-      {/* ✅ NEW: Order Completion Modal */}
+      {/* ✅ UPDATED: Order Completion Modal with delivery address */}
       {showOrderCompletionModal && (
         <OrderCompletionModal
           isOpen={showOrderCompletionModal}
@@ -579,6 +595,7 @@ export default function StaffOrdersPage() {
           customer={customer}
           pendingLoyaltyRedemption={pendingLoyaltyRedemption}
           defaultOrderType={orderType}
+          deliveryAddress={selectedAddress} // ✅ Pass the selected address
           onConfirm={handleOrderCompletionConfirm}
           onCancel={handleOrderCompletionCancel}
           restaurantId={restaurant?.id || ""}

@@ -1,4 +1,4 @@
-// src/app/api/customers/lookup/route.ts - UPDATED
+// src/app/api/customers/lookup/route.ts - UPDATED with addresses
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { ApiResponse, CustomerLoyaltyDetails } from "@/lib/types";
@@ -38,7 +38,18 @@ export async function GET(
         total_spent,
         created_at,
         updated_at,
-        last_order_date
+        last_order_date,
+        addresses:customer_addresses(
+          id,
+          customer_id,
+          label,
+          street,
+          city,
+          state,
+          zip_code,
+          notes,
+          is_default
+        )
       `
       )
       .eq("restaurant_id", restaurantId)
@@ -63,9 +74,16 @@ export async function GET(
       const customerLoyaltyDetails: CustomerLoyaltyDetails = {
         ...customer,
         recent_transactions: transactions || [],
+        addresses: customer.addresses || [], // Include addresses in response
       };
 
-      console.log("Customer found:", customer.name);
+      console.log(
+        "Customer found:",
+        customer.name,
+        "with",
+        customer.addresses?.length || 0,
+        "addresses"
+      );
       return NextResponse.json({
         data: customerLoyaltyDetails,
         message: "Customer found",
