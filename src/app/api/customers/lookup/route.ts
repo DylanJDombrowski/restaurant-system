@@ -1,7 +1,26 @@
-// src/app/api/customers/lookup/route.ts - UPDATED with addresses
+// src/app/api/customers/lookup/route.ts - FIXED with proper types
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { ApiResponse, CustomerLoyaltyDetails } from "@/lib/types";
+import {
+  ApiResponse,
+  CustomerLoyaltyDetails,
+  CustomerAddress,
+} from "@/lib/types";
+
+// Define the existing database schema type
+interface ExistingAddressRecord {
+  id: string;
+  customer_id: string;
+  customer_phone: string;
+  customer_name: string;
+  customer_email?: string;
+  address: string;
+  city: string;
+  zip: string;
+  delivery_instructions?: string;
+  is_default: boolean;
+  created_at: string;
+}
 
 export async function GET(
   request: NextRequest
@@ -42,13 +61,15 @@ export async function GET(
         addresses:customer_addresses(
           id,
           customer_id,
-          label,
-          street,
+          customer_phone,
+          customer_name,
+          customer_email,
+          address,
           city,
-          state,
-          zip_code,
-          notes,
-          is_default
+          zip,
+          delivery_instructions,
+          is_default,
+          created_at
         )
       `
       )
@@ -71,17 +92,33 @@ export async function GET(
         .order("created_at", { ascending: false })
         .limit(5);
 
+      // Transform addresses to match expected interface
+      const transformedAddresses: CustomerAddress[] =
+        customer.addresses?.map((addr: ExistingAddressRecord) => ({
+          id: addr.id,
+          customer_id: addr.customer_id,
+          label: addr.customer_name || "Address", // Use customer_name as label fallback
+          street: addr.address || "",
+          city: addr.city || "",
+          state: "OH", // Default state since not in your schema
+          zip_code: addr.zip || "",
+          notes: addr.delivery_instructions || "",
+          is_default: addr.is_default || false,
+          created_at: addr.created_at,
+          updated_at: addr.created_at, // Use created_at as fallback
+        })) || [];
+
       const customerLoyaltyDetails: CustomerLoyaltyDetails = {
         ...customer,
         recent_transactions: transactions || [],
-        addresses: customer.addresses || [], // Include addresses in response
+        addresses: transformedAddresses, // Use transformed addresses
       };
 
       console.log(
         "Customer found:",
         customer.name,
         "with",
-        customer.addresses?.length || 0,
+        transformedAddresses.length,
         "addresses"
       );
       return NextResponse.json({

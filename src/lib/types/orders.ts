@@ -1,21 +1,8 @@
-// src/lib/types/orders.ts - Order management (FIXED - removed duplicate CustomerAddress)
+// src/lib/types/orders.ts - Order management (FIXED - import CustomerAddress)
 
 import { ID, Timestamp, OrderStatus, OrderType } from "./core";
 import { MenuItem, MenuItemVariant } from "./menu";
-
-export interface CustomerAddress {
-  id: string;
-  customer_id: string;
-  label: string; // 'Home', 'Work', etc.
-  street: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  notes?: string;
-  is_default: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
+import { CustomerAddress } from "./loyalty"; // ✅ Import from loyalty.ts
 
 export interface Customer {
   id: ID;
@@ -30,9 +17,6 @@ export interface Customer {
   created_at: Timestamp;
   updated_at: Timestamp;
 }
-
-// ❌ REMOVED: CustomerAddress (use the one from loyalty.ts instead)
-// This was causing the naming conflict
 
 export interface Order {
   id: ID;
@@ -81,4 +65,8 @@ export type OrderItemWithDetails = OrderItem & {
 export type OrderWithItems = Order & {
   order_items?: OrderItemWithDetails[];
   customer?: Customer;
+};
+
+export type CustomerWithStats = Customer & {
+  addresses?: CustomerAddress[];
 };

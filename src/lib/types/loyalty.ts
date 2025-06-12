@@ -1,6 +1,19 @@
-// src/lib/types/loyalty.ts - Updated with consolidated CustomerAddress
+// src/lib/types/loyalty.ts - Fixed to avoid circular imports
 
-import { CustomerAddress } from "./orders";
+// Define CustomerAddress here to avoid circular import
+export interface CustomerAddress {
+  id: string;
+  customer_id: string;
+  label: string; // 'Home', 'Work', etc.
+  street: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  notes?: string;
+  is_default: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface CustomerLoyaltyDetails {
   id: string;
