@@ -3,6 +3,20 @@
 import { ID, Timestamp, OrderStatus, OrderType } from "./core";
 import { MenuItem, MenuItemVariant } from "./menu";
 
+export interface CustomerAddress {
+  id: string;
+  customer_id: string;
+  label: string; // 'Home', 'Work', etc.
+  street: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  notes?: string;
+  is_default: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Customer {
   id: ID;
   restaurant_id: ID;
@@ -67,9 +81,4 @@ export type OrderItemWithDetails = OrderItem & {
 export type OrderWithItems = Order & {
   order_items?: OrderItemWithDetails[];
   customer?: Customer;
-};
-
-export type CustomerWithStats = Customer & {
-  // ✅ FIXED: Import CustomerAddress from loyalty.ts to avoid duplicate
-  addresses?: import("./loyalty").CustomerAddress[];
 };

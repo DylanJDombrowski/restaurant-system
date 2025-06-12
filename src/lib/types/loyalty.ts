@@ -1,17 +1,6 @@
 // src/lib/types/loyalty.ts - Updated with consolidated CustomerAddress
-export interface CustomerAddress {
-  id: string;
-  customer_id: string;
-  label: string; // 'Home', 'Work', etc.
-  street: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  notes?: string;
-  is_default: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
+
+import { CustomerAddress } from "./orders";
 
 export interface CustomerLoyaltyDetails {
   id: string;
