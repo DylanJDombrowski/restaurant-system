@@ -6,8 +6,7 @@ import {
   CustomerLoyaltyDetails,
   RecentCustomer,
   CustomerAddress,
-} from "@/lib/types/loyalty";
-
+} from "@/lib/types";
 interface CustomerDetailsProps {
   onCustomerSelected: (
     customer: CustomerLoyaltyDetails | null,
