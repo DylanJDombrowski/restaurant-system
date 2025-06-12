@@ -2,7 +2,7 @@
 
 import { Customization } from "./customization";
 import { MenuItem, MenuItemVariant } from "./menu";
-import { Customer, CustomerAddress, Order, OrderItem } from "./orders";
+import { Customer, CustomerAddress, Order, OrderItem } from "./index";
 import { Staff } from "./restaurant";
 
 export type InsertOrder = Omit<Order, "id" | "created_at" | "updated_at">;
