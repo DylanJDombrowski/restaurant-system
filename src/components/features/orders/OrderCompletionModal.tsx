@@ -6,8 +6,8 @@ import {
   ConfiguredCartItem,
   CustomerLoyaltyDetails,
   LoyaltyRedemption,
+  CustomerAddress,
 } from "@/lib/types";
-import { CustomerAddress } from "@/lib/types/loyalty";
 
 interface OrderCompletionModalProps {
   isOpen: boolean;
