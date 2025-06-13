@@ -1,18 +1,18 @@
 // src/app/page.tsx
 import Link from "next/link";
 import Image from "next/image";
-import { supabase } from "@/lib/supabase/client";
+// import { supabase } from "@/lib/supabase/client";
 
 // This is a React Server Component (RSC), so we can fetch data directly.
 export default async function HomePage() {
   // Fetch the primary restaurant's data to personalize the welcome message.
   // In a true multi-tenant landing page, you might not do this, or you'd
   // have a different way of featuring a client. For now, this follows your original pattern.
-  const { data: restaurant } = await supabase
-    .from("restaurants")
-    .select("name")
-    .limit(1)
-    .single();
+  // const { data: restaurant } = await supabase
+  //   .from("restaurants")
+  //   .select("name")
+  //   .limit(1)
+  //   .single();
 
   return (
     <>
@@ -129,7 +129,7 @@ export default async function HomePage() {
                   an intuitive, powerful, and flexible POS system designed to
                   help you grow. Currently powering{" "}
                   <span className="font-bold text-white">
-                    {restaurant?.name || "restaurants like yours"}
+                    {"restaurants like yours"}
                   </span>
                   .
                 </p>
