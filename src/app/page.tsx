@@ -124,7 +124,7 @@ export default async function HomePage() {
                     Built for Your Restaurant
                   </span>
                 </h1>
-                <p className="mt-6 max-w-lg mx-auto text-center text-xl text-indigo-100 sm:max-w-3xl">
+                <p className="mt-6 max-w-lg mx-auto text-center text-xl text-gray-900 sm:max-w-3xl">
                   Streamline your operations from front-of-house to kitchen with
                   an intuitive, powerful, and flexible POS system designed to
                   help you grow. Currently powering{" "}
