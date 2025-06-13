@@ -128,7 +128,7 @@ export default async function HomePage() {
                   Streamline your operations from front-of-house to kitchen with
                   an intuitive, powerful, and flexible POS system designed to
                   help you grow. Currently powering{" "}
-                  <span className="font-bold text-white">
+                  <span className="font-bold text-gray-900">
                     {"restaurants like yours"}
                   </span>
                   .
