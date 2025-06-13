@@ -200,7 +200,7 @@ export default function VariantManagement() {
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-900 mb-1">
                 Size Code
               </label>
               <select
@@ -218,7 +218,7 @@ export default function VariantManagement() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-900 mb-1">
                 Crust Type
               </label>
               <select
@@ -241,7 +241,7 @@ export default function VariantManagement() {
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-900 mb-1">
                 Piece Count
               </label>
               <select
@@ -263,7 +263,7 @@ export default function VariantManagement() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-900 mb-1">
                 Type
               </label>
               <select
@@ -283,7 +283,7 @@ export default function VariantManagement() {
       case "appetizer":
         return (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Size/Count
             </label>
             <input
@@ -339,7 +339,7 @@ export default function VariantManagement() {
           </button>
           <Link
             href="/admin/menu"
-            className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300"
+            className="bg-gray-200 text-gray-900 px-4 py-2 rounded hover:bg-gray-300"
           >
             Back to Menu
           </Link>
@@ -358,7 +358,7 @@ export default function VariantManagement() {
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Variant Name <span className="text-red-600">*</span>
                 </label>
                 <input
@@ -373,7 +373,7 @@ export default function VariantManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Price <span className="text-red-600">*</span>
                 </label>
                 <div className="relative">
@@ -399,7 +399,7 @@ export default function VariantManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Serves
                 </label>
                 <input
@@ -414,7 +414,7 @@ export default function VariantManagement() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-900 mb-1">
                     Sort Order
                   </label>
                   <input
@@ -427,7 +427,7 @@ export default function VariantManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-900 mb-1">
                     Prep Time (minutes)
                   </label>
                   <input
@@ -451,7 +451,7 @@ export default function VariantManagement() {
                 />
                 <label
                   htmlFor="is_available"
-                  className="ml-2 text-sm text-gray-700"
+                  className="ml-2 text-sm text-gray-900"
                 >
                   Variant is available for ordering
                 </label>
@@ -462,7 +462,7 @@ export default function VariantManagement() {
               <button
                 type="button"
                 onClick={handleCancelVariant}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-50"
               >
                 Cancel
               </button>

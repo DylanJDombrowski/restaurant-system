@@ -133,7 +133,7 @@ function SetPinModal({
 
         {/* PIN Method Selection */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+          <label className="block text-sm font-medium text-gray-900 mb-3">
             PIN Setup Method
           </label>
           <div className="space-y-2">
@@ -185,7 +185,7 @@ function SetPinModal({
             <div className="mb-4">
               <label
                 htmlFor="pin"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                className="block text-sm font-medium text-gray-900 mb-1"
               >
                 6-Digit PIN
               </label>
@@ -686,7 +686,7 @@ function StaffFormModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Full Name *
             </label>
             <input
@@ -702,7 +702,7 @@ function StaffFormModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Email Address *
             </label>
             <input
@@ -724,7 +724,7 @@ function StaffFormModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Role *
             </label>
             <select
@@ -750,7 +750,7 @@ function StaffFormModal({
           {!isEditing && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Password *
                 </label>
                 <input
@@ -772,7 +772,7 @@ function StaffFormModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Confirm Password *
                 </label>
                 <input
@@ -795,7 +795,7 @@ function StaffFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-400 transition-colors"
+              className="flex-1 bg-gray-300 text-gray-900 py-2 px-4 rounded-lg font-medium hover:bg-gray-400 transition-colors"
             >
               Cancel
             </button>

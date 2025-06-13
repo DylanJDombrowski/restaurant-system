@@ -29,25 +29,25 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           <nav className="mt-6">
             <Link
               href="/admin"
-              className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+              className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
             >
               Dashboard
             </Link>
             <Link
               href="/admin/analytics"
-              className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+              className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
             >
               Analytics
             </Link>
             <Link
               href="/admin/menu"
-              className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+              className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
             >
               Menu Management
             </Link>
             <Link
               href="/admin/staff"
-              className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+              className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
             >
               Staff Management
             </Link>
@@ -55,7 +55,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             {/* NEW: Terminal Registration Link */}
             <Link
               href="/admin/locations"
-              className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 border-l-4 border-orange-500"
+              className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600 border-l-4 border-orange-500"
             >
               <div className="flex items-center gap-2">
                 <span>📱</span>
@@ -69,7 +69,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             <div className="mt-8 border-t pt-4">
               <Link
                 href="/staff"
-                className="block px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
               >
                 ← Back to Staff Dashboard
               </Link>

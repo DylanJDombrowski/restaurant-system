@@ -525,7 +525,7 @@ export function ProtectedRoute({
           </button>
           <button
             onClick={() => window.location.reload()}
-            className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+            className="bg-gray-300 text-gray-900 px-4 py-2 rounded hover:bg-gray-400"
           >
             Refresh Page
           </button>

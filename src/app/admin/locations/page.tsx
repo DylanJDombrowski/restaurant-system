@@ -279,7 +279,7 @@ export default function LocationsPage() {
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           How Terminal Registration Works
         </h3>
-        <div className="space-y-2 text-sm text-gray-700">
+        <div className="space-y-2 text-sm text-gray-900">
           <p>
             <strong>1. Security:</strong> Each device can only access one
             restaurant&apos;s data

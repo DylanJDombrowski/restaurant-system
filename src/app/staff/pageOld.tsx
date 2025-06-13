@@ -291,7 +291,7 @@ function OrderCard({ order }: { order: OrderWithItems }) {
           <h4 className="font-semibold text-lg text-gray-900">
             Order #{order.order_number}
           </h4>
-          <p className="text-sm text-gray-700">{timeAgo(order.created_at)}</p>
+          <p className="text-sm text-gray-900">{timeAgo(order.created_at)}</p>
         </div>
         <span
           className={`px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(
@@ -304,19 +304,19 @@ function OrderCard({ order }: { order: OrderWithItems }) {
 
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <span className="text-gray-700">Customer:</span>
+          <span className="text-gray-900">Customer:</span>
           <p className="font-medium text-gray-900">{order.customer_name}</p>
-          <p className="text-gray-700">{order.customer_phone}</p>
+          <p className="text-gray-900">{order.customer_phone}</p>
         </div>
         <div>
-          <span className="text-gray-700">Order:</span>
+          <span className="text-gray-900">Order:</span>
           <p className="font-medium text-gray-900">{order.order_type}</p>
           <p className="text-green-600 font-bold">${order.total}</p>
         </div>
       </div>
 
       <div className="mt-3 pt-3 border-t border-gray-100">
-        <p className="text-xs text-gray-700">
+        <p className="text-xs text-gray-900">
           {order.order_items?.length || 0} item
           {(order.order_items?.length || 0) !== 1 ? "s" : ""}
         </p>
