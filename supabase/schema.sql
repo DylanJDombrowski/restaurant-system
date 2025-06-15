@@ -436,6 +436,27 @@ $$;
 ALTER FUNCTION "public"."calculate_topping_price"("base_price" numeric, "pricing_rules" "jsonb", "size_code" "text", "amount" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."ensure_single_default_address"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  -- If setting this address as default, unset all other defaults for this customer
+  IF NEW.is_default = true THEN
+    UPDATE customer_addresses 
+    SET is_default = false 
+    WHERE customer_id = NEW.customer_id 
+    AND id != NEW.id 
+    AND is_default = true;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."ensure_single_default_address"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."generate_kitchen_instructions"("p_order_item_id" "uuid") RETURNS "text"
     LANGUAGE "plpgsql"
     AS $_$
@@ -546,6 +567,69 @@ $_$;
 
 
 ALTER FUNCTION "public"."generate_kitchen_instructions"("p_order_item_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."generate_staff_pin"("p_staff_id" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+  new_pin TEXT;
+  pin_hash TEXT;
+  restaurant_id_val UUID;
+  max_attempts INTEGER := 100;
+  attempt_count INTEGER := 0;
+  pin_exists BOOLEAN;
+BEGIN
+  -- Get the restaurant_id for this staff member
+  SELECT restaurant_id INTO restaurant_id_val
+  FROM staff WHERE id = p_staff_id;
+  
+  IF restaurant_id_val IS NULL THEN
+    RAISE EXCEPTION 'Staff member not found: %', p_staff_id;
+  END IF;
+  
+  -- Generate unique PIN for this restaurant
+  LOOP
+    attempt_count := attempt_count + 1;
+    
+    IF attempt_count > max_attempts THEN
+      RAISE EXCEPTION 'Unable to generate unique PIN after % attempts', max_attempts;
+    END IF;
+    
+    -- Generate random 6-digit PIN
+    new_pin := LPAD(FLOOR(RANDOM() * 1000000)::TEXT, 6, '0');
+    
+    -- Hash the PIN
+    pin_hash := encode(sha256(new_pin::bytea), 'hex');
+    
+    -- Check if this PIN hash already exists for this restaurant
+    SELECT EXISTS(
+      SELECT 1 FROM staff 
+      WHERE restaurant_id = restaurant_id_val 
+        AND pin_hash = pin_hash
+        AND is_active = true
+        AND id != p_staff_id
+    ) INTO pin_exists;
+    
+    -- If PIN is unique, break the loop
+    IF NOT pin_exists THEN
+      EXIT;
+    END IF;
+  END LOOP;
+  
+  -- Update the staff record with the new PIN hash
+  UPDATE staff 
+  SET pin_hash = pin_hash,
+      updated_at = NOW()
+  WHERE id = p_staff_id;
+  
+  -- Return the plain text PIN (only time it's visible)
+  RETURN new_pin;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."generate_staff_pin"("p_staff_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."get_item_customizations"("p_menu_item_id" "uuid", "p_restaurant_id" "uuid" DEFAULT '008e95ca-7131-42e6-9659-bf7a76026586'::"uuid") RETURNS "jsonb"
@@ -677,6 +761,84 @@ $$;
 ALTER FUNCTION "public"."get_pizza_template_with_toppings"("p_template_id" "uuid", "p_restaurant_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."handle_order_loyalty"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $_$
+BEGIN
+  -- When an order is completed, award loyalty points
+  IF NEW.status = 'completed' AND (OLD.status IS NULL OR OLD.status != 'completed') THEN
+    
+    -- Only process if customer_id exists
+    IF NEW.customer_id IS NOT NULL THEN
+      DECLARE
+        points_to_award INTEGER := FLOOR(NEW.total - COALESCE(NEW.loyalty_discount_amount, 0));
+        net_points_change INTEGER;
+      BEGIN
+        -- Calculate net points change (earned - redeemed)
+        net_points_change := points_to_award - COALESCE(NEW.loyalty_points_redeemed, 0);
+        
+        -- Update customer totals
+        UPDATE customers 
+        SET 
+          total_orders = total_orders + 1,
+          total_spent = total_spent + NEW.total,
+          loyalty_points = loyalty_points + net_points_change,
+          updated_at = NOW()
+        WHERE id = NEW.customer_id;
+        
+        -- Log points earned (if any)
+        IF points_to_award > 0 THEN
+          INSERT INTO loyalty_transactions (
+            customer_id,
+            order_id,
+            points_earned,
+            points_redeemed,
+            transaction_type,
+            description
+          ) VALUES (
+            NEW.customer_id,
+            NEW.id,
+            points_to_award,
+            0,
+            'earned',
+            'Points earned from order #' || NEW.order_number || ' ($' || (NEW.total - COALESCE(NEW.loyalty_discount_amount, 0))::text || ')'
+          );
+        END IF;
+        
+        -- Log points redeemed (if any) - but only if not already logged
+        IF COALESCE(NEW.loyalty_points_redeemed, 0) > 0 AND NOT EXISTS (
+          SELECT 1 FROM loyalty_transactions 
+          WHERE order_id = NEW.id AND transaction_type = 'redeemed'
+        ) THEN
+          INSERT INTO loyalty_transactions (
+            customer_id,
+            order_id,
+            points_earned,
+            points_redeemed,
+            transaction_type,
+            description
+          ) VALUES (
+            NEW.customer_id,
+            NEW.id,
+            0,
+            NEW.loyalty_points_redeemed,
+            'redeemed',
+            'Points redeemed on order #' || NEW.order_number || ' (-$' || COALESCE(NEW.loyalty_discount_amount, 0)::text || ')'
+          );
+        END IF;
+        
+      END;
+    END IF;
+  END IF;
+  
+  RETURN NEW;
+END;
+$_$;
+
+
+ALTER FUNCTION "public"."handle_order_loyalty"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."increment_total_orders"("customer_id" "uuid") RETURNS integer
     LANGUAGE "plpgsql"
     AS $$
@@ -696,6 +858,53 @@ $$;
 ALTER FUNCTION "public"."increment_total_orders"("customer_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."is_admin"("user_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.staff
+    WHERE id = user_id AND role = 'admin'
+  );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."is_admin"("user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."set_staff_pin"("p_staff_id" "uuid", "p_pin" "text" DEFAULT NULL::"text") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  result_pin TEXT;
+BEGIN
+  -- Validate PIN format if provided
+  IF p_pin IS NOT NULL THEN
+    IF p_pin !~ '^[0-9]{6}' THEN
+      RAISE EXCEPTION 'PIN must be exactly 6 digits';
+    END IF;
+    
+    -- Use provided PIN
+    UPDATE staff 
+    SET pin_hash = encode(sha256(p_pin::bytea), 'hex'),
+        updated_at = NOW()
+    WHERE id = p_staff_id;
+    
+    result_pin := p_pin;
+  ELSE
+    -- Generate random PIN
+    result_pin := generate_staff_pin(p_staff_id);
+  END IF;
+  
+  RETURN result_pin;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."set_staff_pin"("p_staff_id" "uuid", "p_pin" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."track_order_status_change"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -711,6 +920,19 @@ $$;
 
 
 ALTER FUNCTION "public"."track_order_status_change"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_customer_addresses_updated_at"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_customer_addresses_updated_at"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."update_customer_stats"("customer_id" "uuid", "order_total" numeric, "points_earned" integer) RETURNS "void"
@@ -735,13 +957,52 @@ CREATE OR REPLACE FUNCTION "public"."update_updated_at_column"() RETURNS "trigge
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
+   NEW.updated_at = now();
+   RETURN NEW;
 END;
 $$;
 
 
 ALTER FUNCTION "public"."update_updated_at_column"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."validate_pin_login"("p_pin" "text", "p_restaurant_id" "uuid") RETURNS TABLE("staff_id" "uuid", "staff_name" "text", "staff_email" "text", "staff_role" "text", "is_valid" boolean)
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+  pin_hash TEXT;
+BEGIN
+  -- Hash the provided PIN
+  pin_hash := encode(sha256(p_pin::bytea), 'hex');
+  
+  -- Look for matching staff member
+  RETURN QUERY
+  SELECT 
+    s.id,
+    s.name,
+    s.email,
+    s.role,
+    true as is_valid
+  FROM staff s
+  WHERE s.restaurant_id = p_restaurant_id
+    AND s.pin_hash = pin_hash
+    AND s.is_active = true;
+    
+  -- If no results, return invalid
+  IF NOT FOUND THEN
+    RETURN QUERY
+    SELECT 
+      NULL::UUID,
+      NULL::TEXT,
+      NULL::TEXT,
+      NULL::TEXT,
+      false as is_valid;
+  END IF;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."validate_pin_login"("p_pin" "text", "p_restaurant_id" "uuid") OWNER TO "postgres";
 
 SET default_tablespace = '';
 
@@ -1014,6 +1275,9 @@ CREATE TABLE IF NOT EXISTS "public"."orders" (
     "customer_id" "uuid",
     "scheduled_for" timestamp with time zone,
     "is_scheduled" boolean DEFAULT false,
+    "loyalty_points_redeemed" integer DEFAULT 0,
+    "loyalty_discount_amount" numeric(10,2) DEFAULT 0.00,
+    "loyalty_redemption_details" "jsonb",
     CONSTRAINT "check_delivery_address" CHECK (((("order_type")::"text" = 'pickup'::"text") OR ((("order_type")::"text" = 'delivery'::"text") AND ("customer_address" IS NOT NULL)))),
     CONSTRAINT "check_scheduled_order" CHECK ((("is_scheduled" = false) OR (("is_scheduled" = true) AND ("scheduled_for" IS NOT NULL) AND ("scheduled_for" > "created_at")))),
     CONSTRAINT "orders_order_type_check" CHECK ((("order_type")::"text" = ANY ((ARRAY['pickup'::character varying, 'delivery'::character varying])::"text"[]))),
@@ -1083,6 +1347,7 @@ CREATE TABLE IF NOT EXISTS "public"."staff" (
     "pin_hash" "text",
     "last_login" timestamp with time zone,
     "is_logged_in" boolean DEFAULT false,
+    "updated_at" timestamp with time zone,
     CONSTRAINT "staff_role_check" CHECK (("role" = ANY (ARRAY['staff'::"text", 'manager'::"text", 'admin'::"text"])))
 );
 
@@ -1096,11 +1361,28 @@ CREATE TABLE IF NOT EXISTS "public"."staff_sessions" (
     "terminal_id" "text",
     "created_at" timestamp with time zone DEFAULT "now"(),
     "expires_at" timestamp with time zone DEFAULT ("now"() + '08:00:00'::interval),
-    "is_active" boolean DEFAULT true
+    "is_active" boolean DEFAULT true,
+    "login_method" character varying(20) DEFAULT 'email'::character varying,
+    "device_info" "jsonb" DEFAULT '{}'::"jsonb"
 );
 
 
 ALTER TABLE "public"."staff_sessions" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."terminal_registrations" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "restaurant_id" "uuid" NOT NULL,
+    "device_info" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "registered_by" "uuid",
+    "registered_at" timestamp with time zone DEFAULT "now"(),
+    "is_active" boolean DEFAULT true,
+    "last_used_at" timestamp with time zone,
+    "notes" "text"
+);
+
+
+ALTER TABLE "public"."terminal_registrations" OWNER TO "postgres";
 
 
 ALTER TABLE ONLY "public"."crust_pricing"
@@ -1208,6 +1490,11 @@ ALTER TABLE ONLY "public"."staff_sessions"
 
 
 
+ALTER TABLE ONLY "public"."terminal_registrations"
+    ADD CONSTRAINT "terminal_registrations_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."menu_categories"
     ADD CONSTRAINT "unique_category_name_per_restaurant" UNIQUE ("restaurant_id", "name");
 
@@ -1223,6 +1510,10 @@ CREATE INDEX "idx_crust_pricing_lookup" ON "public"."crust_pricing" USING "btree
 
 
 CREATE INDEX "idx_customer_addresses_customer_id" ON "public"."customer_addresses" USING "btree" ("customer_id");
+
+
+
+CREATE UNIQUE INDEX "idx_customer_addresses_one_default" ON "public"."customer_addresses" USING "btree" ("customer_id") WHERE ("is_default" = true);
 
 
 
@@ -1254,6 +1545,10 @@ CREATE INDEX "idx_orders_created_at" ON "public"."orders" USING "btree" ("create
 
 
 
+CREATE INDEX "idx_orders_loyalty_redemption" ON "public"."orders" USING "btree" ("loyalty_points_redeemed") WHERE ("loyalty_points_redeemed" > 0);
+
+
+
 CREATE INDEX "idx_orders_order_type" ON "public"."orders" USING "btree" ("order_type");
 
 
@@ -1267,6 +1562,10 @@ CREATE INDEX "idx_pizza_template_toppings_template" ON "public"."pizza_template_
 
 
 CREATE INDEX "idx_pizza_templates_menu_item" ON "public"."pizza_templates" USING "btree" ("restaurant_id", "menu_item_id") WHERE ("is_active" = true);
+
+
+
+CREATE INDEX "idx_terminal_registrations_restaurant" ON "public"."terminal_registrations" USING "btree" ("restaurant_id", "is_active");
 
 
 
@@ -1308,7 +1607,23 @@ CREATE OR REPLACE VIEW "public"."menu_items_with_details" AS
 
 
 
+CREATE OR REPLACE TRIGGER "handle_staff_updated_at" BEFORE UPDATE ON "public"."staff" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
 CREATE OR REPLACE TRIGGER "order_status_changed" AFTER UPDATE OF "status" ON "public"."orders" FOR EACH ROW EXECUTE FUNCTION "public"."track_order_status_change"();
+
+
+
+CREATE OR REPLACE TRIGGER "trigger_customer_addresses_updated_at" BEFORE UPDATE ON "public"."customer_addresses" FOR EACH ROW EXECUTE FUNCTION "public"."update_customer_addresses_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "trigger_ensure_single_default_address" BEFORE INSERT OR UPDATE ON "public"."customer_addresses" FOR EACH ROW EXECUTE FUNCTION "public"."ensure_single_default_address"();
+
+
+
+CREATE OR REPLACE TRIGGER "trigger_handle_order_loyalty" AFTER INSERT OR UPDATE ON "public"."orders" FOR EACH ROW EXECUTE FUNCTION "public"."handle_order_loyalty"();
 
 
 
@@ -1449,7 +1764,29 @@ ALTER TABLE ONLY "public"."staff_sessions"
 
 
 
+ALTER TABLE ONLY "public"."terminal_registrations"
+    ADD CONSTRAINT "terminal_registrations_registered_by_fkey" FOREIGN KEY ("registered_by") REFERENCES "public"."staff"("id");
+
+
+
+ALTER TABLE ONLY "public"."terminal_registrations"
+    ADD CONSTRAINT "terminal_registrations_restaurant_id_fkey" FOREIGN KEY ("restaurant_id") REFERENCES "public"."restaurants"("id");
+
+
+
+CREATE POLICY "Allow admin and service_role to manage staff" ON "public"."staff" USING ((("auth"."role"() = 'service_role'::"text") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK ((("auth"."role"() = 'service_role'::"text") OR "public"."is_admin"("auth"."uid"())));
+
+
+
 CREATE POLICY "Allow all operations on orders" ON "public"."orders" USING (true) WITH CHECK (true);
+
+
+
+CREATE POLICY "Allow public read access to menu item variants" ON "public"."menu_item_variants" FOR SELECT USING (true);
+
+
+
+CREATE POLICY "Allow staff to view their own profile" ON "public"."staff" FOR SELECT USING (("auth"."uid"() = "id"));
 
 
 
@@ -1474,6 +1811,13 @@ CREATE POLICY "Restaurant staff access" ON "public"."customers" USING (("restaur
 CREATE POLICY "Restaurant staff can manage menu items" ON "public"."menu_items" USING (("restaurant_id" IN ( SELECT "staff"."restaurant_id"
    FROM "public"."staff"
   WHERE ("staff"."id" = "auth"."uid"()))));
+
+
+
+CREATE POLICY "Staff can access customer addresses in their restaurant" ON "public"."customer_addresses" TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM ("public"."customers" "c"
+     JOIN "public"."staff" "s" ON (("s"."restaurant_id" = "c"."restaurant_id")))
+  WHERE (("c"."id" = "customer_addresses"."customer_id") AND ("s"."id" = "auth"."uid"())))));
 
 
 
@@ -1763,9 +2107,21 @@ GRANT ALL ON FUNCTION "public"."calculate_topping_price"("base_price" numeric, "
 
 
 
+GRANT ALL ON FUNCTION "public"."ensure_single_default_address"() TO "anon";
+GRANT ALL ON FUNCTION "public"."ensure_single_default_address"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."ensure_single_default_address"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."generate_kitchen_instructions"("p_order_item_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."generate_kitchen_instructions"("p_order_item_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."generate_kitchen_instructions"("p_order_item_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."generate_staff_pin"("p_staff_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."generate_staff_pin"("p_staff_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."generate_staff_pin"("p_staff_id" "uuid") TO "service_role";
 
 
 
@@ -1781,15 +2137,39 @@ GRANT ALL ON FUNCTION "public"."get_pizza_template_with_toppings"("p_template_id
 
 
 
+GRANT ALL ON FUNCTION "public"."handle_order_loyalty"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_order_loyalty"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_order_loyalty"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."increment_total_orders"("customer_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."increment_total_orders"("customer_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."increment_total_orders"("customer_id" "uuid") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."is_admin"("user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."is_admin"("user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_admin"("user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."set_staff_pin"("p_staff_id" "uuid", "p_pin" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."set_staff_pin"("p_staff_id" "uuid", "p_pin" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."set_staff_pin"("p_staff_id" "uuid", "p_pin" "text") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."track_order_status_change"() TO "anon";
 GRANT ALL ON FUNCTION "public"."track_order_status_change"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."track_order_status_change"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_customer_addresses_updated_at"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_customer_addresses_updated_at"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_customer_addresses_updated_at"() TO "service_role";
 
 
 
@@ -1802,6 +2182,12 @@ GRANT ALL ON FUNCTION "public"."update_customer_stats"("customer_id" "uuid", "or
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "anon";
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."validate_pin_login"("p_pin" "text", "p_restaurant_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."validate_pin_login"("p_pin" "text", "p_restaurant_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."validate_pin_login"("p_pin" "text", "p_restaurant_id" "uuid") TO "service_role";
 
 
 
@@ -1931,6 +2317,12 @@ GRANT ALL ON TABLE "public"."staff" TO "service_role";
 GRANT ALL ON TABLE "public"."staff_sessions" TO "anon";
 GRANT ALL ON TABLE "public"."staff_sessions" TO "authenticated";
 GRANT ALL ON TABLE "public"."staff_sessions" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."terminal_registrations" TO "anon";
+GRANT ALL ON TABLE "public"."terminal_registrations" TO "authenticated";
+GRANT ALL ON TABLE "public"."terminal_registrations" TO "service_role";
 
 
 

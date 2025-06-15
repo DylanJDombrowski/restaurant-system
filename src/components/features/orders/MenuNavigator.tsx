@@ -213,10 +213,16 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
 
       const categoryName = item.category?.name;
 
-      // 🎯 ROUTING LOGIC
-      if (categoryName === "Pizzas" || categoryName === "Pizza") {
-        console.log("🍕 Opening pizza customizer directly");
-        openPizzaCustomizer(item); // ✅ FIXED: Consistent naming
+      // 🎯 ENHANCED ROUTING LOGIC - Fixed to include Stuffed Pizzas
+      if (
+        categoryName === "Pizzas" ||
+        categoryName === "Pizza" ||
+        categoryName === "Stuffed Pizzas" || // ✅ ADD THIS LINE
+        categoryName === "Stuffed Pizza"
+      ) {
+        // ✅ ADD THIS LINE (in case category name varies)
+        console.log("🍕 Opening pizza customizer for:", item.name);
+        openPizzaCustomizer(item);
       } else if (categoryName === "Sandwiches") {
         console.log("🥪 Opening sandwich customizer directly");
         openSandwichCustomizer(item);
@@ -242,13 +248,7 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
         addDirectToCart(item);
       }
     },
-    [
-      openPizzaCustomizer, // ✅ FIXED: Consistent naming
-      openSandwichCustomizer,
-      openAppetizerCustomizer,
-      openChickenCustomizer,
-      addDirectToCart,
-    ]
+    [openPizzaCustomizer, openSandwichCustomizer, openAppetizerCustomizer, openChickenCustomizer, addDirectToCart]
   );
 
   // ==========================================
