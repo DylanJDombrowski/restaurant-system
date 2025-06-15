@@ -21,37 +21,25 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
               <Link href="/staff" className="text-xl font-bold text-blue-600">
                 Pizza Mia - Staff
               </Link>
-              <div className="ml-4 text-sm text-gray-800">
+              <div className="ml-4 text-sm text-gray-900">
                 {restaurant?.name} • {staff?.name} ({staff?.role})
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Link
-                href="/staff/orders"
-                className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium"
-              >
+              <Link href="/staff/orders" className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium">
                 Orders
               </Link>
               {isManager && (
-                <Link
-                  href="/admin/menu"
-                  className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium"
-                >
+                <Link href="/admin/menu" className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium">
                   Menu
                 </Link>
               )}
               {isAdmin && (
-                <Link
-                  href="/admin"
-                  className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium"
-                >
+                <Link href="/admin" className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md font-medium">
                   Admin
                 </Link>
               )}
-              <Link
-                href="/kitchen"
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium"
-              >
+              <Link href="/kitchen" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium">
                 Kitchen Display
               </Link>
               <button
@@ -73,11 +61,7 @@ function StaffLayoutContent({ children }: { children: React.ReactNode }) {
  * StaffLayout is a conditional layout that correctly handles the public
  * PIN login page versus protected internal staff pages.
  */
-export default function StaffLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function StaffLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const pathname = usePathname();
 

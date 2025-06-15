@@ -1,15 +1,11 @@
 // src/components/features/orders/MenuNavigator.tsx - FIXED COMPONENT INTEGRATION
 "use client";
-import {
-  ConfiguredCartItem,
-  MenuCategory,
-  MenuItemWithVariants,
-} from "@/lib/types";
+import { ConfiguredCartItem, MenuCategory, MenuItemWithVariants } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
 import AppetizerCustomizer from "./AppetizerCustomizer";
+import ChickenCustomizer from "./ChickenCustomizer";
 import PizzaCustomizer from "./PizzaCustomizer"; // ✅ FIXED: Correct import name
 import SandwichCustomizer from "./SandwichCustomizer";
-import ChickenCustomizer from "./ChickenCustomizer";
 
 /**
  * 🎯 FIXED: MenuNavigator with corrected component integration
@@ -35,11 +31,7 @@ interface NavigationState {
   selectedCategory: MenuCategory | null;
 }
 
-export default function MenuNavigator({
-  menuItems,
-  onAddToCart,
-  restaurantId,
-}: MenuNavigatorProps) {
+export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: MenuNavigatorProps) {
   // ==========================================
   // NAVIGATION STATE
   // ==========================================
@@ -56,11 +48,8 @@ export default function MenuNavigator({
   const [showAppetizerCustomizer, setShowAppetizerCustomizer] = useState(false);
   const [showChickenCustomizer, setShowChickenCustomizer] = useState(false);
 
-  const [selectedItem, setSelectedItem] = useState<MenuItemWithVariants | null>(
-    null
-  );
-  const [customizerItem, setCustomizerItem] =
-    useState<ConfiguredCartItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<MenuItemWithVariants | null>(null);
+  const [customizerItem, setCustomizerItem] = useState<ConfiguredCartItem | null>(null);
 
   // ==========================================
   // DATA ORGANIZATION
@@ -70,12 +59,8 @@ export default function MenuNavigator({
   const filteredMenuItems = useMemo(() => {
     return menuItems.filter((item) => {
       if (item.category?.name === "Pizzas") {
-        const hasStuffedVariants = item.variants?.some(
-          (v) => v.crust_type === "stuffed"
-        );
-        const isStuffedPizza =
-          item.name?.toLowerCase().includes("stuffed") ||
-          item.item_type?.includes("stuffed");
+        const hasStuffedVariants = item.variants?.some((v) => v.crust_type === "stuffed");
+        const isStuffedPizza = item.name?.toLowerCase().includes("stuffed") || item.item_type?.includes("stuffed");
 
         return !hasStuffedVariants && !isStuffedPizza;
       }
@@ -109,18 +94,14 @@ export default function MenuNavigator({
       }
     });
 
-    return Array.from(categoryMap.values()).sort(
-      (a, b) => a.category.sort_order - b.category.sort_order
-    );
+    return Array.from(categoryMap.values()).sort((a, b) => a.category.sort_order - b.category.sort_order);
   }, [filteredMenuItems]);
 
   // Get items for currently selected category
   const currentCategoryItems = useMemo(() => {
     if (!navState.selectedCategory) return [];
 
-    const categoryData = categorizedItems.find(
-      (cat) => cat.category.id === navState.selectedCategory!.id
-    );
+    const categoryData = categorizedItems.find((cat) => cat.category.id === navState.selectedCategory!.id);
 
     return categoryData?.items || [];
   }, [categorizedItems, navState.selectedCategory]);
@@ -145,38 +126,32 @@ export default function MenuNavigator({
     });
   }, []);
 
-  const createCartItem = useCallback(
-    (item: MenuItemWithVariants): ConfiguredCartItem => {
-      const defaultVariant =
-        item.variants && item.variants.length > 0 ? item.variants[0] : null;
-      const basePrice = defaultVariant?.price ?? item.base_price;
-      const displayName = item.name;
+  const createCartItem = useCallback((item: MenuItemWithVariants): ConfiguredCartItem => {
+    const defaultVariant = item.variants && item.variants.length > 0 ? item.variants[0] : null;
+    const basePrice = defaultVariant?.price ?? item.base_price;
+    const displayName = item.name;
 
-      return {
-        id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        menuItemId: item.id,
-        menuItemName: item.name,
-        variantId: defaultVariant?.id || null,
-        variantName: defaultVariant?.name || null,
-        quantity: 1,
-        basePrice,
-        selectedToppings: [],
-        selectedModifiers: [],
-        specialInstructions: "",
-        totalPrice: basePrice,
-        displayName,
-      };
-    },
-    []
-  );
+    return {
+      id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      menuItemId: item.id,
+      menuItemName: item.name,
+      variantId: defaultVariant?.id || null,
+      variantName: defaultVariant?.name || null,
+      quantity: 1,
+      basePrice,
+      selectedToppings: [],
+      selectedModifiers: [],
+      specialInstructions: "",
+      totalPrice: basePrice,
+      displayName,
+    };
+  }, []);
 
   const addDirectToCart = useCallback(
     (item: MenuItemWithVariants) => {
       try {
         const cartItem = createCartItem(item);
-        console.log(
-          `➕ Adding to cart: ${cartItem.displayName} - $${cartItem.totalPrice}`
-        );
+        console.log(`➕ Adding to cart: ${cartItem.displayName} - $${cartItem.totalPrice}`);
         onAddToCart(cartItem);
       } catch (error) {
         console.error("Error adding item to cart:", error);
@@ -232,12 +207,7 @@ export default function MenuNavigator({
 
   const handleItemSelect = useCallback(
     (item: MenuItemWithVariants) => {
-      console.log(
-        "🍽️ Selected item:",
-        item.name,
-        "Category:",
-        item.category?.name
-      );
+      console.log("🍽️ Selected item:", item.name, "Category:", item.category?.name);
 
       setSelectedItem(item);
 
@@ -257,12 +227,7 @@ export default function MenuNavigator({
         const itemName = item.name.toLowerCase();
 
         // Individual pieces go directly to cart
-        if (
-          itemName.includes("breast") ||
-          itemName.includes("thigh") ||
-          itemName.includes("leg") ||
-          itemName.includes("wing")
-        ) {
+        if (itemName.includes("breast") || itemName.includes("thigh") || itemName.includes("leg") || itemName.includes("wing")) {
           console.log("🍗 Adding individual chicken piece directly to cart");
           addDirectToCart(item);
         } else {
@@ -343,15 +308,10 @@ export default function MenuNavigator({
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-xl font-bold text-gray-900">Menu Categories</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Choose a category to start ordering
-            </p>
+            <p className="text-sm text-gray-900 mt-1">Choose a category to start ordering</p>
           </div>
           <div className="p-6">
-            <CategoryGrid
-              categories={categorizedItems}
-              onCategorySelect={handleCategorySelect}
-            />
+            <CategoryGrid categories={categorizedItems} onCategorySelect={handleCategorySelect} />
           </div>
         </div>
       )}
@@ -368,22 +328,16 @@ export default function MenuNavigator({
                 ← Categories
               </button>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">
-                  {navState.selectedCategory?.name}
-                </h3>
-                <p className="text-sm text-gray-600">
+                <h3 className="text-xl font-bold text-gray-900">{navState.selectedCategory?.name}</h3>
+                <p className="text-sm text-gray-900">
                   {currentCategoryItems.length} items available
-                  {navState.selectedCategory?.name === "Pizzas" &&
-                    " (Stuffed pizzas in separate category)"}
+                  {navState.selectedCategory?.name === "Pizzas" && " (Stuffed pizzas in separate category)"}
                 </p>
               </div>
             </div>
           </div>
           <div className="p-6">
-            <CategoryItemsGrid
-              items={currentCategoryItems}
-              onItemSelect={handleItemSelect}
-            />
+            <CategoryItemsGrid items={currentCategoryItems} onItemSelect={handleItemSelect} />
           </div>
         </div>
       )}
@@ -461,8 +415,7 @@ function CategoryGrid({ categories, onCategorySelect }: CategoryGridProps) {
 
   const getCategoryDescription = (categoryName: string) => {
     const name = categoryName.toLowerCase();
-    if (name.includes("pizza") && !name.includes("stuffed"))
-      return "Customizable thin & double dough pizzas";
+    if (name.includes("pizza") && !name.includes("stuffed")) return "Customizable thin & double dough pizzas";
     if (name.includes("stuffed")) return "Deep-dish stuffed pizzas";
     if (name.includes("sandwich")) return "Build your perfect sandwich";
     if (name.includes("appetizer")) return "Wings, mozzarella sticks & more";
@@ -482,15 +435,9 @@ function CategoryGrid({ categories, onCategorySelect }: CategoryGridProps) {
           className="bg-gray-50 hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-300 rounded-xl p-6 text-center transition-all duration-200 hover:shadow-md"
         >
           <div className="text-5xl mb-3">{getCategoryIcon(category.name)}</div>
-          <div className="font-bold text-gray-900 mb-2 text-lg">
-            {category.name}
-          </div>
-          <div className="text-sm text-gray-600 mb-2">
-            {getCategoryDescription(category.name)}
-          </div>
-          <div className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full inline-block">
-            {items.length} items
-          </div>
+          <div className="font-bold text-gray-900 mb-2 text-lg">{category.name}</div>
+          <div className="text-sm text-gray-900 mb-2">{getCategoryDescription(category.name)}</div>
+          <div className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full inline-block">{items.length} items</div>
         </button>
       ))}
     </div>
@@ -506,11 +453,7 @@ function CategoryItemsGrid({ items, onItemSelect }: CategoryItemsGridProps) {
   return (
     <div className="grid grid-cols-2 gap-3 max-h-[500px] overflow-y-auto">
       {items.map((item) => (
-        <ItemCard
-          key={item.id}
-          item={item}
-          onSelect={() => onItemSelect(item)}
-        />
+        <ItemCard key={item.id} item={item} onSelect={() => onItemSelect(item)} />
       ))}
     </div>
   );
@@ -530,14 +473,10 @@ function ItemCard({ item, onSelect }: ItemCardProps) {
       <div className="flex justify-between items-center">
         <div className="flex-1">
           <h5 className="font-bold text-gray-900 text-base">{item.name}</h5>
-          <div className="text-xs text-gray-500 mt-1">
-            ~{item.prep_time_minutes || 15} min
-          </div>
+          <div className="text-xs text-gray-900 mt-1">~{item.prep_time_minutes || 15} min</div>
         </div>
         <div className="text-right ml-4">
-          <div className="text-lg font-bold text-green-600">
-            ${(item.base_price || 0).toFixed(2)}
-          </div>
+          <div className="text-lg font-bold text-green-600">${(item.base_price || 0).toFixed(2)}</div>
         </div>
       </div>
     </button>

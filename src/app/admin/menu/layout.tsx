@@ -1,16 +1,12 @@
 // src/app/admin/menu/layout.tsx
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { MenuContextProvider } from "@/lib/contexts/menu-context"; // Add this import
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-export default function MenuLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function MenuLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   // Determine if we're in a deep item edit route
@@ -28,10 +24,7 @@ export default function MenuLayout({
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900">Menu Management</h1>
           <div className="space-x-2">
-            <Link
-              href="/admin"
-              className="bg-gray-200 text-gray-900 px-4 py-2 rounded hover:bg-gray-300"
-            >
+            <Link href="/admin" className="bg-gray-200 text-gray-900 px-4 py-2 rounded hover:bg-gray-300">
               Back to Dashboard
             </Link>
           </div>
@@ -49,7 +42,7 @@ export default function MenuLayout({
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   isMenuItemsTab
                     ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300"
+                    : "border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300"
                 }`}
               >
                 Menu Items
@@ -59,7 +52,7 @@ export default function MenuLayout({
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   isCategoriesTab
                     ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300"
+                    : "border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300"
                 }`}
               >
                 Categories
@@ -67,10 +60,7 @@ export default function MenuLayout({
 
               {/* Action Buttons */}
               <div className="ml-auto flex items-center space-x-2">
-                <Link
-                  href="/admin/menu/item/new"
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                >
+                <Link href="/admin/menu/item/new" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                   Add New Item
                 </Link>
               </div>

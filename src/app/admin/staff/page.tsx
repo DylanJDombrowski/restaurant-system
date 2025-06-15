@@ -9,15 +9,7 @@ import { useCallback, useEffect, useState } from "react";
  * Enhanced modal dialog for setting a staff member's 6-digit PIN.
  * Supports both custom PIN entry and auto-generation.
  */
-function SetPinModal({
-  staff,
-  onClose,
-  onPinSet,
-}: {
-  staff: Staff | null;
-  onClose: () => void;
-  onPinSet: () => void;
-}) {
+function SetPinModal({ staff, onClose, onPinSet }: { staff: Staff | null; onClose: () => void; onPinSet: () => void }) {
   const [pin, setPin] = useState("");
   const [useCustomPin, setUseCustomPin] = useState(false);
   const [error, setError] = useState("");
@@ -93,21 +85,16 @@ function SetPinModal({
         <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md m-4">
           <div className="text-center">
             <div className="text-4xl mb-4">🔐</div>
-            <h2 className="text-xl font-bold mb-4 text-gray-800">
-              PIN Generated for {staff.name}
-            </h2>
+            <h2 className="text-xl font-bold mb-4 text-gray-900">PIN Generated for {staff.name}</h2>
             <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6">
-              <div className="text-sm text-gray-600 mb-2">6-Digit PIN:</div>
-              <div className="text-4xl font-mono font-bold text-blue-600 tracking-widest">
-                {generatedPin}
-              </div>
+              <div className="text-sm text-gray-900 mb-2">6-Digit PIN:</div>
+              <div className="text-4xl font-mono font-bold text-blue-600 tracking-widest">{generatedPin}</div>
             </div>
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
               <div className="flex items-start space-x-2">
                 <span className="text-amber-500 mt-0.5">⚠️</span>
                 <div className="text-sm text-amber-800">
-                  <strong>Important:</strong> Write down this PIN immediately.
-                  For security reasons, it will not be shown again.
+                  <strong>Important:</strong> Write down this PIN immediately. For security reasons, it will not be shown again.
                 </div>
               </div>
             </div>
@@ -127,15 +114,11 @@ function SetPinModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md m-4">
-        <h2 className="text-xl font-bold mb-4 text-gray-800">
-          Set PIN for {staff.name}
-        </h2>
+        <h2 className="text-xl font-bold mb-4 text-gray-900">Set PIN for {staff.name}</h2>
 
         {/* PIN Method Selection */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-900 mb-3">
-            PIN Setup Method
-          </label>
+          <label className="block text-sm font-medium text-gray-900 mb-3">PIN Setup Method</label>
           <div className="space-y-2">
             <label className="flex items-center space-x-3 cursor-pointer">
               <input
@@ -150,12 +133,8 @@ function SetPinModal({
                 className="text-blue-600"
               />
               <div>
-                <div className="font-medium text-gray-800">
-                  Generate Random PIN
-                </div>
-                <div className="text-sm text-gray-600">
-                  System will create a secure 6-digit PIN
-                </div>
+                <div className="font-medium text-gray-900">Generate Random PIN</div>
+                <div className="text-sm text-gray-900">System will create a secure 6-digit PIN</div>
               </div>
             </label>
             <label className="flex items-center space-x-3 cursor-pointer">
@@ -170,10 +149,8 @@ function SetPinModal({
                 className="text-blue-600"
               />
               <div>
-                <div className="font-medium text-gray-800">Set Custom PIN</div>
-                <div className="text-sm text-gray-600">
-                  Choose your own 6-digit PIN
-                </div>
+                <div className="font-medium text-gray-900">Set Custom PIN</div>
+                <div className="text-sm text-gray-900">Choose your own 6-digit PIN</div>
               </div>
             </label>
           </div>
@@ -183,10 +160,7 @@ function SetPinModal({
           {/* Custom PIN Input */}
           {useCustomPin && (
             <div className="mb-4">
-              <label
-                htmlFor="pin"
-                className="block text-sm font-medium text-gray-900 mb-1"
-              >
+              <label htmlFor="pin" className="block text-sm font-medium text-gray-900 mb-1">
                 6-Digit PIN
               </label>
               <input
@@ -201,24 +175,18 @@ function SetPinModal({
                 autoFocus
                 required={useCustomPin}
               />
-              <div className="text-xs text-gray-500 mt-1">
-                Must be exactly 6 digits (numbers only)
-              </div>
+              <div className="text-xs text-gray-900 mt-1">Must be exactly 6 digits (numbers only)</div>
             </div>
           )}
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded mb-4 text-sm">
-              {error}
-            </div>
-          )}
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded mb-4 text-sm">{error}</div>}
 
           <div className="flex justify-end space-x-3">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50"
+              className="px-4 py-2 bg-gray-200 text-gray-900 rounded-md hover:bg-gray-300 disabled:opacity-50"
             >
               Cancel
             </button>
@@ -227,11 +195,7 @@ function SetPinModal({
               disabled={loading || (useCustomPin && pin.length !== 6)}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
             >
-              {loading
-                ? "Setting..."
-                : useCustomPin
-                ? "Set Custom PIN"
-                : "Generate PIN"}
+              {loading ? "Setting..." : useCustomPin ? "Set Custom PIN" : "Generate PIN"}
             </button>
           </div>
         </form>
@@ -250,9 +214,7 @@ export default function StaffManagementPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [selectedStaffForPin, setSelectedStaffForPin] = useState<Staff | null>(
-    null
-  );
+  const [selectedStaffForPin, setSelectedStaffForPin] = useState<Staff | null>(null);
 
   const { restaurant } = useAuth();
 
@@ -261,9 +223,7 @@ export default function StaffManagementPage() {
 
     try {
       setError(null);
-      const response = await fetch(
-        `/api/admin/staff?restaurant_id=${restaurant.id}`
-      );
+      const response = await fetch(`/api/admin/staff?restaurant_id=${restaurant.id}`);
 
       if (!response.ok) {
         throw new Error("Failed to load staff");
@@ -295,13 +255,7 @@ export default function StaffManagementPage() {
         throw new Error("Failed to update staff status");
       }
 
-      setStaff((prev) =>
-        prev.map((member) =>
-          member.id === staffId
-            ? { ...member, is_active: !currentStatus }
-            : member
-        )
-      );
+      setStaff((prev) => prev.map((member) => (member.id === staffId ? { ...member, is_active: !currentStatus } : member)));
     } catch (error) {
       console.error("Error updating staff status:", error);
       alert("Failed to update staff status");
@@ -309,11 +263,7 @@ export default function StaffManagementPage() {
   };
 
   const handleRemovePin = async (staffMember: Staff) => {
-    if (
-      !confirm(
-        `Remove PIN for ${staffMember.name}? They will need a new PIN to log in.`
-      )
-    ) {
+    if (!confirm(`Remove PIN for ${staffMember.name}? They will need a new PIN to log in.`)) {
       return;
     }
 
@@ -348,14 +298,9 @@ export default function StaffManagementPage() {
   if (error) {
     return (
       <div className="text-center py-16">
-        <div className="text-red-600 text-lg font-semibold mb-4">
-          Error Loading Staff
-        </div>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <button
-          onClick={loadStaff}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
+        <div className="text-red-600 text-lg font-semibold mb-4">Error Loading Staff</div>
+        <p className="text-gray-900 mb-4">{error}</p>
+        <button onClick={loadStaff} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
           Try Again
         </button>
       </div>
@@ -367,9 +312,7 @@ export default function StaffManagementPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Staff Management</h1>
-          <p className="text-gray-600 mt-1">
-            Manage staff accounts and 6-digit PINs for {restaurant?.name}
-          </p>
+          <p className="text-gray-900 mt-1">Manage staff accounts and 6-digit PINs for {restaurant?.name}</p>
         </div>
         <button
           onClick={() => setShowCreateForm(true)}
@@ -380,24 +323,11 @@ export default function StaffManagementPage() {
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <StaffSummaryCard
-          title="Total Staff"
-          count={staff.length}
-          icon="👥"
-          color="blue"
-        />
-        <StaffSummaryCard
-          title="With PINs Set"
-          count={staff.filter((s) => s.pin_hash).length}
-          icon="🔐"
-          color="green"
-        />
+        <StaffSummaryCard title="Total Staff" count={staff.length} icon="👥" color="blue" />
+        <StaffSummaryCard title="With PINs Set" count={staff.filter((s) => s.pin_hash).length} icon="🔐" color="green" />
         <StaffSummaryCard
           title="Managers & Admins"
-          count={
-            staff.filter((s) => s.role === "manager" || s.role === "admin")
-              .length
-          }
+          count={staff.filter((s) => s.role === "manager" || s.role === "admin").length}
           icon="👨‍💼"
           color="purple"
         />
@@ -410,13 +340,9 @@ export default function StaffManagementPage() {
 
         {staff.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-gray-400 text-lg">👥</div>
-            <h3 className="text-lg font-medium text-gray-900 mt-2">
-              No staff members yet
-            </h3>
-            <p className="text-gray-600 mt-1">
-              Add your first staff member to get started
-            </p>
+            <div className="text-gray-900 text-lg">👥</div>
+            <h3 className="text-lg font-medium text-gray-900 mt-2">No staff members yet</h3>
+            <p className="text-gray-900 mt-1">Add your first staff member to get started</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
@@ -427,9 +353,7 @@ export default function StaffManagementPage() {
                 onEdit={() => setEditingStaff(member)}
                 onSetPin={() => handleSetPinClick(member)}
                 onRemovePin={() => handleRemovePin(member)}
-                onToggleStatus={() =>
-                  toggleStaffStatus(member.id, member.is_active)
-                }
+                onToggleStatus={() => toggleStaffStatus(member.id, member.is_active)}
               />
             ))}
           </div>
@@ -488,12 +412,10 @@ function StaffSummaryCard({
   };
 
   return (
-    <div
-      className={`bg-white p-6 rounded-lg shadow-md border-l-4 ${colorClasses[color]}`}
-    >
+    <div className={`bg-white p-6 rounded-lg shadow-md border-l-4 ${colorClasses[color]}`}>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <p className="text-sm font-medium text-gray-900">{title}</p>
           <p className="text-3xl font-bold text-gray-900">{count}</p>
         </div>
         <div className="text-3xl">{icon}</div>
@@ -521,7 +443,7 @@ function StaffMemberRow({
       case "manager":
         return "bg-blue-100 text-blue-800";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-900";
     }
   };
 
@@ -537,31 +459,19 @@ function StaffMemberRow({
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
               {staff.name}
-              {!staff.is_active && (
-                <span className="ml-2 text-sm text-red-600">(Inactive)</span>
-              )}
+              {!staff.is_active && <span className="ml-2 text-sm text-red-600">(Inactive)</span>}
             </h3>
-            <p className="text-gray-600">{staff.email}</p>
+            <p className="text-gray-900">{staff.email}</p>
             <div className="flex items-center space-x-3 mt-1">
-              <span
-                className={`px-2 py-1 rounded-full text-xs font-semibold ${getRoleColor(
-                  staff.role
-                )}`}
-              >
+              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getRoleColor(staff.role)}`}>
                 {staff.role.charAt(0).toUpperCase() + staff.role.slice(1)}
               </span>
               {staff.pin ? (
-                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                  PIN Set
-                </span>
+                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">PIN Set</span>
               ) : (
-                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
-                  No PIN
-                </span>
+                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">No PIN</span>
               )}
-              <span className="text-sm text-gray-500">
-                Joined: {joinedDate}
-              </span>
+              <span className="text-sm text-gray-900">Joined: {joinedDate}</span>
             </div>
           </div>
         </div>
@@ -581,9 +491,7 @@ function StaffMemberRow({
           <button
             onClick={onToggleStatus}
             className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-              staff.is_active
-                ? "bg-red-100 text-red-700 hover:bg-red-200"
-                : "bg-green-100 text-green-700 hover:bg-green-200"
+              staff.is_active ? "bg-red-100 text-red-700 hover:bg-red-200" : "bg-green-100 text-green-700 hover:bg-green-200"
             }`}
           >
             {staff.is_active ? "Deactivate" : "Activate"}
@@ -644,9 +552,7 @@ function StaffFormModal({
         ...(!isEditing && { password: formData.password }),
       };
 
-      const endpoint = isEditing
-        ? `/api/admin/staff/${staff!.id}`
-        : "/api/admin/staff";
+      const endpoint = isEditing ? `/api/admin/staff/${staff!.id}` : "/api/admin/staff";
       const method = isEditing ? "PATCH" : "POST";
 
       const response = await fetch(endpoint, {
@@ -657,10 +563,7 @@ function StaffFormModal({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(
-          errorData.error ||
-            `Failed to ${isEditing ? "update" : "create"} staff member`
-        );
+        throw new Error(errorData.error || `Failed to ${isEditing ? "update" : "create"} staff member`);
       }
 
       onSave();
@@ -674,59 +577,39 @@ function StaffFormModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">
-          {isEditing ? "Edit Staff Member" : "Add New Staff Member"}
-        </h2>
+        <h2 className="text-xl font-bold mb-4">{isEditing ? "Edit Staff Member" : "Add New Staff Member"}</h2>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
-          </div>
-        )}
+        {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">{error}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Full Name *
-            </label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Full Name *</label>
             <input
               type="text"
               required
               value={formData.name}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="John Doe"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Email Address *
-            </label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Email Address *</label>
             <input
               type="email"
               required
               value={formData.email}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, email: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="john@pizzamia.com"
               disabled={isEditing}
             />
-            {isEditing && (
-              <p className="text-xs text-gray-500 mt-1">
-                Email cannot be changed after account creation
-              </p>
-            )}
+            {isEditing && <p className="text-xs text-gray-900 mt-1">Email cannot be changed after account creation</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Role *
-            </label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Role *</label>
             <select
               value={formData.role}
               onChange={(e) =>
@@ -741,18 +624,13 @@ function StaffFormModal({
               <option value="manager">Manager</option>
               <option value="admin">Admin</option>
             </select>
-            <p className="text-xs text-gray-500 mt-1">
-              Staff: Basic operations • Manager: Menu management • Admin: Full
-              access
-            </p>
+            <p className="text-xs text-gray-900 mt-1">Staff: Basic operations • Manager: Menu management • Admin: Full access</p>
           </div>
 
           {!isEditing && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">
-                  Password *
-                </label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Password *</label>
                 <input
                   type="password"
                   required
@@ -766,15 +644,11 @@ function StaffFormModal({
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   minLength={6}
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Minimum 6 characters
-                </p>
+                <p className="text-xs text-gray-900 mt-1">Minimum 6 characters</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">
-                  Confirm Password *
-                </label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Confirm Password *</label>
                 <input
                   type="password"
                   required

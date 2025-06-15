@@ -1,13 +1,8 @@
 // src/components/features/orders/OrderCompletionModal.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import {
-  ConfiguredCartItem,
-  CustomerLoyaltyDetails,
-  LoyaltyRedemption,
-  CustomerAddress,
-} from "@/lib/types";
+import { ConfiguredCartItem, CustomerAddress, CustomerLoyaltyDetails, LoyaltyRedemption } from "@/lib/types";
+import { useEffect, useState } from "react";
 
 interface OrderCompletionModalProps {
   isOpen: boolean;
@@ -73,9 +68,7 @@ export default function OrderCompletionModal({
     email: customer?.email || "",
   });
 
-  const [orderType, setOrderType] = useState<"pickup" | "delivery">(
-    defaultOrderType
-  );
+  const [orderType, setOrderType] = useState<"pickup" | "delivery">(defaultOrderType);
 
   const [deliveryForm, setDeliveryForm] = useState<DeliveryFormData>({
     address: "",
@@ -85,8 +78,7 @@ export default function OrderCompletionModal({
   });
 
   // Loyalty state
-  const [finalLoyaltyRedemption, setFinalLoyaltyRedemption] =
-    useState<LoyaltyRedemption | null>(pendingLoyaltyRedemption);
+  const [finalLoyaltyRedemption, setFinalLoyaltyRedemption] = useState<LoyaltyRedemption | null>(pendingLoyaltyRedemption);
 
   // Form validation
   const [formErrors, setFormErrors] = useState<{
@@ -196,10 +188,7 @@ export default function OrderCompletionModal({
         const data = await response.json();
         const redemption: LoyaltyRedemption = {
           points_to_redeem: points,
-          discount_amount: Math.min(
-            data.data.discount_amount,
-            orderSummary.total
-          ),
+          discount_amount: Math.min(data.data.discount_amount, orderSummary.total),
           conversion_rate: 20,
           remaining_points: customer.loyalty_points - points,
         };
@@ -216,20 +205,15 @@ export default function OrderCompletionModal({
 
   if (!isOpen) return null;
 
-  const finalTotal =
-    orderSummary.total - (finalLoyaltyRedemption?.discount_amount || 0);
+  const finalTotal = orderSummary.total - (finalLoyaltyRedemption?.discount_amount || 0);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Complete Order
-          </h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Please confirm customer information and order details
-          </p>
+          <h2 className="text-xl font-semibold text-gray-900">Complete Order</h2>
+          <p className="text-sm text-gray-900 mt-1">Please confirm customer information and order details</p>
         </div>
 
         <div className="px-6 py-4 space-y-6">
@@ -254,9 +238,7 @@ export default function OrderCompletionModal({
               {finalLoyaltyRedemption && (
                 <div className="flex justify-between text-purple-600">
                   <span>🎁 Loyalty Discount</span>
-                  <span>
-                    -${finalLoyaltyRedemption.discount_amount.toFixed(2)}
-                  </span>
+                  <span>-${finalLoyaltyRedemption.discount_amount.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between font-semibold text-lg pt-2 border-t">
@@ -268,62 +250,42 @@ export default function OrderCompletionModal({
 
           {/* Customer Information */}
           <div>
-            <h3 className="font-medium text-gray-900 mb-3">
-              Customer Information
-            </h3>
+            <h3 className="font-medium text-gray-900 mb-3">Customer Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">
-                  Customer Name *
-                </label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Customer Name *</label>
                 <input
                   type="text"
                   value={customerForm.name}
-                  onChange={(e) =>
-                    setCustomerForm({ ...customerForm, name: e.target.value })
-                  }
+                  onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     formErrors.name ? "border-red-500" : "border-gray-300"
                   }`}
                   placeholder="Enter customer name"
                 />
-                {formErrors.name && (
-                  <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
-                )}
+                {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">
-                  Phone Number *
-                </label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Phone Number *</label>
                 <input
                   type="tel"
                   value={customerForm.phone}
-                  onChange={(e) =>
-                    setCustomerForm({ ...customerForm, phone: e.target.value })
-                  }
+                  onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     formErrors.phone ? "border-red-500" : "border-gray-300"
                   }`}
                   placeholder="(555) 123-4567"
                 />
-                {formErrors.phone && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {formErrors.phone}
-                  </p>
-                )}
+                {formErrors.phone && <p className="text-red-500 text-xs mt-1">{formErrors.phone}</p>}
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-900 mb-1">
-                  Email (Optional)
-                </label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Email (Optional)</label>
                 <input
                   type="email"
                   value={customerForm.email}
-                  onChange={(e) =>
-                    setCustomerForm({ ...customerForm, email: e.target.value })
-                  }
+                  onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="customer@example.com"
                 />
@@ -366,17 +328,11 @@ export default function OrderCompletionModal({
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="font-medium text-gray-900">Delivery Address</h3>
-                {deliveryAddress && (
-                  <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
-                    🏠 Using saved address
-                  </span>
-                )}
+                {deliveryAddress && <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">🏠 Using saved address</span>}
               </div>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">
-                    Street Address *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Street Address *</label>
                   <input
                     type="text"
                     value={deliveryForm.address}
@@ -391,18 +347,12 @@ export default function OrderCompletionModal({
                     }`}
                     placeholder="123 Main Street"
                   />
-                  {formErrors.address && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {formErrors.address}
-                    </p>
-                  )}
+                  {formErrors.address && <p className="text-red-500 text-xs mt-1">{formErrors.address}</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-1">
-                      City *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">City *</label>
                     <input
                       type="text"
                       value={deliveryForm.city}
@@ -417,17 +367,11 @@ export default function OrderCompletionModal({
                       }`}
                       placeholder="Columbus"
                     />
-                    {formErrors.city && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.city}
-                      </p>
-                    )}
+                    {formErrors.city && <p className="text-red-500 text-xs mt-1">{formErrors.city}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-1">
-                      ZIP Code *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">ZIP Code *</label>
                     <input
                       type="text"
                       value={deliveryForm.zip}
@@ -442,18 +386,12 @@ export default function OrderCompletionModal({
                       }`}
                       placeholder="43215"
                     />
-                    {formErrors.zip && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.zip}
-                      </p>
-                    )}
+                    {formErrors.zip && <p className="text-red-500 text-xs mt-1">{formErrors.zip}</p>}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">
-                    Delivery Instructions (Optional)
-                  </label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Delivery Instructions (Optional)</label>
                   <textarea
                     value={deliveryForm.instructions}
                     onChange={(e) =>
@@ -478,19 +416,11 @@ export default function OrderCompletionModal({
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex justify-between items-center mb-3">
                   <div>
-                    <div className="font-medium text-blue-900">
-                      Available: {customer.loyalty_points.toLocaleString()}{" "}
-                      points
-                    </div>
-                    <div className="text-sm text-blue-600">
-                      Worth up to ${Math.floor(customer.loyalty_points / 20)}{" "}
-                      discount
-                    </div>
+                    <div className="font-medium text-blue-900">Available: {customer.loyalty_points.toLocaleString()} points</div>
+                    <div className="text-sm text-blue-600">Worth up to ${Math.floor(customer.loyalty_points / 20)} discount</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm text-green-600">
-                      Will earn: {pointsToEarn} points
-                    </div>
+                    <div className="text-sm text-green-600">Will earn: {pointsToEarn} points</div>
                   </div>
                 </div>
 
@@ -499,14 +429,9 @@ export default function OrderCompletionModal({
                     <div className="flex justify-between items-center">
                       <div>
                         <div className="font-medium text-green-900">
-                          Redeeming{" "}
-                          {finalLoyaltyRedemption.points_to_redeem.toLocaleString()}{" "}
-                          points
+                          Redeeming {finalLoyaltyRedemption.points_to_redeem.toLocaleString()} points
                         </div>
-                        <div className="text-sm text-green-700">
-                          ${finalLoyaltyRedemption.discount_amount.toFixed(2)}{" "}
-                          discount applied
-                        </div>
+                        <div className="text-sm text-green-700">${finalLoyaltyRedemption.discount_amount.toFixed(2)} discount applied</div>
                       </div>
                       <button
                         onClick={handleLoyaltyRedemptionRemove}
@@ -517,11 +442,7 @@ export default function OrderCompletionModal({
                     </div>
                   </div>
                 ) : (
-                  <LoyaltyRedemptionSection
-                    customer={customer}
-                    orderTotal={orderSummary.total}
-                    onApply={handleLoyaltyRedemptionApply}
-                  />
+                  <LoyaltyRedemptionSection customer={customer} orderTotal={orderSummary.total} onApply={handleLoyaltyRedemptionApply} />
                 )}
               </div>
             </div>
@@ -530,10 +451,7 @@ export default function OrderCompletionModal({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-          >
+          <button onClick={onCancel} className="px-4 py-2 text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
             Cancel
           </button>
           <button
@@ -555,11 +473,7 @@ interface LoyaltyRedemptionSectionProps {
   onApply: (points: number) => void;
 }
 
-function LoyaltyRedemptionSection({
-  customer,
-  orderTotal,
-  onApply,
-}: LoyaltyRedemptionSectionProps) {
+function LoyaltyRedemptionSection({ customer, orderTotal, onApply }: LoyaltyRedemptionSectionProps) {
   const [pointsInput, setPointsInput] = useState<string>("");
   const [calculatedDiscount, setCalculatedDiscount] = useState<number>(0);
 
@@ -582,22 +496,15 @@ function LoyaltyRedemptionSection({
     }
   };
 
-  const maxPoints = Math.min(
-    customer.loyalty_points,
-    Math.floor(orderTotal * 20)
+  const maxPoints = Math.min(customer.loyalty_points, Math.floor(orderTotal * 20));
+  const quickOptions = [Math.floor((maxPoints * 0.25) / 100) * 100, Math.floor((maxPoints * 0.5) / 100) * 100, maxPoints].filter(
+    (p) => p >= 100
   );
-  const quickOptions = [
-    Math.floor((maxPoints * 0.25) / 100) * 100,
-    Math.floor((maxPoints * 0.5) / 100) * 100,
-    maxPoints,
-  ].filter((p) => p >= 100);
 
   return (
     <div className="space-y-3">
       <div>
-        <label className="block text-sm font-medium text-blue-700 mb-1">
-          Points to Redeem (Minimum 100)
-        </label>
+        <label className="block text-sm font-medium text-blue-700 mb-1">Points to Redeem (Minimum 100)</label>
         <input
           type="number"
           value={pointsInput}
@@ -638,10 +545,7 @@ function LoyaltyRedemptionSection({
 
       <button
         onClick={handleApply}
-        disabled={
-          calculatedDiscount === 0 ||
-          parseInt(pointsInput) > customer.loyalty_points
-        }
+        disabled={calculatedDiscount === 0 || parseInt(pointsInput) > customer.loyalty_points}
         className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md transition-colors text-sm"
       >
         Apply {pointsInput} Points

@@ -12,7 +12,7 @@ function KitchenLayoutContent({ children }: { children: React.ReactNode }) {
       <header className="bg-gray-800 border-b border-gray-700 flex justify-between items-center">
         <div className="px-6 py-4">
           <h1 className="text-2xl font-bold">🍽️ Kitchen Display</h1>
-          <p className="text-gray-400 text-sm">Pizza Mia - New Lenox</p>
+          <p className="text-gray-900 text-sm">Pizza Mia - New Lenox</p>
         </div>
         <div className="px-6">
           <Link href="/staff" className="text-sm bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">

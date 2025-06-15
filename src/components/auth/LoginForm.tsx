@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useAuth } from "@/lib/contexts/auth-context";
+import { useState } from "react";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
@@ -18,8 +18,7 @@ export function LoginForm() {
     try {
       await signIn(email, password);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Login failed";
+      const errorMessage = error instanceof Error ? error.message : "Login failed";
       setLoginError(errorMessage);
       setPassword("");
     } finally {
@@ -31,12 +30,8 @@ export function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-gray-900">
-            🍕 Pizza Mia Staff Login
-          </h2>
-          <p className="mt-2 text-gray-600">
-            Sign in to access the staff dashboard
-          </p>
+          <h2 className="text-3xl font-extrabold text-gray-900">🍕 Pizza Mia Staff Login</h2>
+          <p className="mt-2 text-gray-900">Sign in to access the staff dashboard</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -53,10 +48,7 @@ export function LoginForm() {
           )}
 
           <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-900"
-            >
+            <label htmlFor="email" className="block text-sm font-medium text-gray-900">
               Email Address
             </label>
             <input
@@ -73,10 +65,7 @@ export function LoginForm() {
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-900"
-            >
+            <label htmlFor="password" className="block text-sm font-medium text-gray-900">
               Password
             </label>
             <input
@@ -98,20 +87,8 @@ export function LoginForm() {
           >
             {isSubmitting ? (
               <span className="flex items-center">
-                <svg
-                  className="animate-spin -ml-1 mr-3 h-5 w-5"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path
                     className="opacity-75"
                     fill="currentColor"
@@ -126,7 +103,7 @@ export function LoginForm() {
           </button>
         </form>
 
-        <div className="text-center text-xs text-gray-500">
+        <div className="text-center text-xs text-gray-900">
           <p>Staff accounts are created by administrators</p>
         </div>
       </div>

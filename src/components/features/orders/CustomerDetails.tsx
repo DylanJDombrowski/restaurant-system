@@ -1,17 +1,10 @@
 // src/components/features/orders/CustomerDetails.tsx - UPDATED with address passing
 "use client";
 
-import React, { useState, useEffect } from "react";
-import {
-  CustomerLoyaltyDetails,
-  RecentCustomer,
-  CustomerAddress,
-} from "@/lib/types";
+import { CustomerAddress, CustomerLoyaltyDetails, RecentCustomer } from "@/lib/types";
+import React, { useEffect, useState } from "react";
 interface CustomerDetailsProps {
-  onCustomerSelected: (
-    customer: CustomerLoyaltyDetails | null,
-    address?: CustomerAddress
-  ) => void; // ✅ Updated to pass address
+  onCustomerSelected: (customer: CustomerLoyaltyDetails | null, address?: CustomerAddress) => void; // ✅ Updated to pass address
   restaurantId: string;
 }
 
@@ -23,10 +16,7 @@ interface CustomerLookupState {
   phoneInput: string;
 }
 
-export default function CustomerDetails({
-  onCustomerSelected,
-  restaurantId,
-}: CustomerDetailsProps) {
+export default function CustomerDetails({ onCustomerSelected, restaurantId }: CustomerDetailsProps) {
   const [state, setState] = useState<CustomerLookupState>({
     customer: null,
     isLoading: false,
@@ -43,9 +33,7 @@ export default function CustomerDetails({
 
   const loadRecentCustomers = async () => {
     try {
-      const response = await fetch(
-        `/api/customers/recent?restaurant_id=${restaurantId}`
-      );
+      const response = await fetch(`/api/customers/recent?restaurant_id=${restaurantId}`);
       if (response.ok) {
         const data = await response.json();
         setState((prev) => ({
@@ -68,20 +56,14 @@ export default function CustomerDetails({
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const response = await fetch(
-        `/api/customers/lookup?phone=${encodeURIComponent(
-          phone
-        )}&restaurant_id=${restaurantId}`
-      );
+      const response = await fetch(`/api/customers/lookup?phone=${encodeURIComponent(phone)}&restaurant_id=${restaurantId}`);
 
       if (response.ok) {
         const data = await response.json();
         const customer = data.data as CustomerLoyaltyDetails;
 
         // ✅ Find the default address from the API response
-        const defaultAddress = customer.addresses?.find(
-          (addr: CustomerAddress) => addr.is_default
-        );
+        const defaultAddress = customer.addresses?.find((addr: CustomerAddress) => addr.is_default);
 
         setState((prev) => ({
           ...prev,
@@ -136,10 +118,7 @@ export default function CustomerDetails({
   const formatPhone = (phone: string) => {
     const digits = phone.replace(/\D/g, "");
     if (digits.length >= 10) {
-      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(
-        6,
-        10
-      )}`;
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
     }
     return phone;
   };
@@ -155,16 +134,11 @@ export default function CustomerDetails({
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        Customer Information
-      </h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer Information</h3>
 
       {/* Phone Input */}
       <div className="mb-4">
-        <label
-          htmlFor="phone"
-          className="block text-sm font-medium text-gray-900 mb-2"
-        >
+        <label htmlFor="phone" className="block text-sm font-medium text-gray-900 mb-2">
           Customer Phone Number
         </label>
         <input
@@ -176,12 +150,8 @@ export default function CustomerDetails({
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           disabled={state.isLoading}
         />
-        {state.isLoading && (
-          <p className="text-sm text-blue-600 mt-1">Looking up customer...</p>
-        )}
-        {state.error && (
-          <p className="text-sm text-red-600 mt-1">{state.error}</p>
-        )}
+        {state.isLoading && <p className="text-sm text-blue-600 mt-1">Looking up customer...</p>}
+        {state.error && <p className="text-sm text-red-600 mt-1">{state.error}</p>}
       </div>
 
       {/* Customer Details */}
@@ -189,61 +159,42 @@ export default function CustomerDetails({
         <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <h4 className="font-semibold text-green-900">
-                {state.customer.name || "Customer Found"}
-              </h4>
-              <p className="text-sm text-green-700">
-                {formatPhone(state.customer.phone)}
-              </p>
-              {state.customer.email && (
-                <p className="text-sm text-green-700">{state.customer.email}</p>
-              )}
+              <h4 className="font-semibold text-green-900">{state.customer.name || "Customer Found"}</h4>
+              <p className="text-sm text-green-700">{formatPhone(state.customer.phone)}</p>
+              {state.customer.email && <p className="text-sm text-green-700">{state.customer.email}</p>}
 
               {/* ✅ Display addresses if available */}
-              {state.customer.addresses &&
-                state.customer.addresses.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs text-green-600 mb-1">
-                      Saved Addresses:
-                    </p>
-                    {state.customer.addresses.map((addr) => (
-                      <div key={addr.id} className="text-xs text-green-700">
-                        {addr.is_default && "🏠 "}
-                        {addr.label}: {addr.street}, {addr.city}
-                      </div>
-                    ))}
-                  </div>
-                )}
+              {state.customer.addresses && state.customer.addresses.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-xs text-green-600 mb-1">Saved Addresses:</p>
+                  {state.customer.addresses.map((addr) => (
+                    <div key={addr.id} className="text-xs text-green-700">
+                      {addr.is_default && "🏠 "}
+                      {addr.label}: {addr.street}, {addr.city}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="text-right">
-              <div className="text-lg font-bold text-green-900">
-                {state.customer.loyalty_points} points
-              </div>
-              <div className="text-xs text-green-600">
-                ${Math.floor(state.customer.loyalty_points / 20)} available
-              </div>
+              <div className="text-lg font-bold text-green-900">{state.customer.loyalty_points} points</div>
+              <div className="text-xs text-green-600">${Math.floor(state.customer.loyalty_points / 20)} available</div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-green-600">Total Orders:</span>
-              <span className="ml-1 font-medium">
-                {state.customer.total_orders}
-              </span>
+              <span className="ml-1 font-medium">{state.customer.total_orders}</span>
             </div>
             <div>
               <span className="text-green-600">Total Spent:</span>
-              <span className="ml-1 font-medium">
-                ${state.customer.total_spent.toFixed(2)}
-              </span>
+              <span className="ml-1 font-medium">${state.customer.total_spent.toFixed(2)}</span>
             </div>
           </div>
 
           {state.customer.last_order_date && (
-            <p className="text-xs text-green-600 mt-2">
-              Last order: {formatDate(state.customer.last_order_date)}
-            </p>
+            <p className="text-xs text-green-600 mt-2">Last order: {formatDate(state.customer.last_order_date)}</p>
           )}
         </div>
       )}
@@ -251,9 +202,7 @@ export default function CustomerDetails({
       {/* Recent Customers */}
       {state.recentCustomers.length > 0 && !state.customer && (
         <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-2">
-            Recent Customers
-          </h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-2">Recent Customers</h4>
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {state.recentCustomers.map((customer) => (
               <button
@@ -263,17 +212,12 @@ export default function CustomerDetails({
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-medium text-gray-900">
-                      {customer.name || formatPhone(customer.phone)}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {customer.total_orders} orders • {customer.loyalty_points}{" "}
-                      points
+                    <div className="font-medium text-gray-900">{customer.name || formatPhone(customer.phone)}</div>
+                    <div className="text-sm text-gray-900">
+                      {customer.total_orders} orders • {customer.loyalty_points} points
                     </div>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {formatDate(customer.last_order_date)}
-                  </div>
+                  <div className="text-xs text-gray-900">{formatDate(customer.last_order_date)}</div>
                 </div>
               </button>
             ))}
@@ -284,13 +228,10 @@ export default function CustomerDetails({
       {/* Guest Order Option */}
       {!state.customer && state.phoneInput.trim() === "" && (
         <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-          <p className="text-sm text-gray-600">
-            💡 Enter a phone number to link this order to a customer account and
-            earn loyalty points.
+          <p className="text-sm text-gray-900">
+            💡 Enter a phone number to link this order to a customer account and earn loyalty points.
             <br />
-            <span className="text-xs">
-              Or proceed without a phone number for a guest order.
-            </span>
+            <span className="text-xs">Or proceed without a phone number for a guest order.</span>
           </p>
         </div>
       )}

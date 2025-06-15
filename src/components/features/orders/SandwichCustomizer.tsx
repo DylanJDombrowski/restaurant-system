@@ -1,11 +1,7 @@
 // src/components/features/orders/SandwichCustomizer.tsx
 "use client";
-import { useState, useMemo, useCallback } from "react";
-import {
-  ConfiguredCartItem,
-  MenuItemWithVariants,
-  ConfiguredModifier,
-} from "@/lib/types";
+import { ConfiguredCartItem, ConfiguredModifier, MenuItemWithVariants } from "@/lib/types";
+import { useCallback, useMemo, useState } from "react";
 
 /**
  * 🥪 SANDWICH CUSTOMIZER COMPONENT
@@ -288,9 +284,7 @@ function getPreparationIdFromName(prepName: string): string | null {
 }
 
 // 3. COMPLETE parseExistingModifiers function
-function parseExistingModifiers(
-  modifiers: ConfiguredModifier[]
-): Partial<SandwichSelection> {
+function parseExistingModifiers(modifiers: ConfiguredModifier[]): Partial<SandwichSelection> {
   const parsed: Partial<SandwichSelection> = {
     ingredients: [],
     sideSauces: [],
@@ -387,22 +381,14 @@ export default function SandwichCustomizer({
     const defaultsToGarlic = GARLIC_BREAD_DEFAULTS.includes(item.name);
 
     // 🆕 FIXED: Parse existing cart item state if provided
-    if (
-      existingCartItem?.selectedModifiers &&
-      existingCartItem.selectedModifiers.length > 0
-    ) {
+    if (existingCartItem?.selectedModifiers && existingCartItem.selectedModifiers.length > 0) {
       try {
         console.log("🔧 Parsing existing sandwich selections for:", item.name);
-        const existingSelection = parseExistingModifiers(
-          existingCartItem.selectedModifiers
-        );
+        const existingSelection = parseExistingModifiers(existingCartItem.selectedModifiers);
 
         return {
-          style:
-            existingSelection.style ||
-            (requiresStyle ? undefined : "not_required"),
-          bread:
-            existingSelection.bread || (defaultsToGarlic ? "garlic" : "plain"),
+          style: existingSelection.style || (requiresStyle ? undefined : "not_required"),
+          bread: existingSelection.bread || (defaultsToGarlic ? "garlic" : "plain"),
           makeItDeluxe: existingSelection.makeItDeluxe || false,
           ingredients: existingSelection.ingredients || [],
           sideSauces: existingSelection.sideSauces || [],
@@ -463,13 +449,9 @@ export default function SandwichCustomizer({
 
     // Ingredients
     selection.ingredients.forEach((ingredient) => {
-      const ingredientData = SANDWICH_INGREDIENTS.find(
-        (i) => i.id === ingredient.id
-      );
+      const ingredientData = SANDWICH_INGREDIENTS.find((i) => i.id === ingredient.id);
       if (ingredientData) {
-        const tier = ingredientData.tiers.find(
-          (t) => t.level === ingredient.tier
-        );
+        const tier = ingredientData.tiers.find((t) => t.level === ingredient.tier);
         if (tier) {
           total += ingredientData.basePrice * tier.priceMultiplier;
         }
@@ -506,51 +488,34 @@ export default function SandwichCustomizer({
     setSelection((prev) => ({ ...prev, makeItDeluxe: checked }));
   }, []);
 
-  const handleIngredientChange = useCallback(
-    (ingredientId: string, tier: string | null) => {
-      setSelection((prev) => ({
-        ...prev,
-        ingredients: tier
-          ? [
-              ...prev.ingredients.filter((i) => i.id !== ingredientId),
-              { id: ingredientId, tier },
-            ]
-          : prev.ingredients.filter((i) => i.id !== ingredientId),
-      }));
-    },
-    []
-  );
+  const handleIngredientChange = useCallback((ingredientId: string, tier: string | null) => {
+    setSelection((prev) => ({
+      ...prev,
+      ingredients: tier
+        ? [...prev.ingredients.filter((i) => i.id !== ingredientId), { id: ingredientId, tier }]
+        : prev.ingredients.filter((i) => i.id !== ingredientId),
+    }));
+  }, []);
 
-  const handleSideSauceChange = useCallback(
-    (sauceId: string, tier: string | null) => {
-      setSelection((prev) => ({
-        ...prev,
-        sideSauces: tier
-          ? [
-              ...prev.sideSauces.filter((s) => s.id !== sauceId),
-              { id: sauceId, tier },
-            ]
-          : prev.sideSauces.filter((s) => s.id !== sauceId),
-      }));
-    },
-    []
-  );
+  const handleSideSauceChange = useCallback((sauceId: string, tier: string | null) => {
+    setSelection((prev) => ({
+      ...prev,
+      sideSauces: tier
+        ? [...prev.sideSauces.filter((s) => s.id !== sauceId), { id: sauceId, tier }]
+        : prev.sideSauces.filter((s) => s.id !== sauceId),
+    }));
+  }, []);
 
   const handlePreparationToggle = useCallback((prepId: string) => {
     setSelection((prev) => ({
       ...prev,
-      preparations: prev.preparations.includes(prepId)
-        ? prev.preparations.filter((p) => p !== prepId)
-        : [...prev.preparations, prepId],
+      preparations: prev.preparations.includes(prepId) ? prev.preparations.filter((p) => p !== prepId) : [...prev.preparations, prepId],
     }));
   }, []);
 
-  const handleSpecialInstructionsChange = useCallback(
-    (instructions: string) => {
-      setSelection((prev) => ({ ...prev, specialInstructions: instructions }));
-    },
-    []
-  );
+  const handleSpecialInstructionsChange = useCallback((instructions: string) => {
+    setSelection((prev) => ({ ...prev, specialInstructions: instructions }));
+  }, []);
 
   // ==========================================
   // COMPLETION HANDLER
@@ -577,11 +542,7 @@ export default function SandwichCustomizer({
     // Add bread (only if different from default)
     const isGarlicDefault = GARLIC_BREAD_DEFAULTS.includes(item.name);
     const selectedBread = BREAD_OPTIONS.find((b) => b.id === selection.bread);
-    if (
-      selectedBread &&
-      ((isGarlicDefault && selection.bread !== "garlic") ||
-        (!isGarlicDefault && selection.bread !== "plain"))
-    ) {
+    if (selectedBread && ((isGarlicDefault && selection.bread !== "garlic") || (!isGarlicDefault && selection.bread !== "plain"))) {
       configuredModifiers.push({
         id: selectedBread.id,
         name: selectedBread.name,
@@ -600,12 +561,8 @@ export default function SandwichCustomizer({
 
     // Add ingredients
     selection.ingredients.forEach((ingredient) => {
-      const ingredientData = SANDWICH_INGREDIENTS.find(
-        (i) => i.id === ingredient.id
-      );
-      const tier = ingredientData?.tiers.find(
-        (t) => t.level === ingredient.tier
-      );
+      const ingredientData = SANDWICH_INGREDIENTS.find((i) => i.id === ingredient.id);
+      const tier = ingredientData?.tiers.find((t) => t.level === ingredient.tier);
       if (ingredientData && tier) {
         const price = ingredientData.basePrice * tier.priceMultiplier;
         configuredModifiers.push({
@@ -644,9 +601,7 @@ export default function SandwichCustomizer({
 
     // 🆕 FIXED: Create cart item preserving existing ID and quantity
     const cartItem: ConfiguredCartItem = {
-      id:
-        existingCartItem?.id ||
-        `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: existingCartItem?.id || `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       menuItemId: item.id,
       menuItemName: item.name,
       variantId: null,
@@ -662,14 +617,7 @@ export default function SandwichCustomizer({
 
     console.log("🔧 Completed sandwich customization:", cartItem);
     onComplete(cartItem);
-  }, [
-    canComplete,
-    selection,
-    item,
-    calculatedPrice,
-    onComplete,
-    existingCartItem,
-  ]);
+  }, [canComplete, selection, item, calculatedPrice, onComplete, existingCartItem]);
 
   // ==========================================
   // RENDER
@@ -683,23 +631,15 @@ export default function SandwichCustomizer({
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Customize {item.name}
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <h2 className="text-xl font-semibold text-gray-900">Customize {item.name}</h2>
+            <p className="text-sm text-gray-900 mt-1">
               Base price: ${item.base_price.toFixed(2)}
-              {requiresStyleSelection && !selection.style && (
-                <span className="text-red-600 ml-2">
-                  • Style selection required
-                </span>
-              )}
+              {requiresStyleSelection && !selection.style && <span className="text-red-600 ml-2">• Style selection required</span>}
             </p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-green-600">
-              ${calculatedPrice.toFixed(2)}
-            </div>
-            <div className="text-sm text-gray-500">Current total</div>
+            <div className="text-2xl font-bold text-green-600">${calculatedPrice.toFixed(2)}</div>
+            <div className="text-sm text-gray-900">Current total</div>
           </div>
         </div>
 
@@ -732,15 +672,10 @@ export default function SandwichCustomizer({
 
             {/* Bread Selection */}
             <section>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                Bread Choice
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Bread Choice</h3>
               <div className="space-y-2">
                 {BREAD_OPTIONS.map((bread) => (
-                  <label
-                    key={bread.id}
-                    className="flex items-center justify-between"
-                  >
+                  <label key={bread.id} className="flex items-center justify-between">
                     <div className="flex items-center">
                       <input
                         type="radio"
@@ -752,11 +687,7 @@ export default function SandwichCustomizer({
                       />
                       <span className="text-gray-900">{bread.name}</span>
                     </div>
-                    {bread.price > 0 && (
-                      <span className="text-green-600 font-medium">
-                        +${bread.price.toFixed(2)}
-                      </span>
-                    )}
+                    {bread.price > 0 && <span className="text-green-600 font-medium">+${bread.price.toFixed(2)}</span>}
                   </label>
                 ))}
               </div>
@@ -764,9 +695,7 @@ export default function SandwichCustomizer({
 
             {/* Deluxe Option */}
             <section>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                Upgrade Options
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Upgrade Options</h3>
               <label className="flex items-center justify-between">
                 <div className="flex items-center">
                   <input
@@ -775,9 +704,7 @@ export default function SandwichCustomizer({
                     onChange={(e) => handleDeluxeChange(e.target.checked)}
                     className="mr-3 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-gray-900">
-                    Make it Deluxe (Add Fries)
-                  </span>
+                  <span className="text-gray-900">Make it Deluxe (Add Fries)</span>
                 </div>
                 <span className="text-green-600 font-medium">+$2.00</span>
               </label>
@@ -785,21 +712,14 @@ export default function SandwichCustomizer({
 
             {/* Ingredients */}
             <section>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                Add Ingredients
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Add Ingredients</h3>
               <div className="space-y-4">
                 {SANDWICH_INGREDIENTS.map((ingredient) => (
                   <IngredientSelector
                     key={ingredient.id}
                     ingredient={ingredient}
-                    currentTier={
-                      selection.ingredients.find((i) => i.id === ingredient.id)
-                        ?.tier
-                    }
-                    onChange={(tier) =>
-                      handleIngredientChange(ingredient.id, tier)
-                    }
+                    currentTier={selection.ingredients.find((i) => i.id === ingredient.id)?.tier}
+                    onChange={(tier) => handleIngredientChange(ingredient.id, tier)}
                   />
                 ))}
               </div>
@@ -807,17 +727,13 @@ export default function SandwichCustomizer({
 
             {/* Side Sauces */}
             <section>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                Side Sauces
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Side Sauces</h3>
               <div className="space-y-4">
                 {SIDE_SAUCES.map((sauce) => (
                   <SideSauceSelector
                     key={sauce.id}
                     sauce={sauce}
-                    currentTier={
-                      selection.sideSauces.find((s) => s.id === sauce.id)?.tier
-                    }
+                    currentTier={selection.sideSauces.find((s) => s.id === sauce.id)?.tier}
                     onChange={(tier) => handleSideSauceChange(sauce.id, tier)}
                   />
                 ))}
@@ -826,9 +742,7 @@ export default function SandwichCustomizer({
 
             {/* Preparation Options */}
             <section>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                Preparation Instructions
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Preparation Instructions</h3>
               <div className="grid grid-cols-2 gap-2">
                 {PREPARATION_OPTIONS.map((prep) => (
                   <label key={prep.id} className="flex items-center">
@@ -846,15 +760,11 @@ export default function SandwichCustomizer({
 
             {/* Special Instructions */}
             <section>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                Special Instructions
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Special Instructions</h3>
               <textarea
                 placeholder="Any special requests for this sandwich..."
                 value={selection.specialInstructions}
-                onChange={(e) =>
-                  handleSpecialInstructionsChange(e.target.value)
-                }
+                onChange={(e) => handleSpecialInstructionsChange(e.target.value)}
                 rows={3}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
@@ -873,10 +783,8 @@ export default function SandwichCustomizer({
 
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <div className="text-sm text-gray-600">Total:</div>
-              <div className="text-xl font-bold text-green-600">
-                ${calculatedPrice.toFixed(2)}
-              </div>
+              <div className="text-sm text-gray-900">Total:</div>
+              <div className="text-xl font-bold text-green-600">${calculatedPrice.toFixed(2)}</div>
             </div>
             <button
               onClick={handleComplete}
@@ -902,11 +810,7 @@ interface IngredientSelectorProps {
   onChange: (tier: string | null) => void;
 }
 
-function IngredientSelector({
-  ingredient,
-  currentTier,
-  onChange,
-}: IngredientSelectorProps) {
+function IngredientSelector({ ingredient, currentTier, onChange }: IngredientSelectorProps) {
   const handleTierChange = (tier: string) => {
     if (currentTier === tier) {
       onChange(null); // Deselect if same tier clicked
@@ -916,21 +820,13 @@ function IngredientSelector({
   };
 
   return (
-    <div
-      className={`border rounded-lg p-3 transition-colors ${
-        currentTier ? "border-blue-500 bg-blue-50" : "border-gray-200"
-      }`}
-    >
+    <div className={`border rounded-lg p-3 transition-colors ${currentTier ? "border-blue-500 bg-blue-50" : "border-gray-200"}`}>
       <div className="flex justify-between items-center mb-2">
         <span className="font-medium text-gray-900">{ingredient.name}</span>
         {currentTier && (
           <span className="text-sm font-semibold text-green-600">
             +$
-            {(
-              ingredient.basePrice *
-              (ingredient.tiers.find((t) => t.level === currentTier)
-                ?.priceMultiplier || 1)
-            ).toFixed(2)}
+            {(ingredient.basePrice * (ingredient.tiers.find((t) => t.level === currentTier)?.priceMultiplier || 1)).toFixed(2)}
           </span>
         )}
       </div>
@@ -941,9 +837,7 @@ function IngredientSelector({
             key={tier.level}
             onClick={() => handleTierChange(tier.level)}
             className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-              currentTier === tier.level
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-900 hover:bg-gray-200"
+              currentTier === tier.level ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900 hover:bg-gray-200"
             }`}
           >
             {tier.label}
@@ -960,11 +854,7 @@ interface SideSauceSelectorProps {
   onChange: (tier: string | null) => void;
 }
 
-function SideSauceSelector({
-  sauce,
-  currentTier,
-  onChange,
-}: SideSauceSelectorProps) {
+function SideSauceSelector({ sauce, currentTier, onChange }: SideSauceSelectorProps) {
   const handleTierChange = (tier: string) => {
     if (currentTier === tier) {
       onChange(null); // Deselect if same tier clicked
@@ -974,21 +864,13 @@ function SideSauceSelector({
   };
 
   return (
-    <div
-      className={`border rounded-lg p-3 transition-colors ${
-        currentTier ? "border-blue-500 bg-blue-50" : "border-gray-200"
-      }`}
-    >
+    <div className={`border rounded-lg p-3 transition-colors ${currentTier ? "border-blue-500 bg-blue-50" : "border-gray-200"}`}>
       <div className="flex justify-between items-center mb-2">
         <span className="font-medium text-gray-900">{sauce.name}</span>
         {currentTier && (
           <span className="text-sm font-semibold text-green-600">
             +$
-            {(
-              sauce.basePrice *
-              (sauce.tiers.find((t) => t.level === currentTier)
-                ?.priceMultiplier || 1)
-            ).toFixed(2)}
+            {(sauce.basePrice * (sauce.tiers.find((t) => t.level === currentTier)?.priceMultiplier || 1)).toFixed(2)}
           </span>
         )}
       </div>
@@ -999,9 +881,7 @@ function SideSauceSelector({
             key={tier.level}
             onClick={() => handleTierChange(tier.level)}
             className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-              currentTier === tier.level
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-900 hover:bg-gray-200"
+              currentTier === tier.level ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900 hover:bg-gray-200"
             }`}
           >
             {tier.label}

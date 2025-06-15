@@ -1,6 +1,6 @@
 // src/app/page.tsx
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 // import { supabase } from "@/lib/supabase/client";
 
 // This is a React Server Component (RSC), so we can fetch data directly.
@@ -31,7 +31,7 @@ export default async function HomePage() {
         }
       `}</style>
 
-      <div className="bg-white text-gray-800">
+      <div className="bg-white text-gray-900">
         {/* Navigation */}
         <nav className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -43,21 +43,15 @@ export default async function HomePage() {
               </div>
               <div className="hidden md:block">
                 <div className="ml-10 flex items-baseline space-x-4">
-                  <a
-                    href="#features"
-                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                  >
+                  <a href="#features" className="text-gray-900 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
                     Features
                   </a>
-                  <a
-                    href="#pricing"
-                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                  >
+                  <a href="#pricing" className="text-gray-900 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
                     Pricing
                   </a>
                   <Link
                     href="/staff" // Link to the staff login/dashboard
-                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                    className="text-gray-900 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                   >
                     Log In
                   </Link>
@@ -72,7 +66,7 @@ export default async function HomePage() {
               <div className="md:hidden">
                 <button
                   type="button"
-                  className="bg-gray-200 inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
+                  className="bg-gray-200 inline-flex items-center justify-center p-2 rounded-md text-gray-900 hover:text-gray-900 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
                   aria-controls="mobile-menu"
                   aria-expanded="false"
                 >
@@ -85,12 +79,7 @@ export default async function HomePage() {
                     stroke="currentColor"
                     aria-hidden="true"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M4 6h16M4 12h16M4 18h16"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                 </button>
               </div>
@@ -117,21 +106,12 @@ export default async function HomePage() {
               </div>
               <div className="relative px-4 py-16 sm:px-6 sm:py-24 lg:py-32 lg:px-8">
                 <h1 className="text-center text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
-                  <span className="block text-white">
-                    The Modern Point of Sale
-                  </span>
-                  <span className="block gradient-text">
-                    Built for Your Restaurant
-                  </span>
+                  <span className="block text-white">The Modern Point of Sale</span>
+                  <span className="block gradient-text">Built for Your Restaurant</span>
                 </h1>
                 <p className="mt-6 max-w-lg mx-auto text-center text-xl text-gray-900 sm:max-w-3xl">
-                  Streamline your operations from front-of-house to kitchen with
-                  an intuitive, powerful, and flexible POS system designed to
-                  help you grow. Currently powering{" "}
-                  <span className="font-bold text-gray-900">
-                    {"restaurants like yours"}
-                  </span>
-                  .
+                  Streamline your operations from front-of-house to kitchen with an intuitive, powerful, and flexible POS system designed to
+                  help you grow. Currently powering <span className="font-bold text-gray-900">{"restaurants like yours"}</span>.
                 </p>
                 <div className="mt-10 max-w-sm mx-auto sm:max-w-none sm:flex sm:justify-center">
                   <div className="space-y-4 sm:space-y-0 sm:mx-auto sm:inline-grid sm:grid-cols-2 sm:gap-5">
@@ -158,15 +138,12 @@ export default async function HomePage() {
         <div id="features" className="bg-gray-50 py-16 sm:py-24">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="lg:text-center">
-              <h2 className="text-base text-indigo-600 font-semibold tracking-wide uppercase">
-                Your All-in-One Platform
-              </h2>
+              <h2 className="text-base text-indigo-600 font-semibold tracking-wide uppercase">Your All-in-One Platform</h2>
               <p className="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
                 Everything you need, nothing you don&apos;t.
               </p>
-              <p className="mt-4 max-w-2xl text-xl text-gray-500 lg:mx-auto">
-                From complex customizations to real-time kitchen updates, our
-                system is designed to handle the unique demands of your
+              <p className="mt-4 max-w-2xl text-xl text-gray-900 lg:mx-auto">
+                From complex customizations to real-time kitchen updates, our system is designed to handle the unique demands of your
                 restaurant.
               </p>
             </div>
@@ -190,13 +167,10 @@ export default async function HomePage() {
                         />
                       </svg>
                     </div>
-                    <p className="ml-16 text-lg leading-6 font-medium text-gray-900">
-                      Advanced Menu Customization
-                    </p>
+                    <p className="ml-16 text-lg leading-6 font-medium text-gray-900">Advanced Menu Customization</p>
                   </dt>
-                  <dd className="mt-2 ml-16 text-base text-gray-500">
-                    Handle any order, no matter how complex. From multi-tiered
-                    pizza toppings to variant-specific chicken dinner sides, our
+                  <dd className="mt-2 ml-16 text-base text-gray-900">
+                    Handle any order, no matter how complex. From multi-tiered pizza toppings to variant-specific chicken dinner sides, our
                     system ensures every detail is captured accurately.
                   </dd>
                 </div>
@@ -218,14 +192,11 @@ export default async function HomePage() {
                         />
                       </svg>
                     </div>
-                    <p className="ml-16 text-lg leading-6 font-medium text-gray-900">
-                      Real-Time Kitchen Display
-                    </p>
+                    <p className="ml-16 text-lg leading-6 font-medium text-gray-900">Real-Time Kitchen Display</p>
                   </dt>
-                  <dd className="mt-2 ml-16 text-base text-gray-500">
-                    Orders appear on your Kitchen Display System (KDS)
-                    instantly. Keep your kitchen staff in sync and reduce ticket
-                    times with a clear, live view of the order queue.
+                  <dd className="mt-2 ml-16 text-base text-gray-900">
+                    Orders appear on your Kitchen Display System (KDS) instantly. Keep your kitchen staff in sync and reduce ticket times
+                    with a clear, live view of the order queue.
                   </dd>
                 </div>
                 <div className="relative">
@@ -246,14 +217,11 @@ export default async function HomePage() {
                         />
                       </svg>
                     </div>
-                    <p className="ml-16 text-lg leading-6 font-medium text-gray-900">
-                      Online & In-Person Ordering
-                    </p>
+                    <p className="ml-16 text-lg leading-6 font-medium text-gray-900">Online & In-Person Ordering</p>
                   </dt>
-                  <dd className="mt-2 ml-16 text-base text-gray-500">
-                    Manage phone orders, walk-ins, and online orders from a
-                    single, unified system. Offer your customers the convenience
-                    of ordering how they want, when they want.
+                  <dd className="mt-2 ml-16 text-base text-gray-900">
+                    Manage phone orders, walk-ins, and online orders from a single, unified system. Offer your customers the convenience of
+                    ordering how they want, when they want.
                   </dd>
                 </div>
                 <div className="relative">
@@ -274,13 +242,10 @@ export default async function HomePage() {
                         />
                       </svg>
                     </div>
-                    <p className="ml-16 text-lg leading-6 font-medium text-gray-900">
-                      Powerful Analytics
-                    </p>
+                    <p className="ml-16 text-lg leading-6 font-medium text-gray-900">Powerful Analytics</p>
                   </dt>
-                  <dd className="mt-2 ml-16 text-base text-gray-500">
-                    Make data-driven decisions. Understand your sales trends,
-                    most popular items, and peak hours with an easy-to-use
+                  <dd className="mt-2 ml-16 text-base text-gray-900">
+                    Make data-driven decisions. Understand your sales trends, most popular items, and peak hours with an easy-to-use
                     analytics dashboard built for restaurant owners.
                   </dd>
                 </div>
@@ -293,35 +258,21 @@ export default async function HomePage() {
         <div id="pricing" className="bg-white py-16 sm:py-24">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center">
-              <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-                Simple, Transparent Pricing
-              </h2>
-              <p className="mt-4 text-lg text-gray-500">
-                Choose a plan that scales with your business. No hidden fees.
-              </p>
+              <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">Simple, Transparent Pricing</h2>
+              <p className="mt-4 text-lg text-gray-900">Choose a plan that scales with your business. No hidden fees.</p>
             </div>
             <div className="mt-12 space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-3">
               <div className="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
                 <div className="p-6">
-                  <h2 className="text-lg leading-6 font-medium text-gray-900">
-                    Starter
-                  </h2>
-                  <p className="mt-2 text-sm text-gray-500">
-                    For new restaurants or single locations getting started.
-                  </p>
+                  <h2 className="text-lg leading-6 font-medium text-gray-900">Starter</h2>
+                  <p className="mt-2 text-sm text-gray-900">For new restaurants or single locations getting started.</p>
                   <p className="mt-4">
-                    <span className="text-4xl font-extrabold text-gray-900">
-                      $59
-                    </span>
-                    <span className="text-base font-medium text-gray-500">
-                      /mo per terminal
-                    </span>
+                    <span className="text-4xl font-extrabold text-gray-900">$59</span>
+                    <span className="text-base font-medium text-gray-900">/mo per terminal</span>
                   </p>
                 </div>
                 <div className="pt-6 pb-8 px-6">
-                  <h3 className="text-xs font-medium text-gray-900 tracking-wide uppercase">
-                    What&apos;s included
-                  </h3>
+                  <h3 className="text-xs font-medium text-gray-900 tracking-wide uppercase">What&apos;s included</h3>
                   <ul role="list" className="mt-6 space-y-4">
                     <li className="flex space-x-3">
                       <span className="text-green-500">✔</span>
@@ -345,25 +296,15 @@ export default async function HomePage() {
                   </span>
                 </div>
                 <div className="p-6">
-                  <h2 className="text-lg leading-6 font-medium text-gray-900">
-                    Pro
-                  </h2>
-                  <p className="mt-2 text-sm text-gray-500">
-                    For growing businesses that need more power.
-                  </p>
+                  <h2 className="text-lg leading-6 font-medium text-gray-900">Pro</h2>
+                  <p className="mt-2 text-sm text-gray-900">For growing businesses that need more power.</p>
                   <p className="mt-4">
-                    <span className="text-4xl font-extrabold text-gray-900">
-                      $99
-                    </span>
-                    <span className="text-base font-medium text-gray-500">
-                      /mo per terminal
-                    </span>
+                    <span className="text-4xl font-extrabold text-gray-900">$99</span>
+                    <span className="text-base font-medium text-gray-900">/mo per terminal</span>
                   </p>
                 </div>
                 <div className="pt-6 pb-8 px-6">
-                  <h3 className="text-xs font-medium text-gray-900 tracking-wide uppercase">
-                    What&apos;s included
-                  </h3>
+                  <h3 className="text-xs font-medium text-gray-900 tracking-wide uppercase">What&apos;s included</h3>
                   <ul role="list" className="mt-6 space-y-4">
                     <li className="flex space-x-3">
                       <span className="text-green-500">✔</span>
@@ -386,22 +327,14 @@ export default async function HomePage() {
               </div>
               <div className="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
                 <div className="p-6">
-                  <h2 className="text-lg leading-6 font-medium text-gray-900">
-                    Enterprise
-                  </h2>
-                  <p className="mt-2 text-sm text-gray-500">
-                    For multi-location businesses and franchises.
-                  </p>
+                  <h2 className="text-lg leading-6 font-medium text-gray-900">Enterprise</h2>
+                  <p className="mt-2 text-sm text-gray-900">For multi-location businesses and franchises.</p>
                   <p className="mt-8">
-                    <span className="text-4xl font-extrabold text-gray-900">
-                      Custom
-                    </span>
+                    <span className="text-4xl font-extrabold text-gray-900">Custom</span>
                   </p>
                 </div>
                 <div className="pt-6 pb-8 px-6">
-                  <h3 className="text-xs font-medium text-gray-900 tracking-wide uppercase">
-                    What&apos;s included
-                  </h3>
+                  <h3 className="text-xs font-medium text-gray-900 tracking-wide uppercase">What&apos;s included</h3>
                   <ul role="list" className="mt-6 space-y-4">
                     <li className="flex space-x-3">
                       <span className="text-green-500">✔</span>
@@ -434,77 +367,50 @@ export default async function HomePage() {
                 <Link href="/" className="text-2xl font-bold text-white">
                   <span className="gradient-text">Order</span>Flow
                 </Link>
-                <p className="text-gray-400 text-base">
-                  The command center for your restaurant.
-                </p>
+                <p className="text-gray-900 text-base">The command center for your restaurant.</p>
               </div>
               <div className="mt-12 grid grid-cols-2 gap-8 xl:mt-0 xl:col-span-2">
                 <div className="md:grid md:grid-cols-2 md:gap-8">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-400 tracking-wider uppercase">
-                      Solutions
-                    </h3>
+                    <h3 className="text-sm font-semibold text-gray-900 tracking-wider uppercase">Solutions</h3>
                     <ul role="list" className="mt-4 space-y-4">
                       <li>
-                        <a
-                          href="#"
-                          className="text-base text-gray-300 hover:text-white"
-                        >
+                        <a href="#" className="text-base text-gray-900 hover:text-white">
                           Point of Sale
                         </a>
                       </li>
                       <li>
-                        <a
-                          href="#"
-                          className="text-base text-gray-300 hover:text-white"
-                        >
+                        <a href="#" className="text-base text-gray-900 hover:text-white">
                           Online Ordering
                         </a>
                       </li>
                       <li>
-                        <a
-                          href="#"
-                          className="text-base text-gray-300 hover:text-white"
-                        >
+                        <a href="#" className="text-base text-gray-900 hover:text-white">
                           Kitchen Display
                         </a>
                       </li>
                       <li>
-                        <a
-                          href="#"
-                          className="text-base text-gray-300 hover:text-white"
-                        >
+                        <a href="#" className="text-base text-gray-900 hover:text-white">
                           Analytics
                         </a>
                       </li>
                     </ul>
                   </div>
                   <div className="mt-12 md:mt-0">
-                    <h3 className="text-sm font-semibold text-gray-400 tracking-wider uppercase">
-                      Company
-                    </h3>
+                    <h3 className="text-sm font-semibold text-gray-900 tracking-wider uppercase">Company</h3>
                     <ul role="list" className="mt-4 space-y-4">
                       <li>
-                        <a
-                          href="#"
-                          className="text-base text-gray-300 hover:text-white"
-                        >
+                        <a href="#" className="text-base text-gray-900 hover:text-white">
                           About
                         </a>
                       </li>
                       <li>
-                        <a
-                          href="#"
-                          className="text-base text-gray-300 hover:text-white"
-                        >
+                        <a href="#" className="text-base text-gray-900 hover:text-white">
                           Careers
                         </a>
                       </li>
                       <li>
-                        <a
-                          href="#"
-                          className="text-base text-gray-300 hover:text-white"
-                        >
+                        <a href="#" className="text-base text-gray-900 hover:text-white">
                           Contact
                         </a>
                       </li>
@@ -513,23 +419,15 @@ export default async function HomePage() {
                 </div>
                 <div className="md:grid md:grid-cols-2 md:gap-8">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-400 tracking-wider uppercase">
-                      Legal
-                    </h3>
+                    <h3 className="text-sm font-semibold text-gray-900 tracking-wider uppercase">Legal</h3>
                     <ul role="list" className="mt-4 space-y-4">
                       <li>
-                        <a
-                          href="#"
-                          className="text-base text-gray-300 hover:text-white"
-                        >
+                        <a href="#" className="text-base text-gray-900 hover:text-white">
                           Privacy
                         </a>
                       </li>
                       <li>
-                        <a
-                          href="#"
-                          className="text-base text-gray-300 hover:text-white"
-                        >
+                        <a href="#" className="text-base text-gray-900 hover:text-white">
                           Terms
                         </a>
                       </li>
@@ -539,9 +437,7 @@ export default async function HomePage() {
               </div>
             </div>
             <div className="mt-12 border-t border-gray-700 pt-8">
-              <p className="text-base text-gray-400 xl:text-center">
-                &copy; 2025 OrderFlow, Inc. All rights reserved.
-              </p>
+              <p className="text-base text-gray-900 xl:text-center">&copy; 2025 OrderFlow, Inc. All rights reserved.</p>
             </div>
           </div>
         </footer>

@@ -26,9 +26,7 @@ export default function StaffLoginPage() {
   // Check terminal registration status
   useEffect(() => {
     const registeredRestaurantId = localStorage.getItem("pos_restaurant_id");
-    const registeredRestaurantName = localStorage.getItem(
-      "pos_restaurant_name"
-    );
+    const registeredRestaurantName = localStorage.getItem("pos_restaurant_name");
 
     if (registeredRestaurantId && registeredRestaurantName) {
       setIsRegistered(true);
@@ -121,10 +119,8 @@ export default function StaffLoginPage() {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-lg font-medium text-gray-900 mb-2">
-            Welcome back, {staff.name}!
-          </div>
-          <div className="text-sm text-gray-600">Redirecting to orders...</div>
+          <div className="text-lg font-medium text-gray-900 mb-2">Welcome back, {staff.name}!</div>
+          <div className="text-sm text-gray-900">Redirecting to orders...</div>
         </div>
       </div>
     );
@@ -136,9 +132,7 @@ export default function StaffLoginPage() {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
           <h1 className="text-2xl font-bold text-center mb-6">Admin Login</h1>
-          <p className="text-center text-gray-600 mb-6">
-            Use email and password for administrative access
-          </p>
+          <p className="text-center text-gray-900 mb-6">Use email and password for administrative access</p>
           <button
             onClick={() => router.push("/admin")}
             className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
@@ -162,13 +156,8 @@ export default function StaffLoginPage() {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <div className="text-6xl mb-4">🔧</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            Terminal Not Registered
-          </h1>
-          <p className="text-gray-600 mb-6">
-            This device needs to be registered by an administrator before staff
-            can log in.
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Terminal Not Registered</h1>
+          <p className="text-gray-900 mb-6">This device needs to be registered by an administrator before staff can log in.</p>
           <div className="space-y-3">
             <button
               onClick={handleSwitchToEmail}
@@ -195,26 +184,20 @@ export default function StaffLoginPage() {
         {/* Restaurant Header */}
         <div className="text-center mb-8">
           <div className="text-4xl mb-3">🍕</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">
-            {restaurantName}
-          </h1>
-          <p className="text-gray-600">Staff PIN Login</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">{restaurantName}</h1>
+          <p className="text-gray-900">Staff PIN Login</p>
         </div>
 
         {/* PIN Display */}
         <div className="mb-8">
           <div className="text-center mb-4">
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Enter Your 6-Digit PIN
-            </label>
+            <label className="block text-sm font-medium text-gray-900 mb-2">Enter Your 6-Digit PIN</label>
             <div className="flex justify-center space-x-3">
               {[0, 1, 2, 3, 4, 5].map((index) => (
                 <div
                   key={index}
                   className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center text-2xl font-bold transition-colors ${
-                    pin.length > index
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-300 bg-white text-gray-400"
+                    pin.length > index ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-300 bg-white text-gray-900"
                   }`}
                 >
                   {pin.length > index ? "●" : ""}
@@ -238,7 +221,7 @@ export default function StaffLoginPage() {
               key={digit}
               onClick={() => handleKeypadPress(digit.toString())}
               disabled={loading || pin.length >= 6}
-              className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg text-xl font-bold text-gray-900 transition-colors active:scale-95"
+              className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-900 rounded-lg text-xl font-bold text-gray-900 transition-colors active:scale-95"
             >
               {digit}
             </button>
@@ -248,7 +231,7 @@ export default function StaffLoginPage() {
           <button
             onClick={handleClear}
             disabled={loading}
-            className="h-16 bg-red-100 hover:bg-red-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg text-sm font-bold text-red-700 transition-colors active:scale-95"
+            className="h-16 bg-red-100 hover:bg-red-200 disabled:bg-gray-50 disabled:text-gray-900 rounded-lg text-sm font-bold text-red-700 transition-colors active:scale-95"
           >
             Clear
           </button>
@@ -256,7 +239,7 @@ export default function StaffLoginPage() {
           <button
             onClick={() => handleKeypadPress("0")}
             disabled={loading || pin.length >= 6}
-            className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg text-xl font-bold text-gray-900 transition-colors active:scale-95"
+            className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-900 rounded-lg text-xl font-bold text-gray-900 transition-colors active:scale-95"
           >
             0
           </button>
@@ -264,7 +247,7 @@ export default function StaffLoginPage() {
           <button
             onClick={handleBackspace}
             disabled={loading || pin.length === 0}
-            className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg text-sm font-bold text-gray-900 transition-colors active:scale-95"
+            className="h-16 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-900 rounded-lg text-sm font-bold text-gray-900 transition-colors active:scale-95"
           >
             ⌫
           </button>
@@ -274,28 +257,21 @@ export default function StaffLoginPage() {
         <button
           onClick={handlePinSubmit}
           disabled={loading || pin.length !== 6}
-          className="w-full bg-blue-600 text-white py-4 px-4 rounded-lg font-bold text-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors mb-4"
+          className="w-full bg-blue-600 text-white py-4 px-4 rounded-lg font-bold text-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-900 transition-colors mb-4"
         >
           {loading ? (
             <LoadingScreen />
           ) : pin.length === 6 ? (
             "Sign In"
           ) : (
-            `Enter ${6 - pin.length} more digit${
-              6 - pin.length === 1 ? "" : "s"
-            }`
+            `Enter ${6 - pin.length} more digit${6 - pin.length === 1 ? "" : "s"}`
           )}
         </button>
 
         {/* Footer */}
         <div className="text-center">
-          <p className="text-xs text-gray-500 mb-2">
-            Need help? Contact your manager or admin
-          </p>
-          <button
-            onClick={handleSwitchToEmail}
-            className="text-xs text-blue-600 hover:text-blue-800 underline"
-          >
+          <p className="text-xs text-gray-900 mb-2">Need help? Contact your manager or admin</p>
+          <button onClick={handleSwitchToEmail} className="text-xs text-blue-600 hover:text-blue-800 underline">
             Admin Login (Email & Password)
           </button>
         </div>

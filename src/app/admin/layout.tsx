@@ -1,8 +1,8 @@
 // src/app/admin/layout.tsx - Updated with Locations link
 "use client";
 
-import Link from "next/link";
 import { ProtectedRoute, useAuth } from "@/lib/contexts/auth-context";
+import Link from "next/link";
 
 /**
  * Protected Admin Layout Content
@@ -20,35 +20,21 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             <div className="mt-2 text-sm text-stone-800">
               <div>{restaurant?.name}</div>
               <div className="font-medium">{staff?.name}</div>
-              <div className="text-xs text-blue-600">
-                {staff?.role.toUpperCase()}
-              </div>
+              <div className="text-xs text-blue-600">{staff?.role.toUpperCase()}</div>
             </div>
           </div>
 
           <nav className="mt-6">
-            <Link
-              href="/admin"
-              className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
-            >
+            <Link href="/admin" className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600">
               Dashboard
             </Link>
-            <Link
-              href="/admin/analytics"
-              className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
-            >
+            <Link href="/admin/analytics" className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600">
               Analytics
             </Link>
-            <Link
-              href="/admin/menu"
-              className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
-            >
+            <Link href="/admin/menu" className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600">
               Menu Management
             </Link>
-            <Link
-              href="/admin/staff"
-              className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
-            >
+            <Link href="/admin/staff" className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600">
               Staff Management
             </Link>
 
@@ -61,22 +47,14 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                 <span>📱</span>
                 <span>Terminal Registration</span>
               </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Setup POS devices
-              </div>
+              <div className="text-xs text-gray-900 mt-1">Setup POS devices</div>
             </Link>
 
             <div className="mt-8 border-t pt-4">
-              <Link
-                href="/staff"
-                className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
-              >
+              <Link href="/staff" className="block px-6 py-3 text-gray-900 hover:bg-blue-50 hover:text-blue-600">
                 ← Back to Staff Dashboard
               </Link>
-              <button
-                onClick={signOut}
-                className="block w-full text-left px-6 py-3 text-red-600 hover:bg-red-50"
-              >
+              <button onClick={signOut} className="block w-full text-left px-6 py-3 text-red-600 hover:bg-red-50">
                 Sign Out
               </button>
             </div>
@@ -93,11 +71,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 /**
  * Admin Layout with Protection
  */
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute requireRole="admin">
       <AdminLayoutContent>{children}</AdminLayoutContent>
