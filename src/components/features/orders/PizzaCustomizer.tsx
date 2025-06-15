@@ -2,6 +2,7 @@
 "use client";
 import {
   getCrustDisplayName,
+  ToppingPlacement,
   type ConfiguredCartItem,
   type CrustPricing,
   type Customization,
@@ -12,6 +13,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PizzaCrustSelector } from "./customizers/PizzaCrustSelector";
 import { PizzaSizeSelector } from "./customizers/PizzaSizeSelector";
+import { PricingDisplay } from "./customizers/PricingDisplay";
+import { SpecialInstructions } from "./customizers/SpecialInstructions";
+import { ToppingSelector } from "./customizers/ToppingSelector";
 
 interface ToppingState {
   id: string;
@@ -25,6 +29,7 @@ interface ToppingState {
   isSpecialtyDefault: boolean;
   tier: "normal" | "premium" | "beef";
   icon: string;
+  placement: ToppingPlacement;
 }
 
 interface CrustOption {
@@ -44,7 +49,21 @@ interface EnhancedPizzaCustomizerProps {
   restaurantId: string;
 }
 
-// ENHANCED CATEGORIZATION CONFIG
+// UTILITY FUNCTIONS
+const getSizeDisplayName = (sizeCode: string): string => {
+  const sizeNames: Record<string, string> = {
+    small: 'Small 10"',
+    medium: 'Medium 12"',
+    large: 'Large 14"',
+    xlarge: 'X-Large 16"',
+    "10in": 'Small 10"',
+    "12in": 'Medium 12"',
+    "14in": 'Large 14"',
+    "16in": 'X-Large 16"',
+  };
+  return sizeNames[sizeCode] || sizeCode;
+};
+
 const TOPPING_CATEGORIES = {
   meats: {
     displayName: "Meats & Proteins",
@@ -70,22 +89,7 @@ const TOPPING_CATEGORIES = {
     keywords: ["alfredo", "bbq", "garlic butter", "sauce", "no sauce"],
     defaultOpen: false,
   },
-};
-
-// UTILITY FUNCTIONS
-const getSizeDisplayName = (sizeCode: string): string => {
-  const sizeNames: Record<string, string> = {
-    small: 'Small 10"',
-    medium: 'Medium 12"',
-    large: 'Large 14"',
-    xlarge: 'X-Large 16"',
-    "10in": 'Small 10"',
-    "12in": 'Medium 12"',
-    "14in": 'Large 14"',
-    "16in": 'X-Large 16"',
-  };
-  return sizeNames[sizeCode] || sizeCode;
-};
+} as const;
 
 const getDisplayCategory = (customization: Customization): { category: string; icon: string } => {
   const name = customization.name.toLowerCase();
@@ -140,6 +144,7 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
         .map((t) => ({
           customization_id: t.id,
           amount: t.amount,
+          placement: t.placement,
         })),
     [toppings]
   );
@@ -154,21 +159,6 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
     });
     return key;
   }, [selectedCrust, activeToppings, item.menuItemId]);
-
-  // Group toppings by category for rendering
-  const { includedToppings, addOnToppings } = useMemo(() => {
-    const included = toppings.filter((t) => t.isSpecialtyDefault);
-    const addOns = toppings.filter((t) => !t.isSpecialtyDefault);
-
-    const groupedAddOns = addOns.reduce((acc, topping) => {
-      const category = topping.displayCategory;
-      if (!acc[category]) acc[category] = [];
-      acc[category].push(topping);
-      return acc;
-    }, {} as Record<string, ToppingState[]>);
-
-    return { includedToppings: included, addOnToppings: groupedAddOns };
-  }, [toppings]);
 
   const initializeToppingsWithTemplates = useCallback(
     (menuData: PizzaMenuResponse) => {
@@ -213,6 +203,7 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
           isSpecialtyDefault,
           tier: getTierFromCategory(customization.category),
           icon,
+          placement: "whole", // ✅ ADD THIS default placement
         });
       });
 
@@ -431,6 +422,11 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
     );
   };
 
+  const handleToppingPlacementChange = (toppingId: string, placement: ToppingPlacement) => {
+    console.log(`🍕 Changing topping ${toppingId} placement to`, placement);
+    setToppings((prev) => prev.map((topping) => (topping.id === toppingId ? { ...topping, placement } : topping)));
+  };
+
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) => {
       const newSet = new Set(prev);
@@ -540,28 +536,36 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
                 />
               )}
 
-              {/* NEW: Included Toppings Section */}
-              {selectedCrust && includedToppings.length > 0 && (
-                <IncludedToppingsSection
-                  toppings={includedToppings}
+              {selectedCrust && (
+                <ToppingSelector
+                  toppings={toppings}
                   onToppingChange={handleToppingChange}
-                  selectedSize={selectedCrust.sizeCode}
-                />
-              )}
-
-              {/* NEW: Add-on Toppings Section */}
-              {selectedCrust && Object.keys(addOnToppings).length > 0 && (
-                <AddOnToppingsSection
-                  toppingsByCategory={addOnToppings}
+                  onToppingPlacementChange={handleToppingPlacementChange}
                   expandedCategories={expandedCategories}
-                  onToppingChange={handleToppingChange}
                   onToggleCategory={toggleCategory}
                   selectedSize={selectedCrust.sizeCode}
+                  showPlacements={true} // Enable fractional placement support
                 />
               )}
 
+              {selectedCrust && (
+                <PricingDisplay
+                  currentPricing={currentPricing}
+                  isCalculating={isCalculatingPrice}
+                  pricingError={pricingError}
+                  selectedSize={getSizeDisplayName(selectedCrust.sizeCode)}
+                  selectedCrust={selectedCrust.displayName}
+                />
+              )}
               {/* Special Instructions */}
-              {selectedCrust && <SpecialInstructions instructions={specialInstructions} onChange={setSpecialInstructions} />}
+              {selectedCrust && (
+                <SpecialInstructions
+                  instructions={specialInstructions}
+                  onChange={setSpecialInstructions}
+                  placeholder="Any special requests for this pizza..."
+                  maxLength={500}
+                />
+              )}
             </div>
           )}
         </div>
@@ -591,289 +595,6 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
         </div>
       </div>
     </div>
-  );
-}
-
-// ENHANCED COMPONENT SECTIONS
-
-// NEW: Included Toppings Section - Prominent display of template defaults
-function IncludedToppingsSection({
-  toppings,
-  onToppingChange,
-  selectedSize,
-}: {
-  toppings: ToppingState[];
-  onToppingChange: (toppingId: string, amount: ToppingAmount) => void;
-  selectedSize: string;
-}) {
-  return (
-    <section className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-      <div className="flex items-center mb-4">
-        <div className="text-lg font-semibold text-purple-900 flex items-center">
-          <span className="mr-2 text-xl">✨</span>
-          Included Toppings
-        </div>
-        <div className="ml-auto text-sm text-purple-700 font-medium">Included in {getSizeDisplayName(selectedSize)} price</div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {toppings.map((topping) => (
-          <div key={topping.id} className="bg-white border border-purple-200 rounded-lg p-4 shadow-sm">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <span className="font-medium text-gray-900">{topping.name}</span>
-                <div className="flex items-center mt-1">
-                  <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full font-medium">INCLUDED</span>
-                  {topping.tier !== "normal" && (
-                    <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-medium">
-                      {topping.tier === "beef" ? "🥩 BEEF" : "⭐ PREMIUM"}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Amount:</label>
-              <select
-                value={topping.amount}
-                onChange={(e) => onToppingChange(topping.id, e.target.value as ToppingAmount)}
-                className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-              >
-                <option value="none">Remove</option>
-                <option value="light">Light</option>
-                <option value="normal">Normal (Default)</option>
-                <option value="extra">Extra</option>
-                <option value="xxtra">XXtra</option>
-              </select>
-            </div>
-
-            {/* Show pricing for modifications */}
-            <div className="mt-3 text-sm font-semibold">
-              {topping.amount === "normal" ? (
-                <span className="text-purple-600">INCLUDED</span>
-              ) : topping.amount === "none" ? (
-                <span className="text-gray-500">REMOVED</span>
-              ) : topping.calculatedPrice > 0 ? (
-                <span className="text-green-600">+${topping.calculatedPrice.toFixed(2)}</span>
-              ) : (
-                <span className="text-purple-600">INCLUDED</span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-// NEW: Add-on Toppings Section - Collapsible accordions by category
-function AddOnToppingsSection({
-  toppingsByCategory,
-  expandedCategories,
-  onToppingChange,
-  onToggleCategory,
-  selectedSize,
-}: {
-  toppingsByCategory: Record<string, ToppingState[]>;
-  expandedCategories: Set<string>;
-  onToppingChange: (toppingId: string, amount: ToppingAmount) => void;
-  onToggleCategory: (category: string) => void;
-  selectedSize: string;
-}) {
-  const getCategoryDisplayName = (category: string) => {
-    const config = TOPPING_CATEGORIES[category as keyof typeof TOPPING_CATEGORIES];
-    return config?.displayName || category.charAt(0).toUpperCase() + category.slice(1);
-  };
-
-  const getCategoryIcon = (category: string) => {
-    const config = TOPPING_CATEGORIES[category as keyof typeof TOPPING_CATEGORIES];
-    return config?.icon || "🍕";
-  };
-
-  return (
-    <section>
-      <div className="flex items-center mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-          <span className="mr-2 text-xl">🍕</span>
-          Add-on Toppings
-        </h3>
-        <div className="ml-auto text-sm text-gray-600">Prices for {getSizeDisplayName(selectedSize)}</div>
-      </div>
-
-      <div className="space-y-3">
-        {Object.entries(toppingsByCategory).map(([category, categoryToppings]) => {
-          const isExpanded = expandedCategories.has(category);
-          const activeCount = categoryToppings.filter((t) => t.isActive).length;
-
-          return (
-            <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
-              {/* Category Header - Clickable */}
-              <button
-                onClick={() => onToggleCategory(category)}
-                className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <div className="flex items-center">
-                  <span className="text-lg mr-3">{getCategoryIcon(category)}</span>
-                  <span className="font-medium text-gray-900">{getCategoryDisplayName(category)}</span>
-                  {activeCount > 0 && (
-                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
-                      {activeCount} selected
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center">
-                  <span className="text-sm text-gray-500 mr-2">{categoryToppings.length} items</span>
-                  <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </button>
-
-              {/* Category Content - Collapsible */}
-              {isExpanded && (
-                <div className="p-4 bg-white">
-                  {category === "sauces" ? (
-                    // Sauce Selection - Radio Buttons (Single Selection)
-                    <SauceSelection sauces={categoryToppings} onToppingChange={onToppingChange} />
-                  ) : (
-                    // Regular Toppings - Individual Selection
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {categoryToppings.map((topping) => (
-                        <ToppingCard key={topping.id} topping={topping} onToppingChange={onToppingChange} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-// NEW: Sauce Selection Component - Radio button style for single selection
-function SauceSelection({
-  sauces,
-  onToppingChange,
-}: {
-  sauces: ToppingState[];
-  onToppingChange: (toppingId: string, amount: ToppingAmount) => void;
-}) {
-  const handleSauceSelect = (sauceId: string) => {
-    // Clear all other sauces
-    sauces.forEach((sauce) => {
-      if (sauce.id !== sauceId && sauce.amount !== "none") {
-        onToppingChange(sauce.id, "none");
-      }
-    });
-
-    // Set selected sauce
-    const currentSauce = sauces.find((s) => s.id === sauceId);
-    if (currentSauce) {
-      onToppingChange(sauceId, currentSauce.amount === "none" ? "normal" : "none");
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="text-sm text-gray-600 mb-3">Choose one sauce (all sauces are free):</div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {sauces.map((sauce) => (
-          <label
-            key={sauce.id}
-            className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all ${
-              sauce.amount !== "none" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <input
-              type="radio"
-              name="sauce-selection"
-              checked={sauce.amount !== "none"}
-              onChange={() => handleSauceSelect(sauce.id)}
-              className="mr-3 text-blue-600 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <span className="font-medium text-gray-900">{sauce.name}</span>
-              <div className="text-sm text-green-600 font-medium">FREE</div>
-            </div>
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// NEW: Individual Topping Card Component
-function ToppingCard({
-  topping,
-  onToppingChange,
-}: {
-  topping: ToppingState;
-  onToppingChange: (toppingId: string, amount: ToppingAmount) => void;
-}) {
-  return (
-    <div
-      className={`border rounded-lg p-3 transition-all ${
-        topping.isActive ? "border-blue-500 bg-blue-50 shadow-sm" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-      }`}
-    >
-      <div className="flex items-start justify-between mb-2">
-        <span className="text-sm font-medium text-gray-900 leading-tight">{topping.name}</span>
-        <div className="flex items-center gap-1 ml-2">
-          {topping.tier !== "normal" && (
-            <span className="text-xs bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded font-medium">
-              {topping.tier === "beef" ? "🥩" : "⭐"}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <select
-        value={topping.amount}
-        onChange={(e) => onToppingChange(topping.id, e.target.value as ToppingAmount)}
-        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-      >
-        <option value="none">None</option>
-        <option value="light">Light</option>
-        <option value="normal">Normal</option>
-        <option value="extra">Extra</option>
-        <option value="xxtra">XXtra</option>
-      </select>
-
-      {/* Show pricing */}
-      {topping.isActive && (
-        <div className="text-sm font-semibold mt-2">
-          {topping.calculatedPrice > 0 ? (
-            <span className="text-green-600">+${topping.calculatedPrice.toFixed(2)}</span>
-          ) : (
-            <span className="text-blue-600">Calculating...</span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SpecialInstructions({ instructions, onChange }: { instructions: string; onChange: (instructions: string) => void }) {
-  return (
-    <section>
-      <h3 className="text-lg font-semibold text-gray-900 mb-3">Special Instructions</h3>
-      <textarea
-        placeholder="Any special requests for this pizza..."
-        value={instructions}
-        onChange={(e) => onChange(e.target.value)}
-        rows={2}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-      />
-    </section>
   );
 }
 
