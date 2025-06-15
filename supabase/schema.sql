@@ -215,36 +215,31 @@ DECLARE
   topping_record jsonb;
   customization_record record;
   calculated_price decimal;
+  placement_text text;
+  placement_type text;
+  category_tier text;
+  amount_tier text;
 BEGIN
   -- Get base crust pricing
-  SELECT cp.base_price, cp.upcharge 
+  SELECT cp.base_price, cp.upcharge
   INTO base_price, crust_upcharge
   FROM crust_pricing cp
-  WHERE cp.size_code = p_size_code 
-    AND cp.crust_type = p_crust_type 
+  WHERE cp.size_code = p_size_code
+    AND cp.crust_type = p_crust_type
     AND cp.restaurant_id = p_restaurant_id
     AND cp.is_available = true;
-    
+
   -- If no crust pricing found, return error
   IF base_price IS NULL THEN
-    RETURN jsonb_build_object(
-      'error', format('No pricing found for %s %s', p_size_code, p_crust_type),
-      'base_price', 0,
-      'crust_upcharge', 0,
-      'topping_cost', 0,
-      'final_price', 0,
-      'breakdown', '[]'::jsonb
-    );
+    RETURN jsonb_build_object('error', format('No pricing found for %s %s', p_size_code, p_crust_type));
   END IF;
-  
-  -- Add base price to breakdown
+
   breakdown := breakdown || jsonb_build_object(
     'name', format('%s %s Base', upper(p_size_code), initcap(p_crust_type)),
     'price', base_price,
     'type', 'base'
   );
   
-  -- Add crust upcharge if any
   IF crust_upcharge > 0 THEN
     breakdown := breakdown || jsonb_build_object(
       'name', format('%s Crust Upcharge', initcap(p_crust_type)),
@@ -252,48 +247,92 @@ BEGIN
       'type', 'crust'
     );
   END IF;
-  
-  -- Calculate topping costs
+
+  -- Calculate topping costs with fractional support
   FOR topping_record IN SELECT * FROM jsonb_array_elements(p_toppings)
   LOOP
     -- Get customization details
     SELECT * INTO customization_record
     FROM customizations c
-    WHERE c.id = (topping_record->>'customization_id')::uuid
-      AND c.restaurant_id = p_restaurant_id
-      AND c.is_available = true;
-      
+    WHERE c.id = (topping_record->>'customization_id')::uuid;
+
     IF customization_record.id IS NOT NULL THEN
-      -- Simple calculation using size multipliers
-      calculated_price := calculate_topping_price(
-        customization_record.base_price,
-        customization_record.pricing_rules,
-        p_size_code,
-        topping_record->>'amount'
-      );
+      -- Extract placement and amount
+      placement_text := COALESCE(topping_record->>'placement', 'whole');
+      amount_tier := topping_record->>'amount';
       
+      -- Determine placement type for lookup
+      IF placement_text = 'whole' THEN
+        placement_type := 'whole';
+      ELSIF placement_text IN ('left', 'right') THEN
+        placement_type := 'half';
+      ELSIF placement_text = 'quarter' THEN
+        placement_type := 'quarter';
+      ELSIF placement_text = 'three_quarters' THEN
+        placement_type := 'three_quarters';
+      ELSIF jsonb_typeof(topping_record->'placement') = 'array' THEN
+        -- Handle quarter arrays like ["q1"] or ["q1", "q2"]
+        CASE jsonb_array_length(topping_record->'placement')
+          WHEN 1 THEN placement_type := 'quarter';
+          WHEN 2 THEN placement_type := 'half';
+          WHEN 3 THEN placement_type := 'three_quarters';
+          ELSE placement_type := 'whole';
+        END CASE;
+      ELSE
+        placement_type := 'whole';
+      END IF;
+
+      -- Determine category tier from customization
+      category_tier := CASE 
+        WHEN customization_record.category = 'topping_premium' THEN 'premium'
+        WHEN customization_record.category = 'topping_beef' THEN 'beef'
+        WHEN customization_record.category = 'topping_sauce' THEN 'free'
+        ELSE 'standard'
+      END;
+
+      -- Sauces are always free
+      IF category_tier = 'free' THEN
+        calculated_price := 0;
+      ELSE
+        -- Get price from matrix
+        calculated_price := get_topping_price_from_matrix(
+          p_restaurant_id,
+          p_size_code,
+          category_tier,
+          amount_tier,
+          placement_type
+        );
+      END IF;
+
       topping_cost := topping_cost + calculated_price;
-      
+
       breakdown := breakdown || jsonb_build_object(
-        'name', format('%s (%s)', customization_record.name, upper(topping_record->>'amount')),
+        'name', format('%s (%s, %s)', 
+          customization_record.name, 
+          upper(amount_tier), 
+          CASE placement_type
+            WHEN 'whole' THEN 'Full'
+            WHEN 'half' THEN 'Half'
+            WHEN 'quarter' THEN '1/4'
+            WHEN 'three_quarters' THEN '3/4'
+            ELSE placement_text
+          END
+        ),
         'price', calculated_price,
         'type', 'topping',
-        'category', customization_record.category
+        'placement', placement_type
       );
     END IF;
   END LOOP;
-  
+
   final_price := base_price + crust_upcharge + topping_cost;
-  
+
   RETURN jsonb_build_object(
     'base_price', base_price,
     'crust_upcharge', crust_upcharge,
     'topping_cost', topping_cost,
-    'substitution_credit', 0,
     'final_price', final_price,
-    'breakdown', breakdown,
-    'size_code', p_size_code,
-    'crust_type', p_crust_type
+    'breakdown', breakdown
   );
 END;
 $$;
@@ -761,6 +800,92 @@ $$;
 ALTER FUNCTION "public"."get_pizza_template_with_toppings"("p_template_id" "uuid", "p_restaurant_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."get_topping_price_from_matrix"("size_code" "text", "category_tier" "text", "amount_tier" "text", "placement_multiplier" numeric) RETURNS numeric
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+  base_price decimal;
+  tier_multiplier decimal;
+BEGIN
+  -- Base prices from Excel for 12" (medium) as reference
+  base_price := CASE category_tier
+    WHEN 'standard' THEN 1.85
+    WHEN 'premium' THEN 3.70
+    WHEN 'beef' THEN 5.56
+    WHEN 'free' THEN 0.0
+    ELSE 1.85
+  END;
+
+  -- Size multipliers based on Excel data
+  base_price := base_price * CASE size_code
+    WHEN '10in' THEN 0.865
+    WHEN 'small' THEN 0.865
+    WHEN '12in' THEN 1.0
+    WHEN 'medium' THEN 1.0
+    WHEN '14in' THEN 1.135
+    WHEN 'large' THEN 1.135
+    WHEN '16in' THEN 1.351
+    WHEN 'xlarge' THEN 1.351
+    ELSE 1.0
+  END;
+
+  -- Amount tier multipliers from Excel
+  tier_multiplier := CASE amount_tier
+    WHEN 'light' THEN 1.0
+    WHEN 'normal' THEN 1.0
+    WHEN 'extra' THEN 2.0
+    WHEN 'xxtra' THEN 3.0
+    ELSE 1.0
+  END;
+
+  -- Adjust XXtra multiplier for premium/beef categories
+  IF amount_tier = 'xxtra' AND category_tier IN ('premium', 'beef') THEN
+    tier_multiplier := 2.0;
+  END IF;
+
+  -- Apply placement multiplier and return
+  RETURN round((base_price * tier_multiplier * placement_multiplier) * 100) / 100;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_topping_price_from_matrix"("size_code" "text", "category_tier" "text", "amount_tier" "text", "placement_multiplier" numeric) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_topping_price_from_matrix"("p_restaurant_id" "uuid", "p_size_code" "text", "p_category_tier" "text", "p_amount_tier" "text", "p_placement_type" "text") RETURNS numeric
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+  lookup_price decimal;
+  mapped_placement text;
+BEGIN
+  -- Map placement types to match our data
+  mapped_placement := CASE p_placement_type
+    WHEN 'left' THEN 'half'
+    WHEN 'right' THEN 'half'
+    WHEN 'quarter' THEN 'quarter'
+    WHEN 'three_quarters' THEN 'three_quarters'
+    ELSE 'whole'
+  END;
+
+  -- Look up exact price from matrix with table alias to avoid ambiguity
+  SELECT fpm.price INTO lookup_price
+  FROM fractional_pricing_matrix fpm
+  WHERE fpm.restaurant_id = p_restaurant_id
+    AND fpm.size_code = p_size_code
+    AND fpm.category_tier = p_category_tier
+    AND fpm.amount_tier = p_amount_tier
+    AND fpm.placement_type = mapped_placement;
+
+  -- Return the exact price or 0 if not found
+  RETURN COALESCE(lookup_price, 0.00);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_topping_price_from_matrix"("p_restaurant_id" "uuid", "p_size_code" "text", "p_category_tier" "text", "p_amount_tier" "text", "p_placement_type" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."handle_order_loyalty"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $_$
@@ -1113,6 +1238,21 @@ CREATE OR REPLACE VIEW "public"."customizations_for_pizza" AS
 ALTER TABLE "public"."customizations_for_pizza" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."fractional_pricing_matrix" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "restaurant_id" "uuid" NOT NULL,
+    "size_code" "text" NOT NULL,
+    "category_tier" "text" NOT NULL,
+    "amount_tier" "text" NOT NULL,
+    "placement_type" "text" NOT NULL,
+    "price" numeric(5,2) NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."fractional_pricing_matrix" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."loyalty_transactions" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "customer_id" "uuid" NOT NULL,
@@ -1229,11 +1369,16 @@ CREATE TABLE IF NOT EXISTS "public"."order_items" (
     "crust_type" "text",
     "crust_upcharge" numeric(10,2) DEFAULT 0.00,
     "template_id" "uuid",
+    "topping_placements" "jsonb" DEFAULT '{}'::"jsonb",
     CONSTRAINT "order_items_quantity_check" CHECK (("quantity" > 0))
 );
 
 
 ALTER TABLE "public"."order_items" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."order_items"."topping_placements" IS 'Stores placement data for fractional toppings. Format: {"topping_id": {"placement": "left|right|quarter|three_quarters", "quarters": ["q1","q2"]}}';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."order_status_history" (
@@ -1296,11 +1441,17 @@ CREATE TABLE IF NOT EXISTS "public"."pizza_template_toppings" (
     "default_amount" "text" DEFAULT 'normal'::"text",
     "is_removable" boolean DEFAULT true,
     "substitution_tier" "text" NOT NULL,
-    "sort_order" integer DEFAULT 0
+    "sort_order" integer DEFAULT 0,
+    "allows_fractional" boolean DEFAULT true,
+    "default_placement" "text" DEFAULT 'whole'::"text"
 );
 
 
 ALTER TABLE "public"."pizza_template_toppings" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."pizza_template_toppings"."allows_fractional" IS 'Whether this template topping supports fractional placement';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."pizza_templates" (
@@ -1316,6 +1467,21 @@ CREATE TABLE IF NOT EXISTS "public"."pizza_templates" (
 
 
 ALTER TABLE "public"."pizza_templates" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."pricing_change_log" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "restaurant_id" "uuid",
+    "table_name" "text" NOT NULL,
+    "record_id" "uuid",
+    "old_values" "jsonb",
+    "new_values" "jsonb",
+    "changed_by" "uuid",
+    "changed_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."pricing_change_log" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."restaurants" (
@@ -1420,6 +1586,11 @@ ALTER TABLE ONLY "public"."customizations"
 
 
 
+ALTER TABLE ONLY "public"."fractional_pricing_matrix"
+    ADD CONSTRAINT "fractional_pricing_matrix_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."loyalty_transactions"
     ADD CONSTRAINT "loyalty_transactions_pkey" PRIMARY KEY ("id");
 
@@ -1462,6 +1633,11 @@ ALTER TABLE ONLY "public"."pizza_template_toppings"
 
 ALTER TABLE ONLY "public"."pizza_templates"
     ADD CONSTRAINT "pizza_templates_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."pricing_change_log"
+    ADD CONSTRAINT "pricing_change_log_pkey" PRIMARY KEY ("id");
 
 
 
@@ -1529,6 +1705,10 @@ CREATE INDEX "idx_customizations_category" ON "public"."customizations" USING "b
 
 
 
+CREATE UNIQUE INDEX "idx_fractional_pricing_unique" ON "public"."fractional_pricing_matrix" USING "btree" ("restaurant_id", "size_code", "category_tier", "amount_tier", "placement_type");
+
+
+
 CREATE INDEX "idx_menu_items_category" ON "public"."menu_items" USING "btree" ("category_id");
 
 
@@ -1538,6 +1718,10 @@ CREATE INDEX "idx_menu_items_type_available" ON "public"."menu_items" USING "btr
 
 
 CREATE INDEX "idx_order_items_order" ON "public"."order_items" USING "btree" ("order_id");
+
+
+
+CREATE INDEX "idx_order_items_placements" ON "public"."order_items" USING "gin" ("topping_placements");
 
 
 
@@ -1751,6 +1935,11 @@ ALTER TABLE ONLY "public"."pizza_templates"
 
 ALTER TABLE ONLY "public"."pizza_templates"
     ADD CONSTRAINT "pizza_templates_restaurant_id_fkey" FOREIGN KEY ("restaurant_id") REFERENCES "public"."restaurants"("id");
+
+
+
+ALTER TABLE ONLY "public"."pricing_change_log"
+    ADD CONSTRAINT "pricing_change_log_restaurant_id_fkey" FOREIGN KEY ("restaurant_id") REFERENCES "public"."restaurants"("id");
 
 
 
@@ -2137,6 +2326,18 @@ GRANT ALL ON FUNCTION "public"."get_pizza_template_with_toppings"("p_template_id
 
 
 
+GRANT ALL ON FUNCTION "public"."get_topping_price_from_matrix"("size_code" "text", "category_tier" "text", "amount_tier" "text", "placement_multiplier" numeric) TO "anon";
+GRANT ALL ON FUNCTION "public"."get_topping_price_from_matrix"("size_code" "text", "category_tier" "text", "amount_tier" "text", "placement_multiplier" numeric) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_topping_price_from_matrix"("size_code" "text", "category_tier" "text", "amount_tier" "text", "placement_multiplier" numeric) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_topping_price_from_matrix"("p_restaurant_id" "uuid", "p_size_code" "text", "p_category_tier" "text", "p_amount_tier" "text", "p_placement_type" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_topping_price_from_matrix"("p_restaurant_id" "uuid", "p_size_code" "text", "p_category_tier" "text", "p_amount_tier" "text", "p_placement_type" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_topping_price_from_matrix"("p_restaurant_id" "uuid", "p_size_code" "text", "p_category_tier" "text", "p_amount_tier" "text", "p_placement_type" "text") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."handle_order_loyalty"() TO "anon";
 GRANT ALL ON FUNCTION "public"."handle_order_loyalty"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_order_loyalty"() TO "service_role";
@@ -2242,6 +2443,12 @@ GRANT ALL ON TABLE "public"."customizations_for_pizza" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."fractional_pricing_matrix" TO "anon";
+GRANT ALL ON TABLE "public"."fractional_pricing_matrix" TO "authenticated";
+GRANT ALL ON TABLE "public"."fractional_pricing_matrix" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."loyalty_transactions" TO "anon";
 GRANT ALL ON TABLE "public"."loyalty_transactions" TO "authenticated";
 GRANT ALL ON TABLE "public"."loyalty_transactions" TO "service_role";
@@ -2299,6 +2506,12 @@ GRANT ALL ON TABLE "public"."pizza_template_toppings" TO "service_role";
 GRANT ALL ON TABLE "public"."pizza_templates" TO "anon";
 GRANT ALL ON TABLE "public"."pizza_templates" TO "authenticated";
 GRANT ALL ON TABLE "public"."pizza_templates" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."pricing_change_log" TO "anon";
+GRANT ALL ON TABLE "public"."pricing_change_log" TO "authenticated";
+GRANT ALL ON TABLE "public"."pricing_change_log" TO "service_role";
 
 
 

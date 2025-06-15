@@ -1,15 +1,63 @@
-// src/lib/types/pizza.ts - Enhanced pizza types (NO ANY TYPES)
+// src/lib/types/pizza.ts - UPDATED with Fractional Support
 
 import { ConfiguredModifier } from "./cart";
 import { ID, ToppingAmount } from "./core";
 import { Customization } from "./customization";
 import { MenuItemWithVariants } from "./menu";
 
+// ===================================================================
+// ENHANCED PIZZA TOPPING SELECTION WITH FRACTIONAL SUPPORT
+// ===================================================================
+
+/**
+ * Represents the placement of a topping on the pizza
+ * Supports the fractional pricing structure from Menu Master.xlsx
+ */
+export type ToppingPlacement =
+  | "whole" // Full pizza coverage
+  | "left" // Left half
+  | "right" // Right half
+  | "quarter" // Single quarter
+  | "three_quarters" // Three quarters
+  | Array<"q1" | "q2" | "q3" | "q4">; // Specific quarter selection
+
+/**
+ * Enhanced pizza topping selection with placement support
+ * This matches the fractional pricing in your Excel sheet
+ */
+export interface PizzaToppingSelection {
+  customization_id: ID;
+  amount: ToppingAmount;
+  placement: ToppingPlacement;
+}
+
+/**
+ * UI-friendly topping state for the customizer
+ */
+export interface ToppingState {
+  id: string;
+  name: string;
+  category: string;
+  displayCategory: string;
+  amount: ToppingAmount;
+  placement: ToppingPlacement;
+  basePrice: number;
+  calculatedPrice: number;
+  isActive: boolean;
+  isSpecialtyDefault: boolean;
+  tier: "normal" | "premium" | "beef";
+  icon: string;
+}
+
+// ===================================================================
+// EXISTING TYPES (Updated for compatibility)
+// ===================================================================
+
 export interface CrustPricing {
   id: ID;
   restaurant_id: ID;
-  size_code: string; // "10in", "12in", "14in", "16in"
-  crust_type: string; // "thin", "double_dough", "gluten_free"
+  size_code: string;
+  crust_type: string;
   base_price: number;
   upcharge: number;
   is_available: boolean;
@@ -37,7 +85,6 @@ export interface PizzaTemplateTopping {
   sort_order: number;
 }
 
-// Enhanced pizza menu item with template support
 export interface PizzaMenuItem extends MenuItemWithVariants {
   pizza_template?: PizzaTemplate;
 }
@@ -51,19 +98,16 @@ export interface PizzaMenuResponse {
   available_crusts: string[];
 }
 
-// Pizza pricing types
+// ===================================================================
+// ENHANCED PRICING REQUEST/RESPONSE WITH FRACTIONAL SUPPORT
+// ===================================================================
+
 export interface PizzaPriceCalculationRequest {
   restaurant_id: ID;
   menu_item_id: ID;
   size_code: string;
   crust_type: string;
-  toppings?: PizzaToppingSelection[];
-}
-
-// FIXED: Specific pizza topping selection type (no any)
-export interface PizzaToppingSelection {
-  customization_id: ID;
-  amount: ToppingAmount;
+  toppings?: PizzaToppingSelection[]; // Now includes placement
 }
 
 export interface PizzaPriceBreakdownItem {
@@ -71,6 +115,7 @@ export interface PizzaPriceBreakdownItem {
   price: number;
   type: "specialty_base" | "regular_base" | "crust" | "topping" | "template_default" | "template_extra";
   amount?: string;
+  placement?: string; // NEW: Shows placement info
   category?: string;
   is_default?: boolean;
   calculation_note?: string;
@@ -95,7 +140,92 @@ export interface PizzaPriceCalculationResponse {
   };
 }
 
-// Pizza-specific customization types
+// ===================================================================
+// UTILITY TYPES AND HELPERS
+// ===================================================================
+
+/**
+ * Helper to convert placement to display string
+ */
+export function getPlacementDisplayText(placement: ToppingPlacement): string {
+  if (typeof placement === "string") {
+    switch (placement) {
+      case "whole":
+        return "Full";
+      case "left":
+        return "Left Half";
+      case "right":
+        return "Right Half";
+      case "quarter":
+        return "1/4";
+      case "three_quarters":
+        return "3/4";
+      default:
+        return "Full";
+    }
+  }
+
+  // Handle quarter array
+  if (Array.isArray(placement)) {
+    const count = placement.length;
+    if (count === 1) return "1/4";
+    if (count === 2) return "1/2 (2 quarters)";
+    if (count === 3) return "3/4";
+    if (count === 4) return "Full";
+    return `${count}/4`;
+  }
+
+  return "Full";
+}
+
+/**
+ * Helper to convert placement to multiplier for pricing
+ */
+export function getPlacementMultiplier(placement: ToppingPlacement): number {
+  if (typeof placement === "string") {
+    switch (placement) {
+      case "whole":
+        return 1.0;
+      case "left":
+      case "right":
+        return 0.5;
+      case "quarter":
+        return 0.25;
+      case "three_quarters":
+        return 0.75;
+      default:
+        return 1.0;
+    }
+  }
+
+  // Handle quarter array
+  if (Array.isArray(placement)) {
+    return 0.25 * placement.length;
+  }
+
+  return 1.0;
+}
+
+/**
+ * Validate topping selection
+ */
+export function validateToppingSelection(selection: PizzaToppingSelection): boolean {
+  if (!selection.customization_id || !selection.amount) {
+    return false;
+  }
+
+  if (Array.isArray(selection.placement)) {
+    // Quarter array should have 1-4 quarters
+    return selection.placement.length >= 1 && selection.placement.length <= 4;
+  }
+
+  return true;
+}
+
+// ===================================================================
+// EXISTING CUSTOMIZATION TYPES (Unchanged)
+// ===================================================================
+
 export interface PizzaCustomizationsByCategory {
   toppings: Customization[];
   sauces: Customization[];
