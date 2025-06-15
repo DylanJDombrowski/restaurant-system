@@ -9,6 +9,7 @@ import type {
   ToppingAmount,
 } from "@/lib/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PizzaSizeSelector } from "./customizers/PizzaSizeSelector";
 
 interface ToppingState {
   id: string;
@@ -568,12 +569,13 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
           ) : (
             <div className="p-6 space-y-6">
               {/* Size Selection */}
-              <SizeSelection
+              <PizzaSizeSelector
                 availableSizes={pizzaMenuData?.available_sizes || []}
                 selectedSize={selectedSize}
                 onSizeSelect={handleSizeSelect}
                 pizzaMenuData={pizzaMenuData}
                 menuItemId={item.menuItemId}
+                isLoading={isLoading}
               />
 
               {/* Crust Selection */}
@@ -641,71 +643,6 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
 }
 
 // ENHANCED COMPONENT SECTIONS
-
-function SizeSelection({
-  availableSizes,
-  selectedSize,
-  onSizeSelect,
-  pizzaMenuData,
-  menuItemId,
-}: {
-  availableSizes: string[];
-  selectedSize: string;
-  onSizeSelect: (size: string) => void;
-  pizzaMenuData: PizzaMenuResponse | null;
-  menuItemId: string;
-}) {
-  const getMinPriceForSize = (sizeCode: string): number => {
-    if (!pizzaMenuData) return 0;
-
-    const template = pizzaMenuData.pizza_templates.find((t) => t.menu_item_id === menuItemId);
-
-    if (template) {
-      const specialtyItem = pizzaMenuData.pizza_items.find((item) => item.id === menuItemId);
-      if (specialtyItem) {
-        const variant = specialtyItem.variants.find((v) => v.size_code === sizeCode && v.crust_type === "thin");
-        if (variant) {
-          return variant.price;
-        }
-      }
-    }
-
-    const sizePrices = pizzaMenuData.crust_pricing
-      .filter((cp) => {
-        const matchesSize =
-          cp.size_code === sizeCode ||
-          (sizeCode === "medium" && cp.size_code === "12in") ||
-          (sizeCode === "small" && cp.size_code === "10in") ||
-          (sizeCode === "large" && cp.size_code === "14in") ||
-          (sizeCode === "xlarge" && cp.size_code === "16in");
-
-        return matchesSize && cp.crust_type !== "stuffed";
-      })
-      .map((cp) => cp.base_price);
-
-    return sizePrices.length > 0 ? Math.min(...sizePrices) : 0;
-  };
-
-  return (
-    <section>
-      <h3 className="text-lg font-semibold text-gray-900 mb-3">Choose Size</h3>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {availableSizes.map((size) => (
-          <button
-            key={size}
-            onClick={() => onSizeSelect(size)}
-            className={`p-4 rounded-lg border-2 transition-all text-center hover:shadow-md ${
-              selectedSize === size ? "border-blue-600 bg-blue-50 shadow-md" : "border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <div className="font-semibold text-gray-900">{getSizeDisplayName(size)}</div>
-            <div className="text-sm font-medium text-green-600 mt-2">From ${getMinPriceForSize(size).toFixed(2)}</div>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function CrustSelection({
   selectedSize,
