@@ -119,11 +119,9 @@ const getTierFromCategory = (category: string): "normal" | "premium" | "beef" =>
 const shouldDisableGlutenFree = (item: ConfiguredCartItem, selectedSize: string): boolean => {
   const itemName = item.menuItemName.toLowerCase();
 
-  // Disable gluten-free for stuffed pizzas on 10" size
+  // Deep-dish pizzas cannot have gluten-free on 10" size
   if (selectedSize === "small" || selectedSize === "10in") {
-    // "Stuffed Pizza" and "The Chub" (which uses stuffed crust) cannot have gluten-free
-    // "Skinny Chub Pizza" is allowed to have gluten-free (it's a regular pizza)
-    if (itemName.includes("stuffed") || itemName === "the chub") {
+    if (itemName === "stuffed pizza" || itemName === "the chub") {
       return true;
     }
   }
@@ -513,6 +511,12 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
               (selectedSize === "large" && cp.size_code === "14in") ||
               (selectedSize === "xlarge" && cp.size_code === "16in");
 
+            const itemName = item.menuItemName.toLowerCase();
+            const isDeepDishPizza = itemName === "stuffed pizza" || itemName === "the chub";
+
+            if (cp.crust_type === "stuffed" && !isDeepDishPizza) {
+              return false; // Hide stuffed crust for regular pizzas
+            }
             return matchesSize;
           })
           .map((cp: CrustPricing) => ({
