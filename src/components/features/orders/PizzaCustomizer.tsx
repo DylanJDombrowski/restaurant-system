@@ -1,14 +1,16 @@
 // src/components/features/orders/PizzaCustomizer.tsx - ENHANCED VERSION
 "use client";
-import type {
-  ConfiguredCartItem,
-  CrustPricing,
-  Customization,
-  PizzaMenuResponse,
-  PizzaPriceCalculationResponse,
-  ToppingAmount,
+import {
+  getCrustDisplayName,
+  type ConfiguredCartItem,
+  type CrustPricing,
+  type Customization,
+  type PizzaMenuResponse,
+  type PizzaPriceCalculationResponse,
+  type ToppingAmount,
 } from "@/lib/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PizzaCrustSelector } from "./customizers/PizzaCrustSelector";
 import { PizzaSizeSelector } from "./customizers/PizzaSizeSelector";
 
 interface ToppingState {
@@ -85,16 +87,6 @@ const getSizeDisplayName = (sizeCode: string): string => {
   return sizeNames[sizeCode] || sizeCode;
 };
 
-const getCrustDisplayName = (crustType: string): string => {
-  const crustNames: Record<string, string> = {
-    thin: "Thin Crust",
-    double_dough: "Double Dough",
-    gluten_free: "Gluten Free",
-    stuffed: "Stuffed Crust",
-  };
-  return crustNames[crustType] || crustType;
-};
-
 const getDisplayCategory = (customization: Customization): { category: string; icon: string } => {
   const name = customization.name.toLowerCase();
 
@@ -114,20 +106,6 @@ const getTierFromCategory = (category: string): "normal" | "premium" | "beef" =>
   if (category.includes("beef")) return "beef";
   if (category.includes("premium")) return "premium";
   return "normal";
-};
-
-// 🚨 GLUTEN-FREE BUSINESS RULE
-const shouldDisableGlutenFree = (item: ConfiguredCartItem, selectedSize: string): boolean => {
-  const itemName = item.menuItemName.toLowerCase();
-
-  // Deep-dish pizzas cannot have gluten-free on 10" size
-  if (selectedSize === "small" || selectedSize === "10in") {
-    if (itemName === "stuffed pizza" || itemName === "the chub") {
-      return true;
-    }
-  }
-
-  return false;
 };
 
 export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, isOpen, restaurantId }: EnhancedPizzaCustomizerProps) {
@@ -501,34 +479,6 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
   if (!isOpen) return null;
 
   // Get available crusts for selected size with gluten-free business rule
-  const availableCrusts =
-    selectedSize && pizzaMenuData
-      ? pizzaMenuData.crust_pricing
-          .filter((cp: CrustPricing) => {
-            const matchesSize =
-              cp.size_code === selectedSize ||
-              (selectedSize === "medium" && cp.size_code === "12in") ||
-              (selectedSize === "small" && cp.size_code === "10in") ||
-              (selectedSize === "large" && cp.size_code === "14in") ||
-              (selectedSize === "xlarge" && cp.size_code === "16in");
-
-            const itemName = item.menuItemName.toLowerCase();
-            const isDeepDishPizza = itemName === "stuffed pizza" || itemName === "the chub";
-
-            if (cp.crust_type === "stuffed" && !isDeepDishPizza) {
-              return false; // Hide stuffed crust for regular pizzas
-            }
-            return matchesSize;
-          })
-          .map((cp: CrustPricing) => ({
-            sizeCode: selectedSize,
-            crustType: cp.crust_type,
-            basePrice: cp.base_price,
-            upcharge: cp.upcharge,
-            displayName: getCrustDisplayName(cp.crust_type),
-            isAvailable: !(cp.crust_type === "gluten_free" && shouldDisableGlutenFree(item, selectedSize)),
-          }))
-      : [];
 
   const finalPrice = currentPricing?.finalPrice || selectedCrust?.basePrice || 0;
   const canSave = selectedCrust && !isCalculatingPrice;
@@ -580,11 +530,13 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
 
               {/* Crust Selection */}
               {selectedSize && (
-                <CrustSelection
+                <PizzaCrustSelector
                   selectedSize={selectedSize}
-                  availableCrusts={availableCrusts}
                   selectedCrust={selectedCrust}
                   onCrustSelect={handleCrustSelect}
+                  pizzaMenuData={pizzaMenuData}
+                  item={item}
+                  isLoading={isLoading}
                 />
               )}
 
@@ -643,45 +595,6 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
 }
 
 // ENHANCED COMPONENT SECTIONS
-
-function CrustSelection({
-  selectedSize,
-  availableCrusts,
-  selectedCrust,
-  onCrustSelect,
-}: {
-  selectedSize: string;
-  availableCrusts: CrustOption[];
-  selectedCrust: CrustOption | null;
-  onCrustSelect: (crust: CrustOption) => void;
-}) {
-  return (
-    <section>
-      <h3 className="text-lg font-semibold text-gray-900 mb-3">Choose Crust ({getSizeDisplayName(selectedSize)})</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {availableCrusts.map((crust) => (
-          <button
-            key={`${crust.sizeCode}-${crust.crustType}`}
-            onClick={() => crust.isAvailable && onCrustSelect(crust)}
-            disabled={!crust.isAvailable}
-            className={`p-4 rounded-lg border-2 transition-all hover:shadow-md ${
-              selectedCrust?.crustType === crust.crustType
-                ? "border-blue-600 bg-blue-50 shadow-md"
-                : crust.isAvailable
-                ? "border-gray-200 hover:border-gray-300"
-                : "border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed"
-            }`}
-          >
-            <div className="font-semibold text-gray-900">{crust.displayName}</div>
-            <div className="text-lg font-bold text-green-600 mt-2">${crust.basePrice.toFixed(2)}</div>
-            {crust.upcharge > 0 && <div className="text-sm text-gray-600">+${crust.upcharge.toFixed(2)} upcharge</div>}
-            {!crust.isAvailable && <div className="text-sm text-red-600 mt-1">Not available for this pizza</div>}
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 // NEW: Included Toppings Section - Prominent display of template defaults
 function IncludedToppingsSection({
