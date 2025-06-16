@@ -12,6 +12,11 @@ interface PizzaSizeSelectorProps {
   className?: string;
 }
 
+const isStuffedPizza = (menuItemName: string): boolean => {
+  const name = menuItemName.toLowerCase();
+  return name === "stuffed pizza" || name === "the chub";
+};
+
 export function PizzaSizeSelector({
   availableSizes,
   selectedSize,
@@ -21,6 +26,18 @@ export function PizzaSizeSelector({
   isLoading = false,
   className = "",
 }: PizzaSizeSelectorProps) {
+  const currentMenuItem = pizzaMenuData?.pizza_items.find((item) => item.id === menuItemId);
+  const isStuffed = currentMenuItem ? isStuffedPizza(currentMenuItem.name) : false;
+
+  const filteredSizes = useMemo(() => {
+    if (isStuffed) {
+      // Stuffed pizzas: only small, medium, large (no xlarge)
+      return availableSizes.filter((size) => ["small", "medium", "large"].includes(size));
+    }
+    // Regular pizzas: all sizes
+    return availableSizes;
+  }, [availableSizes, isStuffed]);
+
   // Get minimum price for each size (extracted from PizzaCustomizer logic)
   const getMinPriceForSize = useMemo(() => {
     return (sizeCode: string): number => {
@@ -91,8 +108,13 @@ export function PizzaSizeSelector({
   return (
     <section className={className}>
       <h3 className="text-lg font-semibold text-gray-900 mb-3">Choose Size</h3>
+      {isStuffed && (
+        <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+          <span className="font-medium">Deep Dish Pizza:</span> Available in Small, Medium, and Large sizes only.
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {availableSizes.map((size) => {
+        {filteredSizes.map((size) => {
           const minPrice = getMinPriceForSize(size);
           const isSelected = selectedSize === size;
 

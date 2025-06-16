@@ -72,9 +72,37 @@ export function PizzaCrustSelector({
     return sizeNames[sizeCode] || sizeCode;
   };
 
+  const isStuffedPizza = (menuItemName: string): boolean => {
+    const name = menuItemName.toLowerCase();
+    return name === "stuffed pizza" || name === "the chub";
+  };
+
   // Generate available crusts with business rules applied
   const availableCrusts = useMemo((): CrustOption[] => {
     if (!selectedSize || !pizzaMenuData) return [];
+
+    const isStuffed = isStuffedPizza(item.menuItemName);
+
+    if (isStuffed) {
+      // Stuffed pizzas: Only show stuffed crust option
+      // Use variant pricing instead of crust pricing
+      const currentMenuItem = pizzaMenuData.pizza_items.find((i) => i.id === item.menuItemId);
+      const variant = currentMenuItem?.variants.find((v) => v.size_code === selectedSize && v.crust_type === "stuffed");
+
+      if (variant) {
+        return [
+          {
+            sizeCode: selectedSize,
+            crustType: "stuffed",
+            basePrice: variant.price,
+            upcharge: 0, // No upcharge - price is all-inclusive
+            displayName: "Deep Dish Stuffed",
+            isAvailable: true,
+          },
+        ];
+      }
+      return [];
+    }
 
     return pizzaMenuData.crust_pricing
       .filter((cp: CrustPricing) => {

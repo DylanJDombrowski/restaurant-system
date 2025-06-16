@@ -10,6 +10,7 @@ import {
   type PizzaPriceCalculationResponse,
   type ToppingAmount,
 } from "@/lib/types";
+import { isStuffedPizza } from "@/lib/utils/pizza-utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PizzaCrustSelector } from "./customizers/PizzaCrustSelector";
 import { PizzaSizeSelector } from "./customizers/PizzaSizeSelector";
@@ -292,8 +293,39 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
   // INITIALIZE TOPPINGS WITH TEMPLATE SUPPORT
   // PRICING CALCULATION
   const calculatePrice = useCallback(async () => {
-    if (!selectedCrust || !pizzaMenuData || !pricingRequestKey) {
-      return;
+    if (!selectedCrust || !pizzaMenuData || !pricingRequestKey) return;
+
+    const isStuffed = isStuffedPizza(item.menuItemName);
+
+    if (isStuffed) {
+      // For stuffed pizzas, use variant pricing directly
+      const currentMenuItem = pizzaMenuData.pizza_items.find((i) => i.id === item.menuItemId);
+      const variant = currentMenuItem?.variants.find((v) => v.size_code === selectedCrust.sizeCode && v.crust_type === "stuffed");
+
+      if (variant) {
+        // Build pricing response for stuffed pizza
+        const stuffedPricing: PizzaPriceCalculationResponse = {
+          basePrice: variant.price,
+          basePriceSource: "specialty",
+          crustUpcharge: 0,
+          toppingCost: 0, // Calculate separately if there are toppings
+          substitutionCredit: 0,
+          finalPrice: variant.price, // + topping costs
+          breakdown: [
+            {
+              name: `${getSizeDisplayName(selectedCrust.sizeCode)} Deep Dish Base`,
+              price: variant.price,
+              type: "specialty_base",
+            },
+          ],
+          sizeCode: selectedCrust.sizeCode,
+          crustType: selectedCrust.crustType,
+          estimatedPrepTime: 25, // Stuffed pizzas take longer
+        };
+
+        setCurrentPricing(stuffedPricing);
+        return;
+      }
     }
 
     if (lastPricingRequest.current === pricingRequestKey) {
@@ -372,7 +404,7 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
     } finally {
       setIsCalculatingPrice(false);
     }
-  }, [selectedCrust, toppings, pizzaMenuData, restaurantId, item.menuItemId, pricingRequestKey]);
+  }, [selectedCrust, pizzaMenuData, pricingRequestKey, item.menuItemName, item.menuItemId, toppings, restaurantId]);
 
   // DEBOUNCED PRICING CALCULATION
   useEffect(() => {

@@ -207,20 +207,18 @@ export default function MenuNavigator({ menuItems, onAddToCart, restaurantId }: 
 
   const handleItemSelect = useCallback(
     (item: MenuItemWithVariants) => {
-      console.log("🍽️ Selected item:", item.name, "Category:", item.category?.name);
-
-      setSelectedItem(item);
-
       const categoryName = item.category?.name;
+      const itemName = item.name.toLowerCase();
 
-      // 🎯 ENHANCED ROUTING LOGIC - Fixed to include Stuffed Pizzas
+      // Route all pizza types (including stuffed) to pizza customizer
       if (
         categoryName === "Pizzas" ||
         categoryName === "Pizza" ||
-        categoryName === "Stuffed Pizzas" || // ✅ ADD THIS LINE
-        categoryName === "Stuffed Pizza"
+        categoryName === "Stuffed Pizzas" ||
+        categoryName === "Stuffed Pizza" ||
+        itemName.includes("pizza") ||
+        itemName.includes("chub")
       ) {
-        // ✅ ADD THIS LINE (in case category name varies)
         console.log("🍕 Opening pizza customizer for:", item.name);
         openPizzaCustomizer(item);
       } else if (categoryName === "Sandwiches") {
