@@ -1,4 +1,4 @@
-// src/components/features/orders/PizzaCustomizer.tsx - ENHANCED VERSION
+// src/components/features/orders/PizzaCustomizer.tsx - FINAL FIX
 "use client";
 import {
   getCrustDisplayName,
@@ -39,7 +39,7 @@ interface CrustOption {
   basePrice: number;
   upcharge: number;
   displayName: string;
-  isAvailable: boolean; // NEW: For gluten-free business rule
+  isAvailable: boolean;
 }
 
 interface EnhancedPizzaCustomizerProps {
@@ -69,19 +69,47 @@ const TOPPING_CATEGORIES = {
   meats: {
     displayName: "Meats & Proteins",
     icon: "🥓",
-    keywords: ["pepperoni", "sausage", "bacon", "canadian bacon", "salami", "ham", "chicken", "meatball", "beef"],
+    keywords: [
+      "pepperoni",
+      "sausage",
+      "bacon",
+      "canadian bacon",
+      "salami",
+      "ham",
+      "chicken",
+      "meatball",
+      "beef",
+    ],
     defaultOpen: false,
   },
   vegetables: {
     displayName: "Vegetables & Fruits",
     icon: "🥬",
-    keywords: ["mushroom", "onion", "pepper", "olive", "tomato", "spinach", "basil", "pineapple", "giardiniera"],
+    keywords: [
+      "mushroom",
+      "onion",
+      "pepper",
+      "olive",
+      "tomato",
+      "spinach",
+      "basil",
+      "pineapple",
+      "giardiniera",
+    ],
     defaultOpen: false,
   },
   cheese: {
     displayName: "Cheese",
     icon: "🧀",
-    keywords: ["mozzarella", "feta", "parmesan", "goat cheese", "ricotta", "cheese", "extra"],
+    keywords: [
+      "mozzarella",
+      "feta",
+      "parmesan",
+      "goat cheese",
+      "ricotta",
+      "cheese",
+      "extra",
+    ],
     defaultOpen: false,
   },
   sauces: {
@@ -92,10 +120,14 @@ const TOPPING_CATEGORIES = {
   },
 } as const;
 
-const getDisplayCategory = (customization: Customization): { category: string; icon: string } => {
+const getDisplayCategory = (
+  customization: Customization
+): { category: string; icon: string } => {
   const name = customization.name.toLowerCase();
 
-  for (const [categoryKey, categoryConfig] of Object.entries(TOPPING_CATEGORIES)) {
+  for (const [categoryKey, categoryConfig] of Object.entries(
+    TOPPING_CATEGORIES
+  )) {
     if (categoryConfig.keywords.some((keyword) => name.includes(keyword))) {
       return {
         category: categoryKey,
@@ -107,35 +139,72 @@ const getDisplayCategory = (customization: Customization): { category: string; i
   return { category: "other", icon: "🍕" };
 };
 
-const getTierFromCategory = (category: string): "normal" | "premium" | "beef" => {
+const getTierFromCategory = (
+  category: string
+): "normal" | "premium" | "beef" => {
   if (category.includes("beef")) return "beef";
   if (category.includes("premium")) return "premium";
   return "normal";
 };
 
-export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, isOpen, restaurantId }: EnhancedPizzaCustomizerProps) {
+export default function EnhancedPizzaCustomizer({
+  item,
+  onComplete,
+  onCancel,
+  isOpen,
+  restaurantId,
+}: EnhancedPizzaCustomizerProps) {
   // STATE MANAGEMENT
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pizzaMenuData, setPizzaMenuData] = useState<PizzaMenuResponse | null>(null);
+  const [pizzaMenuData, setPizzaMenuData] = useState<PizzaMenuResponse | null>(
+    null
+  );
 
   // Selection states
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [selectedCrust, setSelectedCrust] = useState<CrustOption | null>(null);
   const [toppings, setToppings] = useState<ToppingState[]>([]);
-  const [specialInstructions, setSpecialInstructions] = useState(item.specialInstructions || "");
+  const [specialInstructions, setSpecialInstructions] = useState(
+    item.specialInstructions || ""
+  );
 
   // Pricing states
-  const [currentPricing, setCurrentPricing] = useState<PizzaPriceCalculationResponse | null>(null);
+  const [currentPricing, setCurrentPricing] =
+    useState<PizzaPriceCalculationResponse | null>(null);
   const [isCalculatingPrice, setIsCalculatingPrice] = useState(false);
   const [pricingError, setPricingError] = useState<string | null>(null);
 
   // UI states
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set()
+  );
 
   // Cache refs
   const lastPricingRequest = useRef<string | null>(null);
   const pricingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  //
+  // ⬇️ MODIFICATION 1: Get available sizes from the specific item's variants ⬇️
+  //
+  const availableSizesForCurrentItem = useMemo(() => {
+    if (!pizzaMenuData) return [];
+
+    const currentItemDetails = pizzaMenuData.pizza_items.find(
+      (p) => p.id === item.menuItemId
+    );
+    if (!currentItemDetails) {
+      console.warn(`Could not find details for menu item ${item.menuItemId}`);
+      return [];
+    }
+
+    // Get the unique size codes from the item's variants
+    const sizes = currentItemDetails.variants.map((v) => v.size_code);
+    return [...new Set(sizes)]; // e.g., ['small', 'medium', 'large'] for stuffed pizzas
+  }, [pizzaMenuData, item.menuItemId]);
+  //
+  // ⬆️ END MODIFICATION 1 ⬆️
+  //
 
   // MEMOIZED VALUES
   const activeToppings = useMemo(
@@ -165,10 +234,14 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
     (menuData: PizzaMenuResponse) => {
       const toppingConfigs: ToppingState[] = [];
 
-      const pizzaToppings = menuData.pizza_customizations.filter((c: Customization) => c.category.startsWith("topping_"));
+      const pizzaToppings = menuData.pizza_customizations.filter(
+        (c: Customization) => c.category.startsWith("topping_")
+      );
 
       // Find pizza template by menu item ID
-      const template = menuData.pizza_templates.find((t) => t.menu_item_id === item.menuItemId);
+      const template = menuData.pizza_templates.find(
+        (t) => t.menu_item_id === item.menuItemId
+      );
       const templateToppings = template?.template_toppings || [];
 
       console.log("🍕 Template lookup:", {
@@ -179,8 +252,11 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
       });
 
       pizzaToppings.forEach((customization: Customization) => {
-        const templateTopping = templateToppings.find((tt) => tt.customization_id === customization.id);
-        const { category: displayCategory, icon } = getDisplayCategory(customization);
+        const templateTopping = templateToppings.find(
+          (tt) => tt.customization_id === customization.id
+        );
+        const { category: displayCategory, icon } =
+          getDisplayCategory(customization);
 
         let defaultAmount: ToppingAmount = "none";
         let isSpecialtyDefault = false;
@@ -204,7 +280,7 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
           isSpecialtyDefault,
           tier: getTierFromCategory(customization.category),
           icon,
-          placement: "whole", // ✅ ADD THIS default placement
+          placement: "whole",
         });
       });
 
@@ -218,7 +294,8 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
       console.log("🍕 Initialized toppings:", {
         total: toppingConfigs.length,
         active: toppingConfigs.filter((t) => t.isActive).length,
-        specialtyDefaults: toppingConfigs.filter((t) => t.isSpecialtyDefault).length,
+        specialtyDefaults: toppingConfigs.filter((t) => t.isSpecialtyDefault)
+          .length,
       });
 
       setToppings(toppingConfigs);
@@ -234,7 +311,9 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
 
       console.log("🍕 Loading enhanced pizza menu data...");
 
-      const response = await fetch(`/api/menu/pizza?restaurant_id=${restaurantId}`);
+      const response = await fetch(
+        `/api/menu/pizza?restaurant_id=${restaurantId}`
+      );
       if (!response.ok) {
         throw new Error(`Failed to load pizza menu: ${response.statusText}`);
       }
@@ -247,9 +326,32 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
       console.log("✅ Pizza menu data loaded:", result.data);
       setPizzaMenuData(result.data);
 
-      // Auto-select defaults
-      const availableSizes = result.data.available_sizes || [];
-      const defaultSize = availableSizes.includes("medium") ? "medium" : availableSizes[0];
+      //
+      // ⬇️ MODIFICATION 2: Use specific variants to determine available sizes ⬇️
+      //
+      // Use the specific variants of the current item to determine available sizes
+      const currentItemDetails = result.data.pizza_items.find(
+        (p: { id: string }) => p.id === item.menuItemId
+      );
+
+      // Explicitly filter out any null/undefined sizes and ensure we have an array of strings.
+      const specificAvailableSizes: string[] = currentItemDetails
+        ? [
+            ...new Set(
+              currentItemDetails.variants
+                .map((v: { size_code: string | null }) => v.size_code)
+                .filter(Boolean) as string[]
+            ),
+          ]
+        : [];
+
+      // Use a clearer if/else block to determine the default size.
+      let defaultSize = ""; // Default to an empty string
+      if (specificAvailableSizes.includes("medium")) {
+        defaultSize = "medium";
+      } else if (specificAvailableSizes.length > 0) {
+        defaultSize = specificAvailableSizes[0];
+      }
 
       if (defaultSize) {
         setSelectedSize(defaultSize);
@@ -259,13 +361,18 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
       initializeToppingsWithTemplates(result.data);
     } catch (error) {
       console.error("Error loading pizza menu:", error);
-      setError(error instanceof Error ? error.message : "Failed to load pizza menu");
+      setError(
+        error instanceof Error ? error.message : "Failed to load pizza menu"
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [restaurantId, initializeToppingsWithTemplates]);
+  }, [restaurantId, initializeToppingsWithTemplates, item.menuItemId]); // Added item.menuItemId dependency
 
-  const autoSelectDefaultCrust = (sizeCode: string, menuData: PizzaMenuResponse) => {
+  const autoSelectDefaultCrust = (
+    sizeCode: string,
+    menuData: PizzaMenuResponse
+  ) => {
     const thinCrustForSize = menuData.crust_pricing.find((cp: CrustPricing) => {
       const matchesSize =
         cp.size_code === sizeCode ||
@@ -290,7 +397,6 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
     }
   };
 
-  // INITIALIZE TOPPINGS WITH TEMPLATE SUPPORT
   // PRICING CALCULATION
   const calculatePrice = useCallback(async () => {
     if (!selectedCrust || !pizzaMenuData || !pricingRequestKey) return;
@@ -299,8 +405,13 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
 
     if (isStuffed) {
       // For stuffed pizzas, use variant pricing directly
-      const currentMenuItem = pizzaMenuData.pizza_items.find((i) => i.id === item.menuItemId);
-      const variant = currentMenuItem?.variants.find((v) => v.size_code === selectedCrust.sizeCode && v.crust_type === "stuffed");
+      const currentMenuItem = pizzaMenuData.pizza_items.find(
+        (i) => i.id === item.menuItemId
+      );
+      const variant = currentMenuItem?.variants.find(
+        (v) =>
+          v.size_code === selectedCrust.sizeCode && v.crust_type === "stuffed"
+      );
 
       if (variant) {
         // Build pricing response for stuffed pizza
@@ -313,7 +424,9 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
           finalPrice: variant.price, // + topping costs
           breakdown: [
             {
-              name: `${getSizeDisplayName(selectedCrust.sizeCode)} Deep Dish Base`,
+              name: `${getSizeDisplayName(
+                selectedCrust.sizeCode
+              )} Deep Dish Base`,
               price: variant.price,
               type: "specialty_base",
             },
@@ -384,7 +497,9 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
             const breakdownItem = result.data.breakdown.find(
               (item: { name: string; type: string; price: number }) =>
                 item.name.toLowerCase().includes(topping.name.toLowerCase()) &&
-                (item.type === "topping" || item.type === "template_default" || item.type === "template_extra")
+                (item.type === "topping" ||
+                  item.type === "template_default" ||
+                  item.type === "template_extra")
             );
 
             const newPrice = breakdownItem?.price || 0;
@@ -400,11 +515,21 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
       }
     } catch (error) {
       console.error("Error calculating price:", error);
-      setPricingError(error instanceof Error ? error.message : "Pricing calculation failed");
+      setPricingError(
+        error instanceof Error ? error.message : "Pricing calculation failed"
+      );
     } finally {
       setIsCalculatingPrice(false);
     }
-  }, [selectedCrust, pizzaMenuData, pricingRequestKey, item.menuItemName, item.menuItemId, toppings, restaurantId]);
+  }, [
+    selectedCrust,
+    pizzaMenuData,
+    pricingRequestKey,
+    item.menuItemName,
+    item.menuItemId,
+    toppings,
+    restaurantId,
+  ]);
 
   // DEBOUNCED PRICING CALCULATION
   useEffect(() => {
@@ -450,13 +575,24 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
   const handleToppingChange = (toppingId: string, newAmount: ToppingAmount) => {
     console.log(`🍕 Changing topping ${toppingId} to ${newAmount}`);
     setToppings((prev) =>
-      prev.map((topping) => (topping.id === toppingId ? { ...topping, amount: newAmount, isActive: newAmount !== "none" } : topping))
+      prev.map((topping) =>
+        topping.id === toppingId
+          ? { ...topping, amount: newAmount, isActive: newAmount !== "none" }
+          : topping
+      )
     );
   };
 
-  const handleToppingPlacementChange = (toppingId: string, placement: ToppingPlacement) => {
+  const handleToppingPlacementChange = (
+    toppingId: string,
+    placement: ToppingPlacement
+  ) => {
     console.log(`🍕 Changing topping ${toppingId} placement to`, placement);
-    setToppings((prev) => prev.map((topping) => (topping.id === toppingId ? { ...topping, placement } : topping)));
+    setToppings((prev) =>
+      prev.map((topping) =>
+        topping.id === toppingId ? { ...topping, placement } : topping
+      )
+    );
   };
 
   const toggleCategory = (category: string) => {
@@ -481,7 +617,9 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
 
     const updatedItem: ConfiguredCartItem = {
       ...item,
-      variantName: `${getSizeDisplayName(selectedCrust.sizeCode)} ${selectedCrust.displayName}`,
+      variantName: `${getSizeDisplayName(selectedCrust.sizeCode)} ${
+        selectedCrust.displayName
+      }`,
       basePrice: currentPricing.basePrice,
       selectedToppings: toppings
         .filter((t) => t.amount !== "none")
@@ -496,7 +634,9 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
       selectedModifiers: [],
       specialInstructions,
       totalPrice: currentPricing.finalPrice,
-      displayName: `${getSizeDisplayName(selectedCrust.sizeCode)} ${selectedCrust.displayName} ${item.menuItemName}`,
+      displayName: `${getSizeDisplayName(selectedCrust.sizeCode)} ${
+        selectedCrust.displayName
+      } ${item.menuItemName}`,
     };
 
     console.log("✅ Saved enhanced pizza:", updatedItem);
@@ -506,9 +646,8 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
   // RENDER CONDITIONS
   if (!isOpen) return null;
 
-  // Get available crusts for selected size with gluten-free business rule
-
-  const finalPrice = currentPricing?.finalPrice || selectedCrust?.basePrice || 0;
+  const finalPrice =
+    currentPricing?.finalPrice || selectedCrust?.basePrice || 0;
   const canSave = selectedCrust && !isCalculatingPrice;
 
   // RENDER
@@ -518,11 +657,14 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Customize {item.menuItemName}</h2>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Customize {item.menuItemName}
+            </h2>
             <p className="text-sm text-gray-600 mt-1">
               {selectedCrust ? (
                 <span className="font-medium">
-                  {getSizeDisplayName(selectedCrust.sizeCode)} {selectedCrust.displayName}
+                  {getSizeDisplayName(selectedCrust.sizeCode)}{" "}
+                  {selectedCrust.displayName}
                 </span>
               ) : (
                 "Choose your pizza size and crust"
@@ -531,10 +673,16 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold text-green-600">
-              {isCalculatingPrice ? <span className="text-gray-500">Calculating...</span> : `$${finalPrice.toFixed(2)}`}
+              {isCalculatingPrice ? (
+                <span className="text-gray-500">Calculating...</span>
+              ) : (
+                `$${finalPrice.toFixed(2)}`
+              )}
             </div>
             <div className="text-sm text-gray-500">Current total</div>
-            {pricingError && <div className="text-sm text-red-600 mt-1">{pricingError}</div>}
+            {pricingError && (
+              <div className="text-sm text-red-600 mt-1">{pricingError}</div>
+            )}
           </div>
         </div>
 
@@ -548,7 +696,13 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
             <div className="p-6 space-y-6">
               {/* Size Selection */}
               <PizzaSizeSelector
-                availableSizes={pizzaMenuData?.available_sizes || []}
+                //
+                // ⬇️ MODIFICATION 3: Use item-specific available sizes ⬇️
+                //
+                availableSizes={availableSizesForCurrentItem} // Use our new derived list
+                //
+                // ⬆️ END MODIFICATION 3 ⬆️
+                //
                 selectedSize={selectedSize}
                 onSizeSelect={handleSizeSelect}
                 pizzaMenuData={pizzaMenuData}
@@ -576,7 +730,7 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
                   expandedCategories={expandedCategories}
                   onToggleCategory={toggleCategory}
                   selectedSize={selectedCrust.sizeCode}
-                  showPlacements={true} // Enable fractional placement support
+                  showPlacements={true}
                 />
               )}
 
@@ -589,6 +743,7 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
                   selectedCrust={selectedCrust.displayName}
                 />
               )}
+
               {/* Special Instructions */}
               {selectedCrust && (
                 <SpecialInstructions
@@ -614,7 +769,9 @@ export default function EnhancedPizzaCustomizer({ item, onComplete, onCancel, is
           <div className="flex items-center gap-4">
             <div className="text-right">
               <div className="text-sm text-gray-500">Total:</div>
-              <div className="text-xl font-bold text-green-600">${finalPrice.toFixed(2)}</div>
+              <div className="text-xl font-bold text-green-600">
+                ${finalPrice.toFixed(2)}
+              </div>
             </div>
             <button
               onClick={handleSave}
@@ -634,19 +791,32 @@ function LoadingState() {
   return (
     <div className="p-8 text-center">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">Loading Pizza Menu</h3>
+      <h3 className="text-lg font-medium text-gray-900 mb-2">
+        Loading Pizza Menu
+      </h3>
       <p className="text-gray-600">Getting crust options and toppings...</p>
     </div>
   );
 }
 
-function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) {
+function ErrorState({
+  error,
+  onRetry,
+}: {
+  error: string;
+  onRetry: () => void;
+}) {
   return (
     <div className="p-8 text-center">
       <div className="text-red-500 text-4xl mb-4">⚠️</div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to Load Pizza Menu</h3>
+      <h3 className="text-lg font-medium text-gray-900 mb-2">
+        Failed to Load Pizza Menu
+      </h3>
       <p className="text-gray-600 mb-4">{error}</p>
-      <button onClick={onRetry} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
+      <button
+        onClick={onRetry}
+        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+      >
         Try Again
       </button>
     </div>
