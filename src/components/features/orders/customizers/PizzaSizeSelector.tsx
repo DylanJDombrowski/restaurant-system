@@ -29,12 +29,23 @@ export function PizzaSizeSelector({
   const currentMenuItem = pizzaMenuData?.pizza_items.find((item) => item.id === menuItemId);
   const isStuffed = currentMenuItem ? isStuffedPizza(currentMenuItem.name) : false;
 
+  console.log("🍕 PizzaSizeSelector Debug:", {
+    menuItemId,
+    currentMenuItem: currentMenuItem?.name,
+    isStuffed,
+    availableSizes,
+    pizzaMenuDataItems: pizzaMenuData?.pizza_items?.length,
+    allMenuItemIds: pizzaMenuData?.pizza_items?.map((item) => ({ id: item.id, name: item.name })),
+  });
+
   const filteredSizes = useMemo(() => {
+    console.log("🔍 Filtering sizes:", { isStuffed, availableSizes });
     if (isStuffed) {
-      // Stuffed pizzas: only small, medium, large (no xlarge)
-      return availableSizes.filter((size) => ["small", "medium", "large"].includes(size));
+      const filtered = availableSizes.filter((size) => ["small", "medium", "large"].includes(size));
+      console.log("🍕 Stuffed pizza filtered sizes:", filtered);
+      return filtered;
     }
-    // Regular pizzas: all sizes
+    console.log("🍕 Regular pizza all sizes:", availableSizes);
     return availableSizes;
   }, [availableSizes, isStuffed]);
 
