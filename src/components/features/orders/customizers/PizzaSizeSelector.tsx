@@ -1,3 +1,6 @@
+// src/components/features/orders/customizers/PizzaSizeSelector.tsx
+// Step 1: Extract size selection logic from PizzaCustomizer
+
 "use client";
 import { PizzaMenuResponse } from "@/lib/types";
 import { useMemo } from "react";
@@ -12,11 +15,6 @@ interface PizzaSizeSelectorProps {
   className?: string;
 }
 
-const isStuffedPizza = (menuItemName: string): boolean => {
-  const name = menuItemName.toLowerCase();
-  return name === "stuffed pizza" || name === "the chub";
-};
-
 export function PizzaSizeSelector({
   availableSizes,
   selectedSize,
@@ -26,29 +24,6 @@ export function PizzaSizeSelector({
   isLoading = false,
   className = "",
 }: PizzaSizeSelectorProps) {
-  const currentMenuItem = pizzaMenuData?.pizza_items.find((item) => item.id === menuItemId);
-  const isStuffed = currentMenuItem ? isStuffedPizza(currentMenuItem.name) : false;
-
-  console.log("🍕 PizzaSizeSelector Debug:", {
-    menuItemId,
-    currentMenuItem: currentMenuItem?.name,
-    isStuffed,
-    availableSizes,
-    pizzaMenuDataItems: pizzaMenuData?.pizza_items?.length,
-    allMenuItemIds: pizzaMenuData?.pizza_items?.map((item) => ({ id: item.id, name: item.name })),
-  });
-
-  const filteredSizes = useMemo(() => {
-    console.log("🔍 Filtering sizes:", { isStuffed, availableSizes });
-    if (isStuffed) {
-      const filtered = availableSizes.filter((size) => ["small", "medium", "large"].includes(size));
-      console.log("🍕 Stuffed pizza filtered sizes:", filtered);
-      return filtered;
-    }
-    console.log("🍕 Regular pizza all sizes:", availableSizes);
-    return availableSizes;
-  }, [availableSizes, isStuffed]);
-
   // Get minimum price for each size (extracted from PizzaCustomizer logic)
   const getMinPriceForSize = useMemo(() => {
     return (sizeCode: string): number => {
@@ -119,13 +94,8 @@ export function PizzaSizeSelector({
   return (
     <section className={className}>
       <h3 className="text-lg font-semibold text-gray-900 mb-3">Choose Size</h3>
-      {isStuffed && (
-        <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
-          <span className="font-medium">Deep Dish Pizza:</span> Available in Small, Medium, and Large sizes only.
-        </div>
-      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {filteredSizes.map((size) => {
+        {availableSizes.map((size) => {
           const minPrice = getMinPriceForSize(size);
           const isSelected = selectedSize === size;
 
