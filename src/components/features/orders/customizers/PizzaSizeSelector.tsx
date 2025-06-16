@@ -1,5 +1,5 @@
 // src/components/features/orders/customizers/PizzaSizeSelector.tsx
-// Step 1: Extract size selection logic from PizzaCustomizer
+// FIXED VERSION: Properly handles stuffed pizzas
 
 "use client";
 import { PizzaMenuResponse } from "@/lib/types";
@@ -24,23 +24,67 @@ export function PizzaSizeSelector({
   isLoading = false,
   className = "",
 }: PizzaSizeSelectorProps) {
-  // Get minimum price for each size (extracted from PizzaCustomizer logic)
+  // 🔧 FIXED: Helper to determine if this is a stuffed pizza
+  const isStuffedPizza = (menuData: PizzaMenuResponse, itemId: string): boolean => {
+    const item = menuData.pizza_items.find((i) => i.id === itemId);
+    if (!item) return false;
+
+    const itemName = item.name.toLowerCase();
+    return itemName.includes("stuffed") || itemName === "the chub";
+  };
+
+  // Get minimum price for each size (FIXED for stuffed pizzas)
   const getMinPriceForSize = useMemo(() => {
     return (sizeCode: string): number => {
       if (!pizzaMenuData) return 0;
+
+      // 🎯 CRITICAL FIX: Determine correct crust type to look for
+      const isStuffed = isStuffedPizza(pizzaMenuData, menuItemId);
+      const targetCrustType = isStuffed ? "stuffed" : "thin";
+
+      console.log("🍕 Size pricing lookup:", {
+        sizeCode,
+        menuItemId,
+        isStuffed,
+        targetCrustType,
+      });
 
       // Check if this is a specialty pizza first
       const template = pizzaMenuData.pizza_templates.find((t) => t.menu_item_id === menuItemId);
 
       if (template) {
-        // Specialty pizza - use variant price
+        // Specialty pizza - use variant price with CORRECT crust type
         const specialtyItem = pizzaMenuData.pizza_items.find((item) => item.id === menuItemId);
         if (specialtyItem) {
-          const variant = specialtyItem.variants.find((v) => v.size_code === sizeCode && v.crust_type === "thin");
+          // 🔧 FIXED: Look for correct crust type (stuffed vs thin)
+          const variant = specialtyItem.variants.find((v) => v.size_code === sizeCode && v.crust_type === targetCrustType);
+
           if (variant) {
+            console.log("✅ Found variant pricing:", {
+              size: sizeCode,
+              crust: targetCrustType,
+              price: variant.price,
+            });
             return variant.price;
+          } else {
+            console.warn("❌ No variant found for:", {
+              size: sizeCode,
+              crust: targetCrustType,
+              availableVariants: specialtyItem.variants.map((v) => `${v.size_code}-${v.crust_type}`),
+            });
           }
         }
+      }
+
+      // 🔧 FIXED: For stuffed pizzas, don't fall back to crust pricing
+      // Stuffed pizzas should ONLY use variant pricing
+      if (isStuffed) {
+        console.warn("⚠️ Stuffed pizza without proper variants:", {
+          menuItemId,
+          sizeCode,
+          hasTemplate: !!template,
+        });
+        return 0; // Return 0 to indicate pricing issue
       }
 
       // Regular pizza - use crust pricing (find cheapest option for this size)
@@ -57,7 +101,15 @@ export function PizzaSizeSelector({
         })
         .map((cp) => cp.base_price);
 
-      return sizePrices.length > 0 ? Math.min(...sizePrices) : 0;
+      const minPrice = sizePrices.length > 0 ? Math.min(...sizePrices) : 0;
+
+      console.log("💰 Regular pizza pricing:", {
+        sizeCode,
+        availablePrices: sizePrices,
+        minPrice,
+      });
+
+      return minPrice;
     };
   }, [pizzaMenuData, menuItemId]);
 
@@ -99,17 +151,27 @@ export function PizzaSizeSelector({
           const minPrice = getMinPriceForSize(size);
           const isSelected = selectedSize === size;
 
+          // 🔧 ADDED: Better handling for missing pricing
+          const priceDisplay = minPrice > 0 ? `From $${minPrice.toFixed(2)}` : "Price TBD";
+
+          const hasValidPricing = minPrice > 0;
+
           return (
             <button
               key={size}
               onClick={() => onSizeSelect(size)}
-              disabled={isLoading}
+              disabled={isLoading || !hasValidPricing}
               className={`p-4 rounded-lg border-2 transition-all text-center hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
-                isSelected ? "border-blue-600 bg-blue-50 shadow-md" : "border-gray-200 hover:border-gray-300"
+                isSelected
+                  ? "border-blue-600 bg-blue-50 shadow-md"
+                  : hasValidPricing
+                  ? "border-gray-200 hover:border-gray-300"
+                  : "border-red-200 bg-red-50"
               }`}
             >
               <div className="font-semibold text-gray-900">{getSizeDisplayName(size)}</div>
-              <div className="text-sm font-medium text-green-600 mt-2">{minPrice > 0 ? `From $${minPrice.toFixed(2)}` : "Loading..."}</div>
+              <div className={`text-sm font-medium mt-2 ${hasValidPricing ? "text-green-600" : "text-red-600"}`}>{priceDisplay}</div>
+              {!hasValidPricing && <div className="text-xs text-red-500 mt-1">Missing pricing data</div>}
             </button>
           );
         })}

@@ -248,7 +248,7 @@ BEGIN
     );
   END IF;
 
-  -- Calculate topping costs with fractional support
+  -- Calculate topping costs with corrected fractional support
   FOR topping_record IN SELECT * FROM jsonb_array_elements(p_toppings)
   LOOP
     -- Get customization details
@@ -261,11 +261,11 @@ BEGIN
       placement_text := COALESCE(topping_record->>'placement', 'whole');
       amount_tier := topping_record->>'amount';
       
-      -- Determine placement type for lookup
+      -- 🔧 CORRECTED: Better placement type determination
       IF placement_text = 'whole' THEN
         placement_type := 'whole';
       ELSIF placement_text IN ('left', 'right') THEN
-        placement_type := 'half';
+        placement_type := 'half';  -- 🎯 KEY FIX: Both left and right map to 'half'
       ELSIF placement_text = 'quarter' THEN
         placement_type := 'quarter';
       ELSIF placement_text = 'three_quarters' THEN
@@ -294,13 +294,13 @@ BEGIN
       IF category_tier = 'free' THEN
         calculated_price := 0;
       ELSE
-        -- Get price from matrix
+        -- Get price from matrix using the corrected function
         calculated_price := get_topping_price_from_matrix(
           p_restaurant_id,
           p_size_code,
           category_tier,
           amount_tier,
-          placement_type
+          placement_type  -- 🎯 This will now correctly map 'right' -> 'half'
         );
       END IF;
 
@@ -859,16 +859,17 @@ DECLARE
   lookup_price decimal;
   mapped_placement text;
 BEGIN
-  -- Map placement types to match our data
+  -- 🔧 CORRECTED: More precise placement mapping
   mapped_placement := CASE p_placement_type
     WHEN 'left' THEN 'half'
-    WHEN 'right' THEN 'half'
+    WHEN 'right' THEN 'half'  -- 🎯 Both left and right should map to 'half'
+    WHEN 'half' THEN 'half'   -- 🎯 Direct half mapping
     WHEN 'quarter' THEN 'quarter'
     WHEN 'three_quarters' THEN 'three_quarters'
-    ELSE 'whole'
+    ELSE 'whole'  -- Default to whole for any unrecognized placement
   END;
 
-  -- Look up exact price from matrix with table alias to avoid ambiguity
+  -- Look up exact price from matrix
   SELECT fpm.price INTO lookup_price
   FROM fractional_pricing_matrix fpm
   WHERE fpm.restaurant_id = p_restaurant_id
