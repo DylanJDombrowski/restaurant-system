@@ -30,7 +30,8 @@ export function PizzaSizeSelector({
     if (!item) return false;
 
     const itemName = item.name.toLowerCase();
-    return itemName.includes("stuffed") || itemName === "the chub";
+    // Only true deep-dish stuffed pizzas (not specialty pizzas like "Skinny Chub")
+    return itemName === "stuffed pizza" || itemName === "the chub";
   };
 
   // Get minimum price for each size (FIXED for stuffed pizzas)
